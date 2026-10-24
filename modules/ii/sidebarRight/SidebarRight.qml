@@ -38,7 +38,9 @@ Scope {
 
         Timer {
             id: closeAnimTimer
-            interval: Appearance.animationCurves.expressiveDefaultSpatialDuration // matches Anim {}
+            // Matches Anim.Standard's own duration (the normal one); a little extra
+            // would only keep the window a moment later, never empty the mask.
+            interval: Appearance.animationCurves.normalDuration
             onTriggered: panelWindow.reallyVisible = false
         }
 
@@ -119,15 +121,20 @@ Scope {
                 readonly property bool open: GlobalStates.sidebarRightOpen
                 readonly property real contentHeight: (sidebarContentLoader.item?.implicitHeight ?? 0) + panelWindow.cove
                 // The palette's motion, turned to this edge: the whole panel rises out of the
-                // bottom edge as one piece and settles with the slight overshoot of the spatial
-                // curve (caelestia launcher Wrapper.qml). No fade: Hyprland blurs only pixels
-                // above ignore_alpha, so a fading panel would pop its blur in mid-way.
+                // bottom edge as one piece (caelestia launcher Wrapper.qml). A standard
+                // curve, not the overshooting spatial one: a docked silhouette that
+                // overshoots lifts off the edge it docks into, and the small panel made
+                // that gap unmistakable (2026-10-25, prototype feedback). No fade: Hyprland
+                // blurs only pixels above ignore_alpha, so a fading panel would pop its
+                // blur in mid-way.
                 property real offsetScale: open ? 0 : 1
                 height: contentHeight
                 transform: Translate { y: entranceWrapper.contentHeight * entranceWrapper.offsetScale }
 
                 Behavior on offsetScale {
-                    Anim {}
+                    Anim {
+                        type: Anim.Standard
+                    }
                 }
 
                 MouseArea {
