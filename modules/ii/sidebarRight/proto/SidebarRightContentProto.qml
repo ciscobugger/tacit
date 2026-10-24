@@ -697,8 +697,6 @@ Item {
                     anchors.rightMargin: root.sidebarPadding
                     anchors.topMargin: root.sidebarPadding
                     anchors.bottomMargin: root.sidebarPadding
-                    spacing: 0
-                    spacing: 0
 
                     WifiSection {
                         shown: root.showWifiDialog
