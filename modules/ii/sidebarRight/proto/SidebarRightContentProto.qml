@@ -685,12 +685,14 @@ Item {
 
                 ColumnLayout {
                     id: submenuColumn
-                    anchors.left: parent.left
-                    anchors.right: parent.right
                     // Spacious, like a card that owns its surface, not a strip glued to
                     // the panel's edge (7 px was the in-place inset; a floating card
                     // gives its content a real interior: 14 at the sides, air above and
                     // below equal to two slider heights).
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     anchors.leftMargin: root.sidebarPadding
                     anchors.rightMargin: root.sidebarPadding
                     anchors.topMargin: root.sidebarPadding
