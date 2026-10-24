@@ -667,7 +667,7 @@ Item {
                 x: root.sidebarPadding
                 y: submenuLayer.active ? submenuLayer.cardY : submenuLayer.cardY - 12
                 width: root.togglesWidth
-                height: submenuColumn.implicitHeight + root.sidebarPadding * 3 / 2
+                height: submenuColumn.implicitHeight + root.sidebarPadding * 2
                 radius: Appearance.rounding.normal
                 // Opaque, and opaque for real: frost is translucent by design (see-
                 // through to the wallpaper), which is right for the panel but wrong for
@@ -687,10 +687,15 @@ Item {
                     id: submenuColumn
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    // A little extra above (the heading sits closer to the card's top
-                    // edge than to its rows) and the normal margin below.
+                    // Spacious, like a card that owns its surface, not a strip glued to
+                    // the panel's edge (7 px was the in-place inset; a floating card
+                    // gives its content a real interior: 14 at the sides, air above and
+                    // below equal to two slider heights).
+                    anchors.leftMargin: root.sidebarPadding
+                    anchors.rightMargin: root.sidebarPadding
                     anchors.topMargin: root.sidebarPadding
-                    anchors.bottomMargin: root.sidebarPadding / 2
+                    anchors.bottomMargin: root.sidebarPadding
+                    spacing: 0
                     spacing: 0
 
                     WifiSection {
