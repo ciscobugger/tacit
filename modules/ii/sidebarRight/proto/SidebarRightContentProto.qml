@@ -24,15 +24,20 @@ import qs.modules.ii.sidebarRight.wifiNetworks
  *
  * Compared with SidebarRightContent.qml:
  *   - timer and tasks (BottomWidgetGroup) are gone
- *   - Settings and Session are icon-only buttons on the footer's right
- *   - sliders are vertical, right of the toggles
- *   - two primary toggles in a rounded-rectangle body, four secondary pills, the rest
- *     hidden in a drawer; the user's arrangement is kept in
- *     Directories.state/user/sidebar-arrangement.json
+ *   - Settings and Session are icon-only buttons on the footer's right (Session is
+ *     risk-coloured: it ends the session)
+ *   - sliders are horizontal, below the toggles
+ *   - four primary toggles stacked in a 2×2 square, a row of secondary pills below it
+ *     (always full: the drawer's own toggles fill its empty cells), the dots (drawer
+ *     opener) as the row's last cell, the rest hidden in a drawer; the user's
+ *     arrangement is kept in Directories.state/user/sidebar-arrangement.json
+ *   - a toggle's submenu opens as an opaque card floating over the panel (elevation
+ *     shadow + lighter scrim), pinned under the toggles block; click outside closes;
  *
- * Edit mode (the drawer's pencil): tap a main pill to retire it to the drawer, tap a
- * drawer pill to make it secondary, right-click a drawer pill to make it primary.
- * Primary and secondary take at most 2 and 4; an overflowed pill returns to the drawer.
+ * Edit mode (the drawer's pencil): any pill is a drag — a ghost follows the pointer,
+ * the zone under it tints, and the release decides placement: a primary square cell, a
+ * secondary row slot, or retired to the drawer anywhere else. Primary and secondary
+ * take at most 4 and 5; an overflowed pill returns to the drawer.
  */
 Item {
     id: root
@@ -43,6 +48,8 @@ Item {
     property bool showBluetoothDialog: false
     property bool showNightLightDialog: false
     property bool showWifiDialog: false
+
+
     property bool showVpn: false
     readonly property var sectionFlags: ["showWifiDialog", "showVpn", "showBluetoothDialog", "showAudioOutputDialog", "showAudioInputDialog", "showNightLightDialog"]
     function only(flag) {
@@ -71,11 +78,12 @@ Item {
         }
     }
 
-    // The user's arrangement: two primary, three secondary (the square's fourth cell is
-    // the dots button), the rest in the drawer. Empty lists mean "first boot": the
-    // defaults below apply until the user moves something.
-    readonly property list<string> defaultPrimary: ["wifi", "bluetooth"]
-    readonly property list<string> defaultSecondary: ["nightLight", "mic", "notifications"]
+    // The user's arrangement: four primary in a 2×2 square (they stack two wide), a
+    // single row of secondaries below it whose last cell is the dots button, the rest
+    // in the drawer. Empty lists mean "first boot": the defaults below apply until the
+    // user moves something.
+    readonly property list<string> defaultPrimary: ["wifi", "bluetooth", "vpn", "nightLight"]
+    readonly property list<string> defaultSecondary: ["mic", "notifications", "keepAwake"]
     property list<string> primary
     property list<string> secondary
     readonly property bool arrangementLoaded: primary.length > 0 || secondary.length > 0
@@ -112,12 +120,17 @@ Item {
     function moveDrag(rootPos) {
         root.dragPoint = rootPos;
     }
-    // The square is two 40 px cells with a 6 px gap: the column is the x half, the row
-    // the y half.
-    function cellIndex(pointInGrid) {
-        const col = Math.floor((pointInGrid.x + 3) / 46);
-        const row = Math.floor((pointInGrid.y + 3) / 46);
+    // Where a drop sits, per zone: the primary square is two 170 px cells in two rows
+    // with a 6 px gap; the secondary row is 40 px pills on one line, the dots in its
+    // last cell.
+    function primaryIndex(pointInGrid) {
+        const col = Math.min(1, Math.floor((pointInGrid.x + 3) / 161));
+        const row = Math.min(1, Math.floor((pointInGrid.y + 3) / 62));
         return row * 2 + col;
+    }
+    function secondaryIndex(pointInGrid) {
+        const idx = Math.min(6, Math.floor(pointInGrid.x / 46));
+        return idx < 6 ? idx : -1; // -1: the dots' cell
     }
     // Which drop zone the pointer sits in: the primary column, the square, or none
     // ("retire"). Used for the drop highlight while dragging and by endDrag; both pass
@@ -142,11 +155,10 @@ Item {
         // Where the pointer sat, in panel coordinates, against each zone's bounds.
         const zone = root.zoneAt(rootPos);
         if (zone === "primary") {
-            const p0 = primaryZone.mapToItem(root, 0, 0);
-            root.promoteAt(pill, "primary", rootPos.y < p0.y + primaryZone.height / 2 ? 0 : 1);
+            root.promoteAt(pill, "primary", root.primaryIndex(root.mapToItem(primaryZone, rootPos.x, rootPos.y)));
         } else if (zone === "secondary") {
-            const idx = root.cellIndex(root.mapToItem(secondaryZone, rootPos.x, rootPos.y));
-            if (idx < 3) // the fourth cell is the dots: a drop there retires the pill
+            const idx = root.secondaryIndex(root.mapToItem(secondaryZone, rootPos.x, rootPos.y));
+            if (idx >= 0) // the dots' cell or the empty tail retires the pill
                 root.promoteAt(pill, "secondary", idx);
             else
                 root.demote(pill);
@@ -155,27 +167,28 @@ Item {
         }
     }
     // Promote with a place: a full level retires the pill that loses its spot (the last
-    // one), and a drop with an index can also reorder within a level.
+    // one), and a drop with an index can also reorder within a level. Four primaries in
+    // the square, six in the row (its last cell is the dots).
     function promoteAt(id, level, index) {
         root.demote(id); // idempotent for pills not shown
         if (level === "primary") {
-            const i = Math.max(0, Math.min(index ?? 0, 1));
+            const i = Math.max(0, Math.min(index ?? 0, 3));
             const list = root.primary.filter(v => v !== id);
             list.splice(i, 0, id);
-            if (list.length > 2) {
-                const retired = list[2];
-                root.primary = list.slice(0, 2);
+            if (list.length > 4) {
+                const retired = list[4];
+                root.primary = list.slice(0, 4);
                 root.secondary = root.secondary.filter(v => v !== retired);
             } else {
                 root.primary = list;
             }
         } else {
-            const i = Math.max(0, Math.min(index ?? 0, 2));
+            const i = Math.max(0, Math.min(index ?? 0, 5));
             const list = root.secondary.filter(v => v !== id);
             list.splice(i, 0, id);
-            if (list.length > 3) {
-                const retired = list[3];
-                root.secondary = list.slice(0, 3);
+            if (list.length > 6) {
+                const retired = list[6];
+                root.secondary = list.slice(0, 6);
                 root.primary = root.primary.filter(v => v !== retired);
             } else {
                 root.secondary = list;
@@ -206,21 +219,42 @@ Item {
     function catalogEntry(id) {
         return root.toggleCatalog.find(e => e[0] === id) ?? null;
     }
-    // Which pills the drawer shows: everything not on a shown level.
-    function drawerIds() {
+
+    // Pills are raised the way the rules want (Tacit.qml): ink *mixed* over the ground —
+    // "on" at the raised slab (11 %), "off" at a fainter mix of the same two, no
+    // transparency anywhere (text ranked by brightness, never by opacity).
+    readonly property color colPillOn: Tacit.raised
+    readonly property color colPillOnHover: Tacit.raisedHot
+    readonly property color colPillOff: ColorUtils.mix(Tacit.inkMain, Tacit.ground, 0.05)
+    readonly property color colPillOffHover: ColorUtils.mix(Tacit.inkMain, Tacit.ground, 0.07)
+    property real maxHeight: 700
+    // The toggles block is the panel's measure: seven 40 px cells — six secondaries in
+    // the row with the dots as the seventh — close it; the primary square's two pills
+    // split the same width. The sliders, row and drawer's grid all match this width so
+    // the panel's columns close on the same right edge.
+    readonly property real togglesWidth: 40 * 7 + 6 * 6
+    // The row's six pills are 40 px with the dots as the seventh cell.
+    // The row is always full: the user's secondaries first, then the drawer's next ids
+    // take the rest of the row's cells (they stay drawer items until placed by hand).
+    function rowIds() {
+        return root.secondary.concat(root.rowFillerIds());
+    }
+    // Everything placed nowhere: neither level shows it.
+    function unplacedIds() {
         return root.toggleCatalog.map(e => e[0]).filter(id => root.primary.indexOf(id) < 0 && root.secondary.indexOf(id) < 0);
     }
-
-    // An "on" pill is raised like the real panel's (SidebarRightContent.qml): colLayer2 is
-    // darker than the frost, so on used to read as a hole.
-    readonly property color colPillOn: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.88)
-    readonly property color colPillOnHover: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.84)
-    property real maxHeight: 700
-    // The toggles block is the panel's measure: primary column, then the square's two
-    // pill cells (the dots sit in the fourth) — the sliders match this width so the
-    // panel's columns all close on the same right edge.
-    readonly property real togglesWidth: 180 + 10 + 40 + 6 + 40
-    implicitHeight: Math.min(column.implicitHeight + root.sidebarPadding * 2, root.maxHeight)
+    function rowFillerIds() {
+        return root.unplacedIds().slice(0, 6 - root.secondary.length);
+    }
+    // Which pills the drawer shows: placed nowhere and not auto-filling the row.
+    function drawerIds() {
+        const filler = root.rowFillerIds();
+        return root.unplacedIds().filter(id => filler.indexOf(id) < 0);
+    }
+    implicitHeight: Math.min(Math.max(
+        column.implicitHeight + root.sidebarPadding * 2, // the content as drawn
+        submenuLayer.active ? submenuLayer.cardBottom + root.sidebarPadding : 0 // the floating submenu may hang lower
+    ), root.maxHeight)
     // Body padding on both sides on top of the toggles measure, or the square's right
     // column is cut by the body's own margin.
     implicitWidth: Math.min(root.togglesWidth + root.sidebarPadding * 2, sidebarWidth)
@@ -249,14 +283,21 @@ Item {
         color: "transparent"
         radius: Appearance.rounding.verylarge
 
-        DockedRect {
-            id: dockedBg
+        // The panel's own material — frost and body — gathered under one item; the
+        // layers above it occupy the same frame without being part of it.
+        Item {
+            id: panelContent
             anchors.fill: parent
-            edge: "bottom-right"
-            cornerRadius: sidebarRightBackground.radius
-            fillet: 12
-            color: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainerHigh, 0.08)
-        }
+
+            DockedRect {
+                id: dockedBg
+                anchors.fill: parent
+                edge: "bottom-right"
+                cornerRadius: sidebarRightBackground.radius
+                fillet: 12
+                // The rule's own role: a shell surface that floats over apps is the frost.
+                color: Appearance.colors.colPanelFrost
+            }
 
         StyledFlickable {
             id: body
@@ -271,20 +312,20 @@ Item {
                 width: body.width
                 spacing: 10
 
-                // --------------------------------- toggles (left) · vertical sliders (right)
-                // The toggles: the two primaries stacked in a column on the left; the
-                // four secondaries in a 2×2 square grid to their right — the last cell
-                // of that grid is the drawer button, not a pill. A Grid, not a Flow: the
-                // Flow was squeezed by the layout and wrapped every pill onto its own
-                // line.
-                RowLayout {
+                // ----------------------------------------- the toggles block
+                // Four primaries stacked in a 2×2 square; below them, one full-width row
+                // of secondary pills whose last cell (after the pills) is the dots, the
+                // drawer's opener. A Grid, not a Flow: the Flow was squeezed by the layout
+                // and wrapped every pill onto its own line.
+                ColumnLayout {
+                    id: togglesBlock
                     Layout.fillWidth: true
-                    spacing: 10
+                    spacing: 6
 
                     Item {
                         id: primaryZone
-                        implicitWidth: primaryCol.implicitWidth
-                        implicitHeight: primaryCol.implicitHeight
+                        implicitWidth: primaryGrid.width
+                        implicitHeight: primaryGrid.height
                         Layout.preferredWidth: implicitWidth
                         Layout.preferredHeight: implicitHeight
                         Layout.fillWidth: false
@@ -304,8 +345,9 @@ Item {
                             }
                         }
 
-                        ColumnLayout {
-                            id: primaryCol
+                        Grid {
+                            id: primaryGrid
+                            columns: 2
                             spacing: 6
 
                             Repeater {
@@ -314,8 +356,8 @@ Item {
                                     required property string modelData
                                     pillId: modelData
                                     editMode: root.editMode
-                                    Layout.preferredWidth: 180
-                                    Layout.fillWidth: false
+                                    implicitWidth: 155
+                                    implicitHeight: 56
                                     onDemoted: id => root.demote(id)
                                 }
                             }
@@ -328,7 +370,7 @@ Item {
                         implicitHeight: secondaryGrid.height
                         Layout.preferredWidth: implicitWidth
                         Layout.preferredHeight: implicitHeight
-                        Layout.alignment: Qt.AlignTop
+                        Layout.alignment: Qt.AlignLeft
 
                         Rectangle {
                             anchors.fill: parent
@@ -343,40 +385,44 @@ Item {
                             }
                         }
 
+                        // The row: six 40 px pills — the user's secondaries, then
+                        // auto-filled from the drawer — and the dots as the seventh
+                        // cell, wide enough to close the row's right edge.
                         Grid {
                             id: secondaryGrid
-                            columns: 2
+                            rows: 1
                             spacing: 6
+                            horizontalItemAlignment: Qt.AlignLeft
 
-                        Repeater {
-                            model: root.secondary
-                            delegate: TogglePill {
-                                required property string modelData
-                                pillId: modelData
-                                editMode: root.editMode
-                                onDemoted: id => root.demote(id)
+                            Repeater {
+                                model: root.rowIds()
+                                delegate: TogglePill {
+                                    required property string modelData
+                                    pillId: modelData
+                                    editMode: root.editMode
+                                    onDemoted: id => root.demote(id)
+                                }
                             }
-                        }
 
-                        // The dots in the grid's last cell: opens (or closes) the drawer.
-                        RippleButton {
-                            implicitWidth: 40
-                            implicitHeight: 40
-                            buttonRadius: 20
-                            toggled: root.drawerOpen
-                            colBackgroundToggled: root.colPillOn
-                            colBackgroundToggledHover: root.colPillOnHover
-                            onClicked: root.drawerOpen = !root.drawerOpen
-                            contentItem: MaterialSymbol {
-                                anchors.centerIn: parent
-                                text: root.drawerOpen ? "expand_less" : "more_horiz"
-                                iconSize: 22
-                                color: Appearance.colors.colOnLayer0
+                            // The dots, the row's last cell: opens (or closes) the drawer.
+                            RippleButton {
+                                implicitWidth: 40
+                                implicitHeight: 40
+                                buttonRadius: 20
+                                toggled: root.drawerOpen
+                                colBackgroundToggled: root.colPillOn
+                                colBackgroundToggledHover: root.colPillOnHover
+                                onClicked: root.drawerOpen = !root.drawerOpen
+                                contentItem: MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: root.drawerOpen ? "expand_less" : "more_horiz"
+                                    iconSize: 22
+                                    color: Tacit.inkMain
+                                }
+                                StyledToolTip {
+                                    text: Translation.tr("More")
+                                }
                             }
-                            StyledToolTip {
-                                text: Translation.tr("More")
-                            }
-                        }
                         }
                     }
                 }
@@ -405,17 +451,19 @@ Item {
                             text: root.dragging ? Translation.tr("Drop on the square to promote — anywhere else retires") : ""
                             visible: root.dragging
                             font.pixelSize: Appearance.font.pixelSize.smaller
-                            color: Appearance.colors.colSubtext
+                            color: Tacit.inkMeta
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
                         }
 
-                        // The pills fill the grid; the pencil takes the tail of the last
-                        // incomplete row, so it is never alone on a line of its own.
+                        // The pills fill the grid in seven across — every row of 40 px
+                        // cells closes on the same right edge as the square — and the
+                        // pencil takes the tail of the last incomplete row, so it is
+                        // never alone on a line of its own.
                         Grid {
                             id: drawerGrid
                             Layout.fillWidth: true
-                            columns: 4
+                            columns: 7
                             spacing: 6
 
                             Repeater {
@@ -434,6 +482,8 @@ Item {
                                 implicitHeight: 40
                                 buttonRadius: 20
                                 toggled: root.editMode
+                                colBackground: root.colPillOff
+                                colBackgroundHover: root.colPillOffHover
                                 colBackgroundToggled: root.colPillOn
                                 onClicked: {
                                     root.editMode = !root.editMode;
@@ -442,7 +492,7 @@ Item {
                                     anchors.centerIn: parent
                                     text: "edit"
                                     iconSize: 16
-                                    color: root.editMode ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                    color: root.editMode ? Tacit.accent : Tacit.inkSec
                                 }
                                 StyledToolTip {
                                     text: Translation.tr("Reshuffle")
@@ -485,27 +535,9 @@ Item {
                     }
                 }
 
-                // -------------------------------------------------- section lists, in place
-                WifiSection {
-                    shown: root.showWifiDialog
-                }
-                VpnSection {
-                    shown: root.showVpn
-                }
-                BluetoothSection {
-                    shown: root.showBluetoothDialog
-                }
-                AudioSection {
-                    input: false
-                    shown: root.showAudioOutputDialog
-                }
-                AudioSection {
-                    input: true
-                    shown: root.showAudioInputDialog
-                }
-                NightLightSection {
-                    shown: root.showNightLightDialog
-                }
+                // The sections (wifi, vpn, bluetooth, mixer...) are not here any more:
+                // with a submenu the toggle opens its floating card over the panel — see
+                // submenuLayer below the body.
 
                 Hairline {}
 
@@ -521,12 +553,12 @@ Item {
                         text: DateTime.time
                         font.family: Appearance.font.family.numbers
                         font.pixelSize: Appearance.font.pixelSize.small
-                        color: Appearance.colors.colOnLayer0
+                        color: Tacit.inkMain
                     }
                     StyledText {
                         text: DateTime.longDate
                         font.pixelSize: Appearance.font.pixelSize.small
-                        color: Appearance.colors.colSubtext
+                        color: Tacit.inkSec
                     }
 
                     Item {
@@ -546,7 +578,7 @@ Item {
                             anchors.centerIn: parent
                             text: "settings"
                             iconSize: 20
-                            color: Appearance.colors.colSubtext
+                            color: Tacit.inkSec
                         }
                         StyledToolTip {
                             text: Translation.tr("Settings")
@@ -566,11 +598,117 @@ Item {
                             anchors.centerIn: parent
                             text: "mode_off_on"
                             iconSize: 20
-                            color: Appearance.colors.colSubtext
+                            // An action that risks something (the session ends) is risk-coloured, per the
+                            // rules; on some palettes risk is near the accent, so the raised pill keeps it apart.
+                            color: Tacit.risk
                         }
                         StyledToolTip {
                             text: Translation.tr("Session")
                         }
+                    }
+                }
+            }
+        }
+        } // panelContent
+
+        // -------------------------------------------------- submenus, a floating layer
+        // A toggle with a submenu opens its card floating on top of the panel — pinned
+        // under the toggles block, whose pills stay readable behind nothing — instead of
+        // growing the column in place. The panel grows beneath it only to keep the card
+        // inside the silhouette; a click outside the card closes it, one submenu at a
+        // time (root.only()).
+        Item {
+            id: submenuLayer
+            anchors.fill: parent
+            z: 250
+            readonly property bool active: root.sectionFlags.some(f => root[f])
+            // The card hangs under the toggles block: the pill that opened it stays visible.
+            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + 6
+            readonly property real cardBottom: cardY + submenuCard.height
+
+            opacity: active ? 1 : 0
+            Behavior on opacity {
+                Anim {
+                    type: Anim.DefaultEffects
+                }
+            }
+
+            // The outside click: a click anywhere not on the card closes the submenu. As a
+            // backdrop it eats the click; the toggle that was open is marked closed by the
+            // click handler only (a re-open from a pill is a second click).
+            MouseArea {
+                anchors.fill: parent
+                visible: submenuLayer.active
+                onClicked: (mouse) => {
+                    mouse.accepted = true;
+                    for (const f of root.sectionFlags)
+                        root[f] = false;
+                }
+            }
+
+            // The scrim, lighter than a dialog's (WindowDialog.qml): the panel behind is
+            // already frosted, so the card is "on top" with a shadow and blurred-back
+            // sunrise rather than a heavy wall.
+            Rectangle {
+                id: submenuScrimRect
+                anchors.fill: parent
+                color: Appearance.colors.colScrim
+                opacity: 0.5
+                visible: submenuLayer.active
+            }
+
+            StyledRectangularShadow {
+                target: submenuCard
+                opacity: submenuLayer.active ? 1 : 0
+            }
+
+            Rectangle {
+                id: submenuCard
+                x: root.sidebarPadding
+                y: submenuLayer.active ? submenuLayer.cardY : submenuLayer.cardY - 12
+                width: root.togglesWidth
+                height: submenuColumn.implicitHeight + root.sidebarPadding
+                radius: Appearance.rounding.normal
+                // Opaque, and opaque for real: frost is translucent by design (see-
+                // through to the wallpaper), which is right for the panel but wrong for
+                // a card floating over it — it read transparent over the dim dimmed
+                // behind. So the card takes the surface colour untinted; the shadow and
+                // the scrim do the lifting, no hairline border (a border drawn for one
+                // screen is a generic pattern).
+                color: Appearance.m3colors.m3surfaceContainerHigh
+
+                Behavior on y {
+                    Anim {
+                        type: Anim.Emphasized
+                    }
+                }
+
+                ColumnLayout {
+                    id: submenuColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: root.sidebarPadding / 2
+                    spacing: 0
+
+                    WifiSection {
+                        shown: root.showWifiDialog
+                    }
+                    VpnSection {
+                        shown: root.showVpn
+                    }
+                    BluetoothSection {
+                        shown: root.showBluetoothDialog
+                    }
+                    AudioSection {
+                        input: false
+                        shown: root.showAudioOutputDialog
+                    }
+                    AudioSection {
+                        input: true
+                        shown: root.showAudioInputDialog
+                    }
+                    NightLightSection {
+                        shown: root.showNightLightDialog
                     }
                 }
             }
@@ -595,7 +733,7 @@ Item {
                     anchors.centerIn: parent
                     text: root.dragIcon
                     iconSize: 22
-                    color: Appearance.colors.colPrimary
+                    color: Tacit.accent
                 }
                 Behavior on x {
                     Anim {
@@ -633,7 +771,7 @@ Item {
             id: lineSymbol
             text: line.glyph
             iconSize: 20
-            color: Appearance.colors.colOnLayer0
+            color: Tacit.inkMain
         }
         TacitSlider {
             id: slider
@@ -701,7 +839,6 @@ Item {
 
         Component.onCompleted: {
             model = entry[1].createObject(pill);
-            console.log("[proto]", pillId, "w", pill.width, "iw", pill.implicitWidth, "inDrawer", inDrawer);
         }
 
         implicitWidth: 40
@@ -712,8 +849,8 @@ Item {
             || (pill.model?.available ?? false) || !!pill.model?.altAction
         opacity: !pill.editMode && !pill.inDrawer && !(pill.model?.available ?? true) ? 0.4
             : (!pill.editMode && pill.model?.busy ? 0.6 : 1)
-        colBackground: "transparent"
-        colBackgroundHover: Appearance.colors.colLayer1Hover
+        colBackground: root.colPillOff
+        colBackgroundHover: root.colPillOffHover
         colBackgroundToggled: root.colPillOn
         colBackgroundToggledHover: root.colPillOnHover
 
@@ -746,7 +883,7 @@ Item {
             text: pill.model?.icon ?? ""
             fill: pill.toggled ? 1 : 0
             iconSize: 22
-            color: pill.toggled ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+            color: pill.toggled ? Tacit.accent : Tacit.inkSec
         }
         StyledToolTip {
             text: pill.editMode
@@ -808,8 +945,8 @@ Item {
         toggled: primary.model?.toggled ?? false
         enabled: primary.editMode || (primary.model?.available ?? false) || primary.dialog.length > 0
         opacity: primary.model?.busy ? 0.6 : 1
-        colBackground: "transparent"
-        colBackgroundHover: Appearance.colors.colLayer1Hover
+        colBackground: root.colPillOff
+        colBackgroundHover: root.colPillOffHover
         colBackgroundToggled: root.colPillOn
         colBackgroundToggledHover: root.colPillOnHover
 
@@ -837,7 +974,7 @@ Item {
                 text: primary.model?.icon ?? ""
                 fill: primary.toggled ? 1 : 0
                 iconSize: 20
-                color: primary.toggled ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                color: primary.toggled ? Tacit.accent : Tacit.inkSec
             }
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
@@ -845,7 +982,7 @@ Item {
                 elide: Text.ElideRight
                 // The pill's own name wiring, as the real panel's row reads it.
                 text: (primary.model?.name ?? "") + (primary.model?.hasStatusText && (primary.model?.statusText ?? "").length > 0 ? " · " + primary.model.statusText : "")
-                color: Appearance.colors.colOnLayer0
+                color: Tacit.inkMain
             }
         }
         StyledToolTip {
