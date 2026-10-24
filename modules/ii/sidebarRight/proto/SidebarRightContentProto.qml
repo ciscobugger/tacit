@@ -120,16 +120,16 @@ Item {
     function moveDrag(rootPos) {
         root.dragPoint = rootPos;
     }
-    // Where a drop sits, per zone: the primary square is two 170 px cells in two rows
-    // with a 6 px gap; the secondary row is 40 px pills on one line, the dots in its
+    // Where a drop sits, per zone: the primary square is two 160 px cells in two rows
+    // with an 8 px gap; the secondary row is 40 px pills on one line, the dots in its
     // last cell.
     function primaryIndex(pointInGrid) {
-        const col = Math.min(1, Math.floor((pointInGrid.x + 3) / 161));
-        const row = Math.min(1, Math.floor((pointInGrid.y + 3) / 62));
+        const col = Math.min(1, Math.floor((pointInGrid.x + 4) / 168));
+        const row = Math.min(1, Math.floor((pointInGrid.y + 4) / 64));
         return row * 2 + col;
     }
     function secondaryIndex(pointInGrid) {
-        const idx = Math.min(6, Math.floor(pointInGrid.x / 46));
+        const idx = Math.min(6, Math.floor(pointInGrid.x / 48));
         return idx < 6 ? idx : -1; // -1: the dots' cell
     }
     // Which drop zone the pointer sits in: the primary column, the square, or none
@@ -232,7 +232,7 @@ Item {
     // the row with the dots as the seventh — close it; the primary square's two pills
     // split the same width. The sliders, row and drawer's grid all match this width so
     // the panel's columns close on the same right edge.
-    readonly property real togglesWidth: 40 * 7 + 6 * 6
+    readonly property real togglesWidth: 40 * 7 + 6 * 8
     // The row's six pills are 40 px with the dots as the seventh cell.
     // The row is always full: the user's secondaries first, then the drawer's next ids
     // take the rest of the row's cells (they stay drawer items until placed by hand).
@@ -310,7 +310,7 @@ Item {
             ColumnLayout {
                 id: column
                 width: body.width
-                spacing: 10
+                spacing: 14
 
                 // ----------------------------------------- the toggles block
                 // Four primaries stacked in a 2×2 square; below them, one full-width row
@@ -320,7 +320,7 @@ Item {
                 ColumnLayout {
                     id: togglesBlock
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 8
 
                     Item {
                         id: primaryZone
@@ -334,7 +334,7 @@ Item {
                         // at it, so aiming is visible rather than imagined.
                         Rectangle {
                             anchors.fill: parent
-                            anchors.margins: -6
+                            anchors.margins: -8
                             radius: Appearance.rounding.normal
                             color: ColorUtils.transparentize(root.colPillOn, 0.75)
                             opacity: root.dragging && root.zoneAt(root.dragPoint) === "primary" ? 1 : 0
@@ -348,7 +348,7 @@ Item {
                         Grid {
                             id: primaryGrid
                             columns: 2
-                            spacing: 6
+                            spacing: 8
 
                             Repeater {
                                 model: root.primary
@@ -356,7 +356,7 @@ Item {
                                     required property string modelData
                                     pillId: modelData
                                     editMode: root.editMode
-                                    implicitWidth: 155
+                                    implicitWidth: 160
                                     implicitHeight: 56
                                     onDemoted: id => root.demote(id)
                                 }
@@ -374,7 +374,7 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            anchors.margins: -6
+                            anchors.margins: -8
                             radius: Appearance.rounding.normal
                             color: ColorUtils.transparentize(root.colPillOn, 0.75)
                             opacity: root.dragging && root.zoneAt(root.dragPoint) === "secondary" ? 1 : 0
@@ -391,7 +391,7 @@ Item {
                         Grid {
                             id: secondaryGrid
                             rows: 1
-                            spacing: 6
+                            spacing: 8
                             horizontalItemAlignment: Qt.AlignLeft
 
                             Repeater {
@@ -443,7 +443,7 @@ Item {
                     ColumnLayout {
                         id: drawerColumn
                         width: parent.width
-                        spacing: 8
+                        spacing: 10
 
                         // The caption exists only while a pill is in the air: at rest the
                         // drawer is just a shelf, and the mechanics show themselves in use.
@@ -464,7 +464,7 @@ Item {
                             id: drawerGrid
                             Layout.fillWidth: true
                             columns: 7
-                            spacing: 6
+                            spacing: 8
 
                             Repeater {
                                 model: root.drawerIds()
@@ -511,7 +511,7 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: false
                     Layout.preferredWidth: root.togglesWidth
-                    spacing: 10
+                    spacing: 14
 
                     LineSlider {
                         Layout.fillWidth: true
@@ -547,7 +547,7 @@ Item {
                 // closes itself before opening Settings, handing it the screen.
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 8
 
                     StyledText {
                         text: DateTime.time
@@ -623,7 +623,7 @@ Item {
             z: 250
             readonly property bool active: root.sectionFlags.some(f => root[f])
             // The card hangs under the toggles block: the pill that opened it stays visible.
-            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + 6
+            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + 10
             readonly property real cardBottom: cardY + submenuCard.height
 
             opacity: active ? 1 : 0
