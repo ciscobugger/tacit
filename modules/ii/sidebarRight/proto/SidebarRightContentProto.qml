@@ -18,6 +18,7 @@ import qs.modules.ii.sidebarRight.vpn
 import qs.modules.ii.sidebarRight.nightLight
 import qs.modules.ii.sidebarRight.volumeMixer
 import qs.modules.ii.sidebarRight.wifiNetworks
+import qs.modules.ii.sidebarRight.calendar
 
 /**
  * Prototype: the control panel rearranged for the idea issue.
@@ -48,10 +49,13 @@ Item {
     property bool showBluetoothDialog: false
     property bool showNightLightDialog: false
     property bool showWifiDialog: false
+    // The calendar: opened from the footer's clock, in a floating card like the
+    // toggle submenus (so only() applies, and the panel clears it on close).
+    property bool showCalendar: false
 
 
     property bool showVpn: false
-    readonly property var sectionFlags: ["showWifiDialog", "showVpn", "showBluetoothDialog", "showAudioOutputDialog", "showAudioInputDialog", "showNightLightDialog"]
+    readonly property var sectionFlags: ["showWifiDialog", "showVpn", "showBluetoothDialog", "showAudioOutputDialog", "showAudioInputDialog", "showNightLightDialog", "showCalendar"]
     function only(flag) {
         for (const f of root.sectionFlags)
             if (f !== flag && root[f])
@@ -150,6 +154,7 @@ Item {
         const pill = root.dragTarget;
         root.dragging = false;
         root.dragTarget = "";
+        root.dragIcon = ""; // no stale glyph under the hidden ghost's next appearance
         if (pill.length === 0)
             return;
         // Where the pointer sat, in panel coordinates, against each zone's bounds.
@@ -165,6 +170,13 @@ Item {
         } else {
             root.demote(pill);
         }
+    }
+    // The drop that never lands: the grab was taken away (the panel closing under the
+    // pointer, a reload). Nothing is placed — the pointer never chose a zone.
+    function cancelDrag() {
+        root.dragging = false;
+        root.dragTarget = "";
+        root.dragIcon = "";
     }
     // Promote with a place: a full level retires the pill that loses its spot (the last
     // one), and a drop with an index can also reorder within a level. Four primaries in
@@ -261,8 +273,13 @@ Item {
 
     property var brightnessMonitor: Brightness.getMonitorForScreen(root.QsWindow.window?.screen)
 
+    // The arrangement's file, exposed for the test harness (a QObject, not an Item:
+    // unreachable by object-name search from outside).
+    readonly property QtObject arrangementView: arrangementFile
+
     FileView {
         id: arrangementFile
+        objectName: "arrangementFile"
         path: `${Directories.state}/user/sidebar-arrangement.json`
         watchChanges: true
         blockLoading: true
@@ -326,6 +343,7 @@ Item {
 
                     Item {
                         id: primaryZone
+                        objectName: "primaryZone"
                         implicitWidth: primaryGrid.width
                         implicitHeight: primaryGrid.height
                         Layout.preferredWidth: implicitWidth
@@ -368,6 +386,7 @@ Item {
 
                     Item {
                         id: secondaryZone
+                        objectName: "secondaryZone"
                         implicitWidth: secondaryGrid.width
                         implicitHeight: secondaryGrid.height
                         Layout.preferredWidth: implicitWidth
@@ -392,6 +411,7 @@ Item {
                         // cell, wide enough to close the row's right edge.
                         Grid {
                             id: secondaryGrid
+                            objectName: "secondaryGrid"
                             rows: 1
                             spacing: 8
                             horizontalItemAlignment: Qt.AlignLeft
@@ -444,6 +464,7 @@ Item {
 
                     ColumnLayout {
                         id: drawerColumn
+                        objectName: "drawerColumn"
                         width: parent.width
                         spacing: 12
 
@@ -464,6 +485,7 @@ Item {
                         // never alone on a line of its own.
                         Grid {
                             id: drawerGrid
+                            objectName: "drawerGrid"
                             Layout.fillWidth: true
                             columns: 7
                             spacing: 8
@@ -494,13 +516,14 @@ Item {
                                     anchors.centerIn: parent
                                     text: "edit"
                                     iconSize: 22
-                                    // Tacit's edit glyph draws its ink off-centre: the box is
-                                    // centred but the pencil's mass sits up-left of it (the
-                                    // crosshair test proved it, down-right by a sixth of the
-                                    // glyph reads centred). Optical, sized with the glyph;
-                                    // the real fix belongs to TacitSymbols itself.
-                                    anchors.horizontalCenterOffset: iconSize / 6
-                                    anchors.verticalCenterOffset: iconSize / 6
+                                    // Measured at the pill's own scale: the glyph's ink is
+                                    // centred in its box, reading a hair high — a single
+                                    // pixel returned. (The earlier "mass leans up-left"
+                                    // diagnosis came from a 60 px mock and was wrong; the
+                                    // old equal-axes nudge it produced put the pencil
+                                    // almost four pixels right. The honest fix — if other
+                                    // sizes keep disagreeing — is in TacitSymbols itself.)
+                                    anchors.verticalCenterOffset: iconSize / 22
                                     // The wash says edit mode is on; the glyph stays ink.
                                     color: Tacit.inkSec
                                 }
@@ -562,16 +585,38 @@ Item {
                     Layout.fillWidth: true
                     spacing: 8
 
-                    StyledText {
-                        text: DateTime.time
-                        font.family: Appearance.font.family.numbers
-                        font.pixelSize: Appearance.font.pixelSize.small
-                        color: Tacit.inkMain
-                    }
-                    StyledText {
-                        text: DateTime.longDate
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: Tacit.inkMeta
+                    // The clock is the calendar's opener: the row hovers as one and opens
+                    // the calendar in the floating card above (the card of the toggles'
+                    // submenus, one at a time), the hover wash being its on-signal too.
+                    RippleButton {
+                        implicitWidth: clockRow.implicitWidth + 8
+                        implicitHeight: 40
+                        buttonRadius: Appearance.rounding.small
+                        colBackground: "transparent"
+                        colBackgroundHover: Appearance.colors.colLayer1Hover
+                        colBackgroundToggled: Appearance.colors.colLayer1Hover
+                        toggled: root.showCalendar
+                        onClicked: root.showCalendar = !root.showCalendar
+                        contentItem: Row {
+                            id: clockRow
+                            spacing: 8
+                            StyledText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: DateTime.time
+                                font.family: Appearance.font.family.numbers
+                                font.pixelSize: Appearance.font.pixelSize.small
+                                color: Tacit.inkMain
+                            }
+                            StyledText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: DateTime.longDate
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: Tacit.inkMeta
+                            }
+                        }
+                        StyledToolTip {
+                            text: Translation.tr("Calendar")
+                        }
                     }
 
                     Item {
@@ -731,6 +776,14 @@ Item {
                     NightLightSection {
                         shown: root.showNightLightDialog
                     }
+
+                    // The footer's calendar, in the same floating card, its month
+                    // navigation's own widget as-is.
+                    Loader {
+                        active: root.showCalendar
+                        Layout.alignment: Qt.AlignHCenter
+                        sourceComponent: CalendarWidget {}
+                    }
                 }
             }
         }
@@ -832,6 +885,8 @@ Item {
                 pill.rootBeginDrag(mouse);
                 mouse.accepted = true;
             }
+            // A lifted grab (the panel closing under the pointer) is not a drop.
+            onCanceled: root.cancelDrag()
             onPositionChanged: mouse => pill.rootMoveDrag(mouse)
             onReleased: mouse => pill.rootEndDrag(mouse)
         }
@@ -840,7 +895,6 @@ Item {
             const p = pill.mapToItem(root, mouse.x, mouse.y);
             root.beginDrag(pill.model?.icon ?? "", p);
             root.dragTarget = pill.pillId;
-            pill.opacity = 0.3;
         }
         function rootMoveDrag(mouse) {
             if (!root.dragging)
@@ -851,7 +905,6 @@ Item {
             if (!root.dragging)
                 return;
             const p = pill.mapToItem(root, mouse.x, mouse.y);
-            pill.opacity = 1;
             root.endDrag(p);
         }
 
@@ -870,8 +923,12 @@ Item {
         toggled: pill.model?.toggled ?? false
         enabled: pill.editMode || pill.dialog.length > 0 || pill.inDrawer
             || (pill.model?.available ?? false) || !!pill.model?.altAction
-        opacity: !pill.editMode && !pill.inDrawer && !(pill.model?.available ?? true) ? 0.4
-            : (!pill.editMode && pill.model?.busy ? 0.6 : 1)
+        // Being carried draws the pill out (the ghost carries its shape); state drives
+        // it, not an imperative restore, so a stolen grab heals too.
+        opacity: root.dragging && root.dragTarget === pill.pillId
+            ? 0.3
+            : (!pill.editMode && !pill.inDrawer && !(pill.model?.available ?? true) ? 0.4
+            : (!pill.editMode && pill.model?.busy ? 0.6 : 1))
         colBackground: root.colPillOff
         colBackgroundHover: root.colPillOffHover
         colBackgroundToggled: root.colPillOn
@@ -1016,7 +1073,8 @@ Item {
         }
     }
 
-    property bool drawerOpen: false    property bool editMode: false
+    property bool drawerOpen: false
+    property bool editMode: false
 
     // The dots button sits in the primary row's tail: the drawer is reachable whether or
     // not the user has filled all eight shown places.
