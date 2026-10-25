@@ -544,12 +544,13 @@ Item {
 
                 Hairline {}
 
-                // -------------------------------------------------- footer: date · words
+                // -------------------------------------------------- footer: date · icons
                 // The time and date lead the row on the left, mirroring the notch's
-                // clock. The actions are words (the kit's "words, not symbols for
-                // actions"), the risk one last with the warning symbol so the risk is
-                // said twice, not by colour alone. The shipped panel closes itself
-                // before opening Settings, handing it the screen.
+                // clock; the two actions close it on the right as icon buttons (the
+                // user's call over the kit's words here: they read faster in a single
+                // glance, and both carry their names as tooltips). Session's symbol is
+                // in the risk ink regardless. The shipped panel closes itself before
+                // opening Settings, handing it the screen.
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -562,9 +563,6 @@ Item {
                     }
                     StyledText {
                         text: DateTime.longDate
-                        // The facts in the meta ink at the meta size: the time leads,
-                        // the date is beside it (the kit's "each fact said once", and
-                        // the words after need the room this saves).
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Tacit.inkMeta
                     }
@@ -573,56 +571,42 @@ Item {
                         Layout.fillWidth: true
                     }
                     RippleButton {
-                        id: settingsButton
-                        implicitWidth: settingsWord.implicitWidth + 16
+                        implicitWidth: 40
                         implicitHeight: 40
-                        buttonRadius: Appearance.rounding.small
+                        buttonRadius: 20
                         colBackground: "transparent"
                         colBackgroundHover: Appearance.colors.colLayer1Hover
                         onClicked: {
                             GlobalStates.sidebarRightOpen = false;
                             SettingsApp.open("");
                         }
-                        contentItem: StyledText {
-                            id: settingsWord
+                        contentItem: MaterialSymbol {
                             anchors.centerIn: parent
-                            text: Translation.tr("Settings")
-                            font.pixelSize: Appearance.font.pixelSize.smallie
-                            color: Tacit.inkMain
+                            text: "settings"
+                            iconSize: 20
+                            color: Tacit.inkSec
                         }
                         StyledToolTip {
-                            text: Translation.tr("Open the Settings")
+                            text: Translation.tr("Settings")
                         }
                     }
                     RippleButton {
-                        id: sessionButton
-                        implicitWidth: sessionWords.implicitWidth + 16
+                        implicitWidth: 40
                         implicitHeight: 40
-                        buttonRadius: Appearance.rounding.small
+                        buttonRadius: 20
                         colBackground: "transparent"
                         colBackgroundHover: Appearance.colors.colLayer1Hover
                         onClicked: {
                             GlobalStates.sidebarRightOpen = false;
                             GlobalStates.sessionOpen = true;
                         }
-                        contentItem: Item {
-                            Row {
-                                id: sessionWords
-                                anchors.centerIn: parent
-                                spacing: 6
-                                MaterialSymbol {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "warning"
-                                    iconSize: 14
-                                    color: Tacit.risk
-                                }
-                                StyledText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: Translation.tr("Session")
-                                    font.pixelSize: Appearance.font.pixelSize.smallie
-                                    color: Tacit.risk
-                                }
-                            }
+                        contentItem: MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "mode_off_on"
+                            iconSize: 20
+                            // An action that risks something (the session ends) is risk-
+                            // coloured, with its warning companion as the tooltip.
+                            color: Tacit.risk
                         }
                         StyledToolTip {
                             text: Translation.tr("Ends the session")
