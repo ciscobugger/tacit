@@ -42,7 +42,7 @@ import qs.modules.ii.sidebarRight.wifiNetworks
 Item {
     id: root
     property int sidebarWidth: Appearance.sizes.sidebarWidth
-    property int sidebarPadding: 14
+    property int sidebarPadding: 16
     property bool showAudioOutputDialog: false
     property bool showAudioInputDialog: false
     property bool showBluetoothDialog: false
@@ -310,7 +310,9 @@ Item {
             ColumnLayout {
                 id: column
                 width: body.width
-                spacing: 14
+                // The grid of four (the kit's Layout): a block gap is m (12), a pill
+                // gap is s (8), the panel's own inset is l (16).
+                spacing: 12
 
                 // ----------------------------------------- the toggles block
                 // Four primaries stacked in a 2×2 square; below them, one full-width row
@@ -443,7 +445,7 @@ Item {
                     ColumnLayout {
                         id: drawerColumn
                         width: parent.width
-                        spacing: 10
+                        spacing: 12
 
                         // The caption exists only while a pill is in the air: at rest the
                         // drawer is just a shelf, and the mechanics show themselves in use.
@@ -492,7 +494,8 @@ Item {
                                     anchors.centerIn: parent
                                     text: "edit"
                                     iconSize: 16
-                                    color: root.editMode ? Tacit.accent : Tacit.inkSec
+                                    // The wash says edit mode is on; the glyph stays ink.
+                                    color: Tacit.inkSec
                                 }
                                 StyledToolTip {
                                     text: Translation.tr("Reshuffle")
@@ -511,7 +514,7 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: false
                     Layout.preferredWidth: root.togglesWidth
-                    spacing: 14
+                    spacing: 12
 
                     LineSlider {
                         Layout.fillWidth: true
@@ -541,10 +544,12 @@ Item {
 
                 Hairline {}
 
-                // -------------------------------------------------- footer: date · icons
+                // -------------------------------------------------- footer: date · words
                 // The time and date lead the row on the left, mirroring the notch's
-                // clock; the two actions close it on the right. The shipped panel
-                // closes itself before opening Settings, handing it the screen.
+                // clock. The actions are words (the kit's "words, not symbols for
+                // actions"), the risk one last with the warning symbol so the risk is
+                // said twice, not by colour alone. The shipped panel closes itself
+                // before opening Settings, handing it the screen.
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -557,53 +562,70 @@ Item {
                     }
                     StyledText {
                         text: DateTime.longDate
-                        font.pixelSize: Appearance.font.pixelSize.small
-                        color: Tacit.inkSec
+                        // The facts in the meta ink at the meta size: the time leads,
+                        // the date is beside it (the kit's "each fact said once", and
+                        // the words after need the room this saves).
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Tacit.inkMeta
                     }
 
                     Item {
                         Layout.fillWidth: true
                     }
                     RippleButton {
-                        implicitWidth: 40
+                        id: settingsButton
+                        implicitWidth: settingsWord.implicitWidth + 16
                         implicitHeight: 40
-                        buttonRadius: 20
+                        buttonRadius: Appearance.rounding.small
                         colBackground: "transparent"
                         colBackgroundHover: Appearance.colors.colLayer1Hover
                         onClicked: {
                             GlobalStates.sidebarRightOpen = false;
                             SettingsApp.open("");
                         }
-                        contentItem: MaterialSymbol {
+                        contentItem: StyledText {
+                            id: settingsWord
                             anchors.centerIn: parent
-                            text: "settings"
-                            iconSize: 20
-                            color: Tacit.inkSec
+                            text: Translation.tr("Settings")
+                            font.pixelSize: Appearance.font.pixelSize.smallie
+                            color: Tacit.inkMain
                         }
                         StyledToolTip {
-                            text: Translation.tr("Settings")
+                            text: Translation.tr("Open the Settings")
                         }
                     }
                     RippleButton {
-                        implicitWidth: 40
+                        id: sessionButton
+                        implicitWidth: sessionWords.implicitWidth + 16
                         implicitHeight: 40
-                        buttonRadius: 20
+                        buttonRadius: Appearance.rounding.small
                         colBackground: "transparent"
                         colBackgroundHover: Appearance.colors.colLayer1Hover
                         onClicked: {
                             GlobalStates.sidebarRightOpen = false;
                             GlobalStates.sessionOpen = true;
                         }
-                        contentItem: MaterialSymbol {
-                            anchors.centerIn: parent
-                            text: "mode_off_on"
-                            iconSize: 20
-                            // An action that risks something (the session ends) is risk-coloured, per the
-                            // rules; on some palettes risk is near the accent, so the raised pill keeps it apart.
-                            color: Tacit.risk
+                        contentItem: Item {
+                            Row {
+                                id: sessionWords
+                                anchors.centerIn: parent
+                                spacing: 6
+                                MaterialSymbol {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "warning"
+                                    iconSize: 14
+                                    color: Tacit.risk
+                                }
+                                StyledText {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: Translation.tr("Session")
+                                    font.pixelSize: Appearance.font.pixelSize.smallie
+                                    color: Tacit.risk
+                                }
+                            }
                         }
                         StyledToolTip {
-                            text: Translation.tr("Session")
+                            text: Translation.tr("Ends the session")
                         }
                     }
                 }
@@ -623,7 +645,7 @@ Item {
             z: 250
             readonly property bool active: root.sectionFlags.some(f => root[f])
             // The card hangs under the toggles block: the pill that opened it stays visible.
-            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + 10
+            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + 12
             readonly property real cardBottom: cardY + submenuCard.height
 
             opacity: active ? 1 : 0
@@ -741,7 +763,9 @@ Item {
                     anchors.centerIn: parent
                     text: root.dragIcon
                     iconSize: 22
-                    color: Tacit.accent
+                    // The wash on the disc is this one signal too; the glyph is ink, not
+                    // an accent colour (accent is a mark for places and playing).
+                    color: Tacit.inkMain
                 }
                 Behavior on x {
                     Anim {
@@ -891,7 +915,9 @@ Item {
             text: pill.model?.icon ?? ""
             fill: pill.toggled ? 1 : 0
             iconSize: 22
-            color: pill.toggled ? Tacit.accent : Tacit.inkSec
+            // One signal: the raised wash says "on"; the glyph is ink in both states
+            // (the kit's accent is a mark, and an active pill is not a mark).
+            color: Tacit.inkSec
         }
         StyledToolTip {
             text: pill.editMode
@@ -982,7 +1008,8 @@ Item {
                 text: primary.model?.icon ?? ""
                 fill: primary.toggled ? 1 : 0
                 iconSize: 20
-                color: primary.toggled ? Tacit.accent : Tacit.inkSec
+                // One signal: the wash, not a colour change on the glyph.
+                color: Tacit.inkSec
             }
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
