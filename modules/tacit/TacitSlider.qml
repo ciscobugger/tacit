@@ -41,8 +41,13 @@ Slider {
         implicitHeight: 28
         Rectangle {
             id: track
-            width: root.width - root.numberArea
+            // The track lives in the padding box, not the whole control: with the
+            // number's room taken from the right, the left padding must come off the
+            // track too, or a full slider stops short of its own track's end.
+            anchors.left: parent.left
+            anchors.leftMargin: root.leftPadding
             anchors.verticalCenter: parent.verticalCenter
+            width: root.availableWidth
             height: 6
             radius: 3
             // The quiet track: the main ink washed to 12 % over the ground — never a
@@ -50,9 +55,14 @@ Slider {
             color: ColorUtils.transparentize(Tacit.inkMain, 0.88)
             // The reached part in the secondary ink (the kit moves the accent out of
             // the slider: accent is a mark, not an amount).
+            // The reached part: to the value while the knob is away (a 100 % fill
+            // closes flush with the track's end, 0 leaves nothing), and to the knob's
+            // centre while it shows, so the fill meets the knob that follows it.
             Rectangle {
                 height: parent.height
-                width: root.dotHeld / 2 + root.visualPosition * (root.availableWidth - root.dotHeld)
+                width: root.knobShown
+                    ? root.dotHeld / 2 + root.visualPosition * (root.availableWidth - root.dotHeld)
+                    : root.visualPosition * root.availableWidth
                 radius: parent.radius
                 color: Tacit.inkSec
             }

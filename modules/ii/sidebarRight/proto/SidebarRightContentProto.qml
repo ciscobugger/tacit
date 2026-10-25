@@ -493,7 +493,14 @@ Item {
                                 contentItem: MaterialSymbol {
                                     anchors.centerIn: parent
                                     text: "edit"
-                                    iconSize: 16
+                                    iconSize: 22
+                                    // Tacit's edit glyph draws its ink off-centre: the box is
+                                    // centred but the pencil's mass sits up-left of it (the
+                                    // crosshair test proved it, down-right by a sixth of the
+                                    // glyph reads centred). Optical, sized with the glyph;
+                                    // the real fix belongs to TacitSymbols itself.
+                                    anchors.horizontalCenterOffset: iconSize / 6
+                                    anchors.verticalCenterOffset: iconSize / 6
                                     // The wash says edit mode is on; the glyph stays ink.
                                     color: Tacit.inkSec
                                 }
@@ -1009,8 +1016,7 @@ Item {
         }
     }
 
-    property bool drawerOpen: false
-    property bool editMode: false
+    property bool drawerOpen: false    property bool editMode: false
 
     // The dots button sits in the primary row's tail: the drawer is reachable whether or
     // not the user has filled all eight shown places.
