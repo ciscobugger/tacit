@@ -7,10 +7,17 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+// PROTOTYPE: exists for the swapped content below; remove with the swap to revert.
+import "proto"
 
 Scope {
     id: root
-    property int sidebarWidth: Appearance.sizes.sidebarWidth
+    // PROTOTYPE: the window hugs the prototype content's measure (seven 40 px cells —
+    // the secondary row — plus the body's two 16 px paddings); revert to
+    // Appearance.sizes.sidebarWidth with the swap when the layout idea is settled.
+    // !!! Update together with the content's own paddings (SidebarRightContentProto's
+    // sidebarPadding) and togglesWidth — this stale once already and cut the content.
+    property int sidebarWidth: 40 * 7 + 6 * 8 + 2 * 16
     readonly property bool centerOnly: Config.options.bar.layouts.leftLayout.length === 0 && Config.options.bar.layouts.rightLayout.length === 0 && !Config.options.bar.vertical
 
     PanelWindow {
@@ -166,7 +173,10 @@ Scope {
                         }
                     }
 
-                    sourceComponent: SidebarRightContent {
+                    // PROTOTYPE: the content shown is the rearranged panel
+                    // (proto/SidebarRightContentProto.qml); swap back to
+                    // SidebarRightContent and drop the "proto" import below to revert.
+                    sourceComponent: SidebarRightContentProto {
                         maxHeight: panelWindow.panelMaxHeight
                     }
                 }
