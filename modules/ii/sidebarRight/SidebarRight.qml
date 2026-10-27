@@ -20,6 +20,21 @@ Scope {
     property int sidebarWidth: 40 * 7 + 6 * 8 + 2 * 16
     readonly property bool centerOnly: Config.options.bar.layouts.leftLayout.length === 0 && Config.options.bar.layouts.rightLayout.length === 0 && !Config.options.bar.vertical
 
+    // PROTOTYPE: quickshell target for opening the panel without the notch, for the
+    // reshuffle and screenshots; revert with the swap.
+    IpcHandler {
+        target: "sidebar-right"
+        function toggle(): void {
+            GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+        }
+        function open(): void {
+            GlobalStates.sidebarRightOpen = true;
+        }
+        function close(): void {
+            GlobalStates.sidebarRightOpen = false;
+        }
+    }
+
     PanelWindow {
         id: panelWindow
 

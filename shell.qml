@@ -1,7 +1,9 @@
 //@ pragma UseQApplication
 //@ pragma Env QS_NO_RELOAD_POPUP=1
 // the notch's sand (Tacit.Sand, native/sand/build.sh) is installed in ~/.local/lib/qml
-//@ pragma Env QML_IMPORT_PATH=/home/abdul/.local/lib/qml
+// PROTOTYPE: Tacit.Kit readable for the rearranged panel's parts; revert this line with
+// the swap (an installed Tacit carries Tacit.Kit by package)
+//@ pragma Env QML_IMPORT_PATH=/home/yugaaank/Projects/tacit-kit/qml
 //@ pragma Env QT_QUICK_CONTROLS_STYLE=Basic
 //@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
 // Remove two slashes below and adjust the value to change the UI scale
