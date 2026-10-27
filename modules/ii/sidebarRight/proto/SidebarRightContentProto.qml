@@ -457,23 +457,27 @@ Item {
                 // ----------------------------------------- the toggles block
                 // Four primaries stacked in a 2×2 square; below them, one full-width row
                 // of secondary pills whose last cell (after the pills) is the dots, the
-                // drawer's opener. A Grid, not a Flow: the Flow was squeezed by the layout
-                // and wrapped every pill onto its own line.
-                ColumnLayout {
+                // drawer's opener; under the row the drawer and the sliders. The block
+                // lays its children by hand, not with a layout: a layout counts its gaps
+                // on a child's *visibility*, not on its animated height, so the drawer's
+                // fold snapped a whole gap in at both ends of the motion. Placed by
+                // hand, the drawer's trailing gap rides inside its animated height and
+                // the fold is one clean curve.
+                Item {
                     id: togglesBlock
                     Layout.fillWidth: true
-                    spacing: Kit.tokens.space.s
+                    implicitWidth: root.togglesWidth
+                    implicitHeight: slidersBlock.y + slidersBlock.height
 
                     Item {
                         id: primaryZone
                         objectName: "primaryZone"
-                        // An s more: the square stands a step apart from the row under it.
-                        Layout.bottomMargin: Kit.tokens.space.xs
+                        x: 0
+                        y: 0
                         implicitWidth: primaryGrid.width
                         implicitHeight: primaryGrid.height
-                        Layout.preferredWidth: implicitWidth
-                        Layout.preferredHeight: implicitHeight
-                        Layout.fillWidth: false
+                        width: implicitWidth
+                        height: implicitHeight
 
                         // The drop highlight: the zone tints while a dragged pill is aimed
                         // at it, so aiming is visible rather than imagined.
@@ -510,11 +514,12 @@ Item {
                     Item {
                         id: secondaryZone
                         objectName: "secondaryZone"
+                        // The row stands a step under the square.
+                        y: primaryZone.height + Kit.tokens.space.m
                         implicitWidth: secondaryGrid.width
                         implicitHeight: secondaryGrid.height
-                        Layout.preferredWidth: implicitWidth
-                        Layout.preferredHeight: implicitHeight
-                        Layout.alignment: Qt.AlignLeft
+                        width: implicitWidth
+                        height: implicitHeight
 
                         Rectangle {
                             anchors.fill: parent
@@ -582,134 +587,143 @@ Item {
                             }
                         }
                     }
-                }
 
                 // The drawer: the rest, closed by default, opened by the dots, kept in the
-                // shape the user last chose.
-                Item {
-                    Layout.fillWidth: true
-                    implicitHeight: !root.drawerOpen ? 0 : drawerColumn.implicitHeight
-                    visible: implicitHeight > 0
-                    clip: true
-                    Behavior on implicitHeight {
-                        NumberAnimation {
-                            duration: Kit.ms(Kit.motion("arrive").ms)
+                    // shape the user last chose. Hand-placed under the row; the fold runs on
+                    // the emphasized curve, and the gap that follows the drawer rides inside
+                    // the animated height, so opening and closing are each one smooth run
+                    // with no snap (a layout's spacing would have popped one in).
+                    Item {
+                        id: drawerWrapper
+                        y: secondaryZone.y + secondaryZone.height + Kit.tokens.space.s
+                        implicitHeight: !root.drawerOpen
+                            ? 0
+                            : drawerColumn.implicitHeight + Kit.tokens.space.m
+                        width: parent.width
+                        visible: implicitHeight > 0
+                        clip: true
+                        Behavior on implicitHeight {
+                            Anim {
+                                type: Anim.Emphasized
+                            }
+                        }
+
+                        ColumnLayout {
+                            id: drawerColumn
+                            objectName: "drawerColumn"
+                            width: parent.width
+                            spacing: Kit.tokens.space.m
+
+                            // The caption exists only while a pill is in the air: at rest the
+                            // drawer is just a shelf, and the mechanics show themselves in use.
+                            StyledText {
+                                text: root.dragging ? Translation.tr("Drop on the square to promote — anywhere else retires") : ""
+                                visible: root.dragging
+                                font.pixelSize: Kit.tokens.size.meta
+                                color: Tacit.inkMeta
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                            }
+
+                            // The pills fill the grid in seven across — every row of
+                            // height.action cells closes on the same right edge as the square
+                            // — and the pencil takes the tail of the last incomplete row, so
+                            // it is never alone on a line of its own.
+                            Grid {
+                                id: drawerGrid
+                                objectName: "drawerGrid"
+                                Layout.fillWidth: true
+                                columns: 7
+                                spacing: Kit.tokens.space.s
+
+                                Repeater {
+                                    model: root.drawerIds()
+                                    delegate: TogglePill {
+                                        required property string modelData
+                                        pillId: modelData
+                                        editMode: root.editMode
+                                        inDrawer: true
+                                        onPromoted: (id, level) => root.promoteAt(id, level, 0)
+                                    }
+                                }
+
+                                RippleButton {
+                                    implicitWidth: Kit.tokens.height.action
+                                    implicitHeight: Kit.tokens.height.action
+                                    buttonRadius: width / 2
+                                    borderWidth: 0
+                                    toggled: root.editMode
+                                    colBackground: root.colPillOff
+                                    colBackgroundHover: root.colPillOffHover
+                                    colBackgroundToggled: root.colPillOn
+                                    onClicked: {
+                                        root.editMode = !root.editMode;
+                                    }
+                                    contentItem: Symbol {
+                                        anchors.centerIn: parent
+                                        text: "edit"
+                                        size: Kit.tokens.icon.nav
+                                        // Measured at the pill's own scale: the glyph's ink
+                                        // is centred in its box, reading a hair high — a
+                                        // single pixel returned. The same TacitSymbols face
+                                        // the kit draws with, so the correction rides on it.
+                                        anchors.verticalCenterOffset: size / 22
+                                        // The wash says edit mode is on; the glyph stays ink.
+                                        color: Tacit.inkSec
+                                    }
+                                    FocusRing {
+                                        shown: parent.keyboardFocus
+                                        corner: width / 2
+                                    }
+                                    StyledToolTip {
+                                        text: Translation.tr("Reshuffle")
+                                    }
+                                    Keys.onPressed: event => {
+                                        Kit.focusVisible = true;
+                                    }
+                                    Accessible.role: Accessible.Button
+                                    Accessible.name: Translation.tr("Reshuffle")
+                                    Accessible.checkable: true
+                                    Accessible.checked: root.editMode
+                                }
+                            }
                         }
                     }
 
+                    // -------------------------------------------------- sliders
+                    // One full-width-of-the-toggles row per slider, below the toggles: the
+                    // kit's own Slider for the bar and the keyboard, the pill glyph left.
+                    // Backlight keeps the 2% floor and gamma rescue; the block is as wide as
+                    // the toggles block, so the numbers close on the same right edge the
+                    // pills do.
                     ColumnLayout {
-                        id: drawerColumn
-                        objectName: "drawerColumn"
-                        width: parent.width
+                        id: slidersBlock
+                        x: 0
+                        y: drawerWrapper.y + drawerWrapper.height
+                        width: root.togglesWidth
                         spacing: Kit.tokens.space.m
 
-                        // The caption exists only while a pill is in the air: at rest the
-                        // drawer is just a shelf, and the mechanics show themselves in use.
-                        StyledText {
-                            text: root.dragging ? Translation.tr("Drop on the square to promote — anywhere else retires") : ""
-                            visible: root.dragging
-                            font.pixelSize: Kit.tokens.size.meta
-                            color: Tacit.inkMeta
+                        LineSlider {
                             Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                        }
-
-                        // The pills fill the grid in seven across — every row of
-                        // height.action cells closes on the same right edge as the square
-                        // — and the pencil takes the tail of the last incomplete row, so
-                        // it is never alone on a line of its own.
-                        Grid {
-                            id: drawerGrid
-                            objectName: "drawerGrid"
-                            Layout.fillWidth: true
-                            columns: 7
-                            spacing: Kit.tokens.space.s
-
-                            Repeater {
-                                model: root.drawerIds()
-                                delegate: TogglePill {
-                                    required property string modelData
-                                    pillId: modelData
-                                    editMode: root.editMode
-                                    inDrawer: true
-                                    onPromoted: (id, level) => root.promoteAt(id, level, 0)
-                                }
-                            }
-
-                            RippleButton {
-                                implicitWidth: Kit.tokens.height.action
-                                implicitHeight: Kit.tokens.height.action
-                                buttonRadius: width / 2
-                                borderWidth: 0
-                                toggled: root.editMode
-                                colBackground: root.colPillOff
-                                colBackgroundHover: root.colPillOffHover
-                                colBackgroundToggled: root.colPillOn
-                                onClicked: {
-                                    root.editMode = !root.editMode;
-                                }
-                                contentItem: Symbol {
-                                    anchors.centerIn: parent
-                                    text: "edit"
-                                    size: Kit.tokens.icon.nav
-                                    // Measured at the pill's own scale: the glyph's ink
-                                    // is centred in its box, reading a hair high — a
-                                    // single pixel returned. The same TacitSymbols face
-                                    // the kit draws with, so the correction rides on it.
-                                    anchors.verticalCenterOffset: size / 22
-                                    // The wash says edit mode is on; the glyph stays ink.
-                                    color: Tacit.inkSec
-                                }
-                                FocusRing {
-                                    shown: parent.keyboardFocus
-                                    corner: width / 2
-                                }
-                                StyledToolTip {
-                                    text: Translation.tr("Reshuffle")
-                                }
-                                Keys.onPressed: event => {
-                                    Kit.focusVisible = true;
-                                }
-                                Accessible.role: Accessible.Button
-                                Accessible.name: Translation.tr("Reshuffle")
-                                Accessible.checkable: true
-                                Accessible.checked: root.editMode
+                            glyph: "brightness_6"
+                            label: Translation.tr("Brightness")
+                            value: root.brightnessMonitor?.brightness ?? 0
+                            onMoved: {
+                                if (Hyprsunset.gamma !== 100 && (root.brightnessMonitor?.brightness ?? 1) < 0.01)
+                                    Hyprsunset.setGamma(100);
+                                root.brightnessMonitor?.setBrightness(Math.max(0.02, value));
                             }
                         }
-                    }
-                }
-
-                // -------------------------------------------------- sliders
-                // One full-width-of-the-toggles row per slider, below the toggles: the
-                // kit's own Slider for the bar and the keyboard, the pill glyph left.
-                // Backlight keeps the 2% floor and gamma rescue; the block is as wide as
-                // the toggles block, so the numbers close on the same right edge the
-                // pills do.
-                ColumnLayout {
-                    Layout.fillWidth: false
-                    Layout.preferredWidth: root.togglesWidth
-                    spacing: Kit.tokens.space.m
-
-                    LineSlider {
-                        Layout.fillWidth: true
-                        glyph: "brightness_6"
-                        label: Translation.tr("Brightness")
-                        value: root.brightnessMonitor?.brightness ?? 0
-                        onMoved: {
-                            if (Hyprsunset.gamma !== 100 && (root.brightnessMonitor?.brightness ?? 1) < 0.01)
-                                Hyprsunset.setGamma(100);
-                            root.brightnessMonitor?.setBrightness(Math.max(0.02, value));
-                        }
-                    }
-                    LineSlider {
-                        Layout.fillWidth: true
-                        glyph: (Audio.sink?.audio?.muted ?? false) ? "volume_off"
-                            : ((Audio.sink?.audio?.volume ?? 0) < 0.34 ? "volume_down" : "volume_up")
-                        label: Translation.tr("Volume")
-                        value: Audio.sink?.audio?.volume ?? 0
-                        onMoved: {
-                            if (Audio.sink?.audio)
-                                Audio.sink.audio.volume = value;
+                        LineSlider {
+                            Layout.fillWidth: true
+                            glyph: (Audio.sink?.audio?.muted ?? false) ? "volume_off"
+                                : ((Audio.sink?.audio?.volume ?? 0) < 0.34 ? "volume_down" : "volume_up")
+                            label: Translation.tr("Volume")
+                            value: Audio.sink?.audio?.volume ?? 0
+                            onMoved: {
+                                if (Audio.sink?.audio)
+                                    Audio.sink.audio.volume = value;
+                            }
                         }
                     }
                 }
