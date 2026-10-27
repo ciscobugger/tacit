@@ -474,8 +474,12 @@ Item {
                         objectName: "primaryZone"
                         x: 0
                         y: 0
-                        implicitWidth: primaryGrid.width
-                        implicitHeight: primaryGrid.height
+                        // A constant 2×2 footprint, not the grid's: with fewer than four
+                        // pills the grid shrinks to them, but the square takes a drop in
+                        // any of its four cells — the empty half is still a cell.
+                        implicitWidth: root.togglesWidth
+                        implicitHeight: 2 * (Kit.tokens.height.action + Kit.tokens.space.l)
+                            + Kit.tokens.space.s
                         width: implicitWidth
                         height: implicitHeight
 
