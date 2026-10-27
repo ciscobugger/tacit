@@ -713,9 +713,12 @@ Item {
 
                 // -------------------------------------------------- calendar
                 // Always with the panel, below the sliders: no opener, no flag — it is
-                // where the clock used to lead you to, kept in place instead.
+                // where the clock used to lead you to, kept in place instead. The week
+                // strip is the resting shape: one row, the current week; the header's
+                // button unfolds the full month and folds it back.
                 CalendarWidget {
                     Layout.alignment: Qt.AlignHCenter
+                    expandable: true
                 }
 
                 // The sections (wifi, vpn, bluetooth, mixer...) are not here any more:
