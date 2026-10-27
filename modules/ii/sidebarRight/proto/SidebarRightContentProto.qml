@@ -643,7 +643,6 @@ Item {
                                         pillId: modelData
                                         editMode: root.editMode
                                         inDrawer: true
-                                        onPromoted: (id, level) => root.promoteAt(id, level, 0)
                                     }
                                 }
 
@@ -1090,7 +1089,6 @@ Item {
         property bool editMode: false
         property bool inDrawer: false
         signal demoted(string id)
-        signal promoted(string id, string level)
         // Not required this time: the model arrives from createObject, not the catalog.
         property var model
 
@@ -1159,8 +1157,8 @@ Item {
         colBackgroundToggled: root.colPillOn
         colBackgroundToggledHover: root.colPillOnHover
 
-        // Normal use (edit off): click = the pill's action. In edit mode a click is
-        // nothing (the owner's call): drag or the arrows place the pill.
+        // Normal use (edit off): click = the pill's action, or the dialog. In edit mode
+        // rearranging is drag or arrows only: a click, left or right, is nothing.
         releaseAction: () => {
             if (pill.editMode)
                 return;
@@ -1170,10 +1168,8 @@ Item {
                 pill.model.mainAction();
             }
         }
-        // In edit mode the right button promotes (drawer pills only); otherwise it
-        // toggles directly for pills with a list, as the real panel does.
         altAction: pill.editMode
-            ? (pill.inDrawer ? (function() { root.pushUndo(`Moved ${pill.name} to the square`); pill.promoted(pill.pillId, "primary"); }) : null)
+            ? null
             : (pill.dialog.length > 0
                 ? (function() { if (pill.model.available) pill.model.mainAction(); })
                 : pill.model?.altAction)
@@ -1195,7 +1191,7 @@ Item {
         }
         StyledToolTip {
             text: pill.editMode
-                ? (pill.inDrawer ? Translation.tr("Make secondary · right-click: primary") : Translation.tr("Back to the drawer"))
+                ? Translation.tr("Drag to its place")
                 : pill.name
         }
         Keys.onPressed: event => {
@@ -1319,7 +1315,7 @@ Item {
             corner: Kit.tokens.radius.slab
         }
         StyledToolTip {
-            text: primary.editMode ? Translation.tr("Back to the drawer") : ((primary.model?.name ?? "") + (primary.dialog.length > 0 ? Translation.tr("\nRight-click to turn on/off") : ""))
+            text: primary.editMode ? Translation.tr("Drag to its place") : ((primary.model?.name ?? "") + (primary.dialog.length > 0 ? Translation.tr("\nRight-click to turn on/off") : ""))
         }
         Keys.onPressed: event => {
             Kit.focusVisible = true;
