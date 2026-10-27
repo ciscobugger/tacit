@@ -474,12 +474,14 @@ Item {
                         objectName: "primaryZone"
                         x: 0
                         y: 0
-                        // A constant 2×2 footprint, not the grid's: with fewer than four
-                        // pills the grid shrinks to them, but the square takes a drop in
-                        // any of its four cells — the empty half is still a cell.
+                        // The square's 2×2 footprint, full width, but its height follows
+                        // the rows the pills use: two primaries are one row, four are two.
+                        // (It is never shorter than one row: with a single primary the
+                        // empty half is still a cell.)
                         implicitWidth: root.togglesWidth
-                        implicitHeight: 2 * (Kit.tokens.height.action + Kit.tokens.space.l)
-                            + Kit.tokens.space.s
+                        implicitHeight: Math.ceil(Math.max(1, root.primary.length) / 2)
+                            * (Kit.tokens.height.action + Kit.tokens.space.l)
+                            + (Math.ceil(Math.max(1, root.primary.length) / 2) - 1) * Kit.tokens.space.s
                         width: implicitWidth
                         height: implicitHeight
 
