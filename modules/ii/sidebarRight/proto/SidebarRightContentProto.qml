@@ -467,6 +467,8 @@ Item {
                     Item {
                         id: primaryZone
                         objectName: "primaryZone"
+                        // An s more: the square stands a step apart from the row under it.
+                        Layout.bottomMargin: Kit.tokens.space.xs
                         implicitWidth: primaryGrid.width
                         implicitHeight: primaryGrid.height
                         Layout.preferredWidth: implicitWidth
