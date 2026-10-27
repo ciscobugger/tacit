@@ -1098,6 +1098,10 @@ Item {
             anchors.fill: parent
             z: 10
             enabled: pill.editMode
+            // The drag is ours, not the scroll's: a vertical pill drag (up to the
+            // square) must not be stolen by the flickable mid-move, or the release
+            // lands as a cancel and nothing happens.
+            preventStealing: true
             cursorShape: Qt.ClosedHandCursor
             onPressed: mouse => {
                 pill.rootBeginDrag(mouse);
@@ -1225,6 +1229,8 @@ Item {
             anchors.fill: parent
             z: 10
             enabled: primary.editMode
+            // Same as the TogglePill's: the drag is ours, not the scroll's.
+            preventStealing: true
             cursorShape: Qt.ClosedHandCursor
             onPressed: mouse => primary.rootBeginDrag(mouse)
             // A lifted grab (the panel closing under the pointer) is not a drop.
