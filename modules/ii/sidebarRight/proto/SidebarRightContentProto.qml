@@ -449,8 +449,9 @@ Item {
             ColumnLayout {
                 id: column
                 width: body.width
-                // The grid of four (the kit's Layout): a block gap is space.m, a pill
-                // gap is space.s, the panel's own inset is space.l.
+                // The panel reads in three groups — the toggles (square, row, drawer)
+                // and the sliders with them, the calendar, the bottom row — so inside
+                // a group the gap is space.m and between groups an s more.
                 spacing: Kit.tokens.space.m
 
                 // ----------------------------------------- the toggles block
@@ -711,13 +712,14 @@ Item {
                     }
                 }
 
-                // -------------------------------------------------- calendar
+                // -------------------------------------- calendar (its own group)
                 // Always with the panel, below the sliders: no opener, no flag — it is
                 // where the clock used to lead you to, kept in place instead. The week
                 // strip is the resting shape: one row, the current week; the header's
                 // button unfolds the full month and folds it back.
                 CalendarWidget {
                     Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: Kit.tokens.space.s
                     expandable: true
                 }
 
@@ -725,7 +727,11 @@ Item {
                 // with a submenu the toggle opens its floating card over the panel — see
                 // submenuLayer below the body.
 
-                Hairline {}
+                // The hairline opens the bottom row's group: calendar apart, then the
+                // row and the notice's strip together.
+                Hairline {
+                    Layout.topMargin: Kit.tokens.space.s
+                }
 
                 // -------------------------------------------------- footer: date · icons
                 // The time and date lead the row on the left, mirroring the notch's
@@ -859,10 +865,12 @@ Item {
                 width: root.togglesWidth
                 height: submenuColumn.implicitHeight + root.sidebarPadding * 2
                 radius: Kit.tokens.radius.panel
-                // The card is the panel's own ground (the frost, the same colour the
-                // panel stands on) — no shadow lifts it, no scrim dims what is behind;
-                // the panel keeps its silhouette and the card its place.
-                color: Appearance.colors.colPanelFrost
+                // The card is the panel's own ground, solid: the same role the
+                // panel's frost is made of (m3surfaceContainerHigh) without the
+                // see-through, so the contents the card floats over stay behind it.
+                // No shadow lifts it, no scrim dims what is behind; the panel keeps
+                // its silhouette and the card its place.
+                color: Appearance.m3colors.m3surfaceContainerHigh
 
                 Behavior on y {
                     NumberAnimation {
