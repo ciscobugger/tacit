@@ -8,11 +8,11 @@ import qs.modules.common.functions
 import qs.modules.common.models.quickToggles
 import qs.modules.tacit
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Bluetooth
+import Tacit.Kit
 import qs.modules.ii.sidebarRight.bluetoothDevices
 import qs.modules.ii.sidebarRight.vpn
 import qs.modules.ii.sidebarRight.nightLight
@@ -25,37 +25,45 @@ import qs.modules.ii.sidebarRight.calendar
  *
  * Compared with SidebarRightContent.qml:
  *   - timer and tasks (BottomWidgetGroup) are gone
- *   - Settings and Session are icon-only buttons on the footer's right (Session is
+ *   - Settings and Session are icon buttons on the footer's right (Session is
  *     risk-coloured: it ends the session)
- *   - sliders are horizontal, below the toggles
+ *   - sliders are horizontal, below the toggles; the calendar lives below them,
+ *     always visible
  *   - four primary toggles stacked in a 2×2 square, a row of secondary pills below it
  *     (always full: the drawer's own toggles fill its empty cells), the dots (drawer
  *     opener) as the row's last cell, the rest hidden in a drawer; the user's
  *     arrangement is kept in Directories.state/user/sidebar-arrangement.json
- *   - a toggle's submenu opens as an opaque card floating over the panel (elevation
- *     shadow + lighter scrim), pinned under the toggles block; click outside closes;
+ *   - a toggle's submenu opens as a card in the panel's own ground floating over the
+ *     panel (no shadow, no scrim), pinned under the toggles block; click outside
+ *     closes; one submenu at a time
  *
- * Edit mode (the drawer's pencil): any pill is a drag — a ghost follows the pointer,
- * the zone under it tints, and the release decides placement: a primary square cell, a
+ * The parts the design kit carries are the kit's own (`import Tacit.Kit`): Symbol, IconButton,
+ * Slider, FocusRing. Values (corners, text sizes, spaces, motion) come from
+ * Kit.tokens; the panel's own frost and the pill washes stay the shell's, in
+ * Appearance/Tacit roles (Tacit.q carries the same token block, generated from
+ * tacit-kit's tokens.json).
+ *
+ * Arranging: a pill is a drag in edit mode — a ghost follows the pointer, the zone
+ * under it tints, and the release decides placement: a primary square cell, a
  * secondary row slot, or retired to the drawer anywhere else. Primary and secondary
- * take at most 4 and 5; an overflowed pill returns to the drawer.
+ * take at most 4 and 6; an overflowed pill returns to the drawer. Every placement
+ * (drag or keyboard) is undoable: a line offers Undo at the foot, Ctrl+Z works too.
+ * Every pill takes Tab and moves with the arrows: left/right swap it with its
+ * neighbour in its own level, up promotes (the square, the row, then the drawer),
+ * down demotes. The keyboard ring is the kit's FocusRing.
  */
 Item {
     id: root
     property int sidebarWidth: Appearance.sizes.sidebarWidth
-    property int sidebarPadding: 16
+    property int sidebarPadding: Kit.tokens.space.l
     property bool showAudioOutputDialog: false
     property bool showAudioInputDialog: false
     property bool showBluetoothDialog: false
     property bool showNightLightDialog: false
     property bool showWifiDialog: false
-    // The calendar: opened from the footer's clock, in a floating card like the
-    // toggle submenus (so only() applies, and the panel clears it on close).
-    property bool showCalendar: false
-
 
     property bool showVpn: false
-    readonly property var sectionFlags: ["showWifiDialog", "showVpn", "showBluetoothDialog", "showAudioOutputDialog", "showAudioInputDialog", "showNightLightDialog", "showCalendar"]
+    readonly property var sectionFlags: ["showWifiDialog", "showVpn", "showBluetoothDialog", "showAudioOutputDialog", "showAudioInputDialog", "showNightLightDialog"]
     function only(flag) {
         for (const f of root.sectionFlags)
             if (f !== flag && root[f])
@@ -78,8 +86,32 @@ Item {
                     root[f] = false;
                 root.drawerOpen = false;
                 root.editMode = false;
+                _undoBox.hide();
             }
         }
+    }
+
+    // ---------------------------------------------------------------- undo
+    // The undo line (a small stand-in for the kit's Notice, which reads
+    // Kit.tokens.overlay — a token the shell's Tacit does not carry yet). One step
+    // back: only the last placement can be undone.
+    property var _undoSnapshot: null
+    function pushUndo(line) {
+        _undoSnapshot = {
+            primary: root.primary.slice(),
+            secondary: root.secondary.slice()
+        };
+        _undoBox.show(line, "Undo");
+    }
+    function doUndo() {
+        if (!root._undoSnapshot)
+            return;
+        const s = root._undoSnapshot;
+        root.primary = s.primary.slice();
+        root.secondary = s.secondary.slice();
+        root._undoSnapshot = null;
+        root.saveArrangement();
+        _undoBox.hide();
     }
 
     // The user's arrangement: four primary in a 2×2 square (they stack two wide), a
@@ -115,30 +147,37 @@ Item {
     property bool dragging: false
     property string dragTarget: ""
     property string dragIcon: ""
+    property string dragName: ""
     property point dragPoint
-    function beginDrag(icon, rootPos) {
+    function beginDrag(icon, name, rootPos) {
         root.dragIcon = icon;
+        root.dragName = name;
         root.dragPoint = rootPos;
         root.dragging = true;
     }
     function moveDrag(rootPos) {
         root.dragPoint = rootPos;
     }
-    // Where a drop sits, per zone: the primary square is two 160 px cells in two rows
-    // with an 8 px gap; the secondary row is 40 px pills on one line, the dots in its
-    // last cell.
+    // Where a drop sits, per zone: the primary square is two cells wide split of the
+    // toggles measure in two rows with an s gap; the secondary row is height.action
+    // pills on one line, the dots in its last cell.
     function primaryIndex(pointInGrid) {
-        const col = Math.min(1, Math.floor((pointInGrid.x + 4) / 168));
-        const row = Math.min(1, Math.floor((pointInGrid.y + 4) / 64));
+        // The square: two cells split of the toggles measure, two rows of the primary
+        // pill's own height, both with an s gap (cell pitch 168).
+        const cell = (root.togglesWidth - Kit.tokens.space.s) / 2;
+        const rowHeight = Kit.tokens.height.action + Kit.tokens.space.l;
+        const col = Math.min(1, Math.floor((pointInGrid.x + Kit.tokens.space.s / 2) / (cell + Kit.tokens.space.s)));
+        const row = Math.min(1, Math.floor((pointInGrid.y + Kit.tokens.space.s / 2) / (rowHeight + Kit.tokens.space.s)));
         return row * 2 + col;
     }
     function secondaryIndex(pointInGrid) {
-        const idx = Math.min(6, Math.floor(pointInGrid.x / 48));
+        const pitch = Kit.tokens.height.action + Kit.tokens.space.s;
+        const idx = Math.min(6, Math.floor(pointInGrid.x / pitch));
         return idx < 6 ? idx : -1; // -1: the dots' cell
     }
-    // Which drop zone the pointer sits in: the primary column, the square, or none
-    // ("retire"). Used for the drop highlight while dragging and by endDrag; both pass
-    // root.dragPoint, so the highlight re-evaluates on every move.
+    // Which drop zone the pointer sits in: the primary square, the secondary row, or
+    // none ("retire"). Used for the drop highlight while dragging and by endDrag; both
+    // pass root.dragPoint, so the highlight re-evaluates on every move.
     function zoneAt(rootPos) {
         const p0 = primaryZone.mapToItem(root, 0, 0);
         const s0 = secondaryZone.mapToItem(root, 0, 0);
@@ -152,13 +191,16 @@ Item {
     }
     function endDrag(rootPos) {
         const pill = root.dragTarget;
+        const name = root.dragName;
         root.dragging = false;
         root.dragTarget = "";
         root.dragIcon = ""; // no stale glyph under the hidden ghost's next appearance
+        root.dragName = "";
         if (pill.length === 0)
             return;
         // Where the pointer sat, in panel coordinates, against each zone's bounds.
         const zone = root.zoneAt(rootPos);
+        root.pushUndo(`Moved ${name}`);
         if (zone === "primary") {
             root.promoteAt(pill, "primary", root.primaryIndex(root.mapToItem(primaryZone, rootPos.x, rootPos.y)));
         } else if (zone === "secondary") {
@@ -177,6 +219,7 @@ Item {
         root.dragging = false;
         root.dragTarget = "";
         root.dragIcon = "";
+        root.dragName = "";
     }
     // Promote with a place: a full level retires the pill that loses its spot (the last
     // one), and a drop with an index can also reorder within a level. Four primaries in
@@ -207,6 +250,63 @@ Item {
             }
         }
         root.saveArrangement();
+    }
+
+    // ------------------------------------------------------------------ keyboard
+    // Tab reaches every pill; arrows move it. Names ride with the move for the undo
+    // line. After a move the moved pill keeps the keyboard focus (the Repeater
+    // recreates delegates on any list change, so the id is handed back).
+    property string pendingFocus: ""
+    function focusNext(id) {
+        if (id.length > 0)
+            root.pendingFocus = id;
+    }
+    function keyboardMove(id, name, level, dir) {
+        if (level === "primary") {
+            const i = root.primary.indexOf(id);
+            if ((dir === "left" || dir === "right") && i >= 0) {
+                const j = i + (dir === "left" ? -1 : 1);
+                if (j < 0 || j >= root.primary.length)
+                    return;
+                root.pushUndo(`Swapped ${name} and ${root.primary[j]}`);
+                const list = root.primary.slice();
+                list[i] = list[j];
+                list[j] = id;
+                root.primary = list;
+                root.focusNext(id);
+            } else if (dir === "down") {
+                root.pushUndo(`Moved ${name} to the row`);
+                root.promoteAt(id, "secondary", root.secondary.length);
+                root.focusNext(id);
+            }
+        } else if (level === "secondary") {
+            const i = root.secondary.indexOf(id);
+            if ((dir === "left" || dir === "right") && i >= 0) {
+                const j = i + (dir === "left" ? -1 : 1);
+                if (j < 0 || j >= root.secondary.length)
+                    return;
+                root.pushUndo(`Swapped ${name} and ${root.secondary[j]}`);
+                const list = root.secondary.slice();
+                list[i] = list[j];
+                list[j] = id;
+                root.secondary = list;
+                root.focusNext(id);
+            } else if (dir === "up") {
+                root.pushUndo(`Moved ${name} to the square`);
+                root.promoteAt(id, "primary", root.primary.length);
+                root.focusNext(id);
+            } else if (dir === "down") {
+                root.pushUndo(`Moved ${name} to the drawer`);
+                root.demote(id);
+                root.focusNext(id);
+            }
+        } else if (level === "drawer") {
+            if (dir === "up") {
+                root.pushUndo(`Moved ${name} to the square`);
+                root.promoteAt(id, "primary", root.primary.length);
+                root.focusNext(id);
+            }
+        }
     }
 
     // Everything the drawer can hold. Each id wants a toggle model and, for the ones with
@@ -240,12 +340,12 @@ Item {
     readonly property color colPillOff: ColorUtils.mix(Tacit.inkMain, Tacit.ground, 0.05)
     readonly property color colPillOffHover: ColorUtils.mix(Tacit.inkMain, Tacit.ground, 0.07)
     property real maxHeight: 700
-    // The toggles block is the panel's measure: seven 40 px cells — six secondaries in
-    // the row with the dots as the seventh — close it; the primary square's two pills
-    // split the same width. The sliders, row and drawer's grid all match this width so
-    // the panel's columns close on the same right edge.
-    readonly property real togglesWidth: 40 * 7 + 6 * 8
-    // The row's six pills are 40 px with the dots as the seventh cell.
+    // The toggles block is the panel's measure: seven height.action cells — six
+    // secondaries in the row with the dots as the seventh — close it; the primary
+    // square's two pills split the same width. The sliders, row and drawer's grid all
+    // match this width so the panel's columns close on the same right edge.
+    readonly property real togglesWidth: Kit.tokens.height.action * 7 + Kit.tokens.space.s * 6
+    // The row's six pills are height.action with the dots as the seventh cell.
     // The row is always full: the user's secondaries first, then the drawer's next ids
     // take the rest of the row's cells (they stay drawer items until placed by hand).
     function rowIds() {
@@ -298,6 +398,9 @@ Item {
 
         anchors.fill: parent
         color: "transparent"
+        // The panel's own silhouette (DockedRect's coves) — the shell's surface, not
+        // content; the shipped panel carries this radius, the kit's radius.token
+        // ladder begins at content.
         radius: Appearance.rounding.verylarge
 
         // The panel's own material — frost and body — gathered under one item; the
@@ -324,12 +427,31 @@ Item {
             interactive: contentHeight > height
             clip: true
 
+            // Escape folds what is open (the submenu first, the drawer, then edit
+            // mode); Ctrl+Z steps the last placement back.
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_Escape) {
+                    if (root.sectionFlags.some(f => root[f])) {
+                        for (const f of root.sectionFlags)
+                            root[f] = false;
+                    } else if (root.drawerOpen) {
+                        root.drawerOpen = false;
+                    } else {
+                        root.editMode = false;
+                    }
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Z && (event.modifiers & Qt.ControlModifier)) {
+                    root.doUndo();
+                    event.accepted = true;
+                }
+            }
+
             ColumnLayout {
                 id: column
                 width: body.width
-                // The grid of four (the kit's Layout): a block gap is m (12), a pill
-                // gap is s (8), the panel's own inset is l (16).
-                spacing: 12
+                // The grid of four (the kit's Layout): a block gap is space.m, a pill
+                // gap is space.s, the panel's own inset is space.l.
+                spacing: Kit.tokens.space.m
 
                 // ----------------------------------------- the toggles block
                 // Four primaries stacked in a 2×2 square; below them, one full-width row
@@ -339,7 +461,7 @@ Item {
                 ColumnLayout {
                     id: togglesBlock
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: Kit.tokens.space.s
 
                     Item {
                         id: primaryZone
@@ -354,13 +476,13 @@ Item {
                         // at it, so aiming is visible rather than imagined.
                         Rectangle {
                             anchors.fill: parent
-                            anchors.margins: -8
-                            radius: Appearance.rounding.normal
+                            anchors.margins: -Kit.tokens.space.s
+                            radius: Kit.tokens.radius.row
                             color: ColorUtils.transparentize(root.colPillOn, 0.75)
                             opacity: root.dragging && root.zoneAt(root.dragPoint) === "primary" ? 1 : 0
                             Behavior on opacity {
-                                Anim {
-                                    type: Anim.DefaultEffects
+                                NumberAnimation {
+                                    duration: Kit.ms(Kit.motion("fadeFast").ms)
                                 }
                             }
                         }
@@ -368,7 +490,7 @@ Item {
                         Grid {
                             id: primaryGrid
                             columns: 2
-                            spacing: 8
+                            spacing: Kit.tokens.space.s
 
                             Repeater {
                                 model: root.primary
@@ -376,8 +498,6 @@ Item {
                                     required property string modelData
                                     pillId: modelData
                                     editMode: root.editMode
-                                    implicitWidth: 160
-                                    implicitHeight: 56
                                     onDemoted: id => root.demote(id)
                                 }
                             }
@@ -395,25 +515,25 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            anchors.margins: -8
-                            radius: Appearance.rounding.normal
+                            anchors.margins: -Kit.tokens.space.s
+                            radius: Kit.tokens.radius.row
                             color: ColorUtils.transparentize(root.colPillOn, 0.75)
                             opacity: root.dragging && root.zoneAt(root.dragPoint) === "secondary" ? 1 : 0
                             Behavior on opacity {
-                                Anim {
-                                    type: Anim.DefaultEffects
+                                NumberAnimation {
+                                    duration: Kit.ms(Kit.motion("fadeFast").ms)
                                 }
                             }
                         }
 
-                        // The row: six 40 px pills — the user's secondaries, then
+                        // The row: six height.action pills — the user's secondaries, then
                         // auto-filled from the drawer — and the dots as the seventh
                         // cell, wide enough to close the row's right edge.
                         Grid {
                             id: secondaryGrid
                             objectName: "secondaryGrid"
                             rows: 1
-                            spacing: 8
+                            spacing: Kit.tokens.space.s
                             horizontalItemAlignment: Qt.AlignLeft
 
                             Repeater {
@@ -428,22 +548,34 @@ Item {
 
                             // The dots, the row's last cell: opens (or closes) the drawer.
                             RippleButton {
-                                implicitWidth: 40
-                                implicitHeight: 40
-                                buttonRadius: 20
+                                implicitWidth: Kit.tokens.height.action
+                                implicitHeight: Kit.tokens.height.action
+                                buttonRadius: width / 2
+                                borderWidth: 0
                                 toggled: root.drawerOpen
                                 colBackgroundToggled: root.colPillOn
                                 colBackgroundToggledHover: root.colPillOnHover
                                 onClicked: root.drawerOpen = !root.drawerOpen
-                                contentItem: MaterialSymbol {
+                                contentItem: Symbol {
                                     anchors.centerIn: parent
                                     text: root.drawerOpen ? "expand_less" : "more_horiz"
-                                    iconSize: 22
+                                    size: Kit.tokens.icon.nav
                                     color: Tacit.inkMain
+                                }
+                                FocusRing {
+                                    shown: parent.keyboardFocus
+                                    corner: width / 2
                                 }
                                 StyledToolTip {
                                     text: Translation.tr("More")
                                 }
+                                Keys.onPressed: event => {
+                                    Kit.focusVisible = true;
+                                }
+                                Accessible.role: Accessible.Button
+                                Accessible.name: Translation.tr("More")
+                                Accessible.checkable: true
+                                Accessible.checked: root.drawerOpen
                             }
                         }
                     }
@@ -457,8 +589,8 @@ Item {
                     visible: implicitHeight > 0
                     clip: true
                     Behavior on implicitHeight {
-                        Anim {
-                            type: Anim.Emphasized
+                        NumberAnimation {
+                            duration: Kit.ms(Kit.motion("arrive").ms)
                         }
                     }
 
@@ -466,29 +598,29 @@ Item {
                         id: drawerColumn
                         objectName: "drawerColumn"
                         width: parent.width
-                        spacing: 12
+                        spacing: Kit.tokens.space.m
 
                         // The caption exists only while a pill is in the air: at rest the
                         // drawer is just a shelf, and the mechanics show themselves in use.
                         StyledText {
                             text: root.dragging ? Translation.tr("Drop on the square to promote — anywhere else retires") : ""
                             visible: root.dragging
-                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            font.pixelSize: Kit.tokens.size.meta
                             color: Tacit.inkMeta
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
                         }
 
-                        // The pills fill the grid in seven across — every row of 40 px
-                        // cells closes on the same right edge as the square — and the
-                        // pencil takes the tail of the last incomplete row, so it is
-                        // never alone on a line of its own.
+                        // The pills fill the grid in seven across — every row of
+                        // height.action cells closes on the same right edge as the square
+                        // — and the pencil takes the tail of the last incomplete row, so
+                        // it is never alone on a line of its own.
                         Grid {
                             id: drawerGrid
                             objectName: "drawerGrid"
                             Layout.fillWidth: true
                             columns: 7
-                            spacing: 8
+                            spacing: Kit.tokens.space.s
 
                             Repeater {
                                 model: root.drawerIds()
@@ -502,9 +634,10 @@ Item {
                             }
 
                             RippleButton {
-                                implicitWidth: 40
-                                implicitHeight: 40
-                                buttonRadius: 20
+                                implicitWidth: Kit.tokens.height.action
+                                implicitHeight: Kit.tokens.height.action
+                                buttonRadius: width / 2
+                                borderWidth: 0
                                 toggled: root.editMode
                                 colBackground: root.colPillOff
                                 colBackgroundHover: root.colPillOffHover
@@ -512,24 +645,32 @@ Item {
                                 onClicked: {
                                     root.editMode = !root.editMode;
                                 }
-                                contentItem: MaterialSymbol {
+                                contentItem: Symbol {
                                     anchors.centerIn: parent
                                     text: "edit"
-                                    iconSize: 22
-                                    // Measured at the pill's own scale: the glyph's ink is
-                                    // centred in its box, reading a hair high — a single
-                                    // pixel returned. (The earlier "mass leans up-left"
-                                    // diagnosis came from a 60 px mock and was wrong; the
-                                    // old equal-axes nudge it produced put the pencil
-                                    // almost four pixels right. The honest fix — if other
-                                    // sizes keep disagreeing — is in TacitSymbols itself.)
-                                    anchors.verticalCenterOffset: iconSize / 22
+                                    size: Kit.tokens.icon.nav
+                                    // Measured at the pill's own scale: the glyph's ink
+                                    // is centred in its box, reading a hair high — a
+                                    // single pixel returned. The same TacitSymbols face
+                                    // the kit draws with, so the correction rides on it.
+                                    anchors.verticalCenterOffset: size / 22
                                     // The wash says edit mode is on; the glyph stays ink.
                                     color: Tacit.inkSec
+                                }
+                                FocusRing {
+                                    shown: parent.keyboardFocus
+                                    corner: width / 2
                                 }
                                 StyledToolTip {
                                     text: Translation.tr("Reshuffle")
                                 }
+                                Keys.onPressed: event => {
+                                    Kit.focusVisible = true;
+                                }
+                                Accessible.role: Accessible.Button
+                                Accessible.name: Translation.tr("Reshuffle")
+                                Accessible.checkable: true
+                                Accessible.checked: root.editMode
                             }
                         }
                     }
@@ -537,18 +678,19 @@ Item {
 
                 // -------------------------------------------------- sliders
                 // One full-width-of-the-toggles row per slider, below the toggles: the
-                // notch meter's language (glyph left, number right) exactly as the
-                // shipped panel's LineSlider draws it. Backlight keeps the 2% floor and
-                // gamma rescue; the block is as wide as the toggles block, so the
-                // numbers close on the same right edge the pills do.
+                // kit's own Slider for the bar and the keyboard, the pill glyph left.
+                // Backlight keeps the 2% floor and gamma rescue; the block is as wide as
+                // the toggles block, so the numbers close on the same right edge the
+                // pills do.
                 ColumnLayout {
                     Layout.fillWidth: false
                     Layout.preferredWidth: root.togglesWidth
-                    spacing: 12
+                    spacing: Kit.tokens.space.m
 
                     LineSlider {
                         Layout.fillWidth: true
                         glyph: "brightness_6"
+                        label: Translation.tr("Brightness")
                         value: root.brightnessMonitor?.brightness ?? 0
                         onMoved: {
                             if (Hyprsunset.gamma !== 100 && (root.brightnessMonitor?.brightness ?? 1) < 0.01)
@@ -560,12 +702,20 @@ Item {
                         Layout.fillWidth: true
                         glyph: (Audio.sink?.audio?.muted ?? false) ? "volume_off"
                             : ((Audio.sink?.audio?.volume ?? 0) < 0.34 ? "volume_down" : "volume_up")
+                        label: Translation.tr("Volume")
                         value: Audio.sink?.audio?.volume ?? 0
                         onMoved: {
                             if (Audio.sink?.audio)
                                 Audio.sink.audio.volume = value;
                         }
                     }
+                }
+
+                // -------------------------------------------------- calendar
+                // Always with the panel, below the sliders: no opener, no flag — it is
+                // where the clock used to lead you to, kept in place instead.
+                CalendarWidget {
+                    Layout.alignment: Qt.AlignHCenter
                 }
 
                 // The sections (wifi, vpn, bluetooth, mixer...) are not here any more:
@@ -576,92 +726,87 @@ Item {
 
                 // -------------------------------------------------- footer: date · icons
                 // The time and date lead the row on the left, mirroring the notch's
-                // clock; the two actions close it on the right as icon buttons (the
-                // user's call over the kit's words here: they read faster in a single
-                // glance, and both carry their names as tooltips). Session's symbol is
-                // in the risk ink regardless. The shipped panel closes itself before
+                // clock; the two actions close it on the right. Session's symbol is in
+                // the risk ink regardless. The shipped panel closes itself before
                 // opening Settings, handing it the screen.
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: Kit.tokens.space.s
 
-                    // The clock is the calendar's opener: the row hovers as one and opens
-                    // the calendar in the floating card above (the card of the toggles'
-                    // submenus, one at a time), the hover wash being its on-signal too.
-                    RippleButton {
-                        implicitWidth: clockRow.implicitWidth + 8
-                        implicitHeight: 40
-                        buttonRadius: Appearance.rounding.small
-                        colBackground: "transparent"
-                        colBackgroundHover: Appearance.colors.colLayer1Hover
-                        colBackgroundToggled: Appearance.colors.colLayer1Hover
-                        toggled: root.showCalendar
-                        onClicked: root.showCalendar = !root.showCalendar
-                        contentItem: Row {
-                            id: clockRow
-                            spacing: 8
-                            StyledText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: DateTime.time
-                                font.family: Appearance.font.family.numbers
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                color: Tacit.inkMain
-                            }
-                            StyledText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: DateTime.longDate
-                                font.pixelSize: Appearance.font.pixelSize.smaller
-                                color: Tacit.inkMeta
-                            }
+                    ColumnLayout {
+                        spacing: 0
+
+                        StyledText {
+                            Layout.alignment: Qt.AlignLeft
+                            text: DateTime.time
+                            font.family: Appearance.font.family.numbers
+                            font.pixelSize: Kit.tokens.size.row
+                            color: Tacit.inkMain
                         }
-                        StyledToolTip {
-                            text: Translation.tr("Calendar")
+                        StyledText {
+                            Layout.alignment: Qt.AlignLeft
+                            text: DateTime.longDate
+                            font.pixelSize: Kit.tokens.size.meta
+                            color: Tacit.inkMeta
                         }
                     }
 
                     Item {
                         Layout.fillWidth: true
                     }
-                    RippleButton {
-                        implicitWidth: 40
-                        implicitHeight: 40
-                        buttonRadius: 20
-                        colBackground: "transparent"
-                        colBackgroundHover: Appearance.colors.colLayer1Hover
-                        onClicked: {
+
+                    IconButton {
+                        symbol: "settings"
+                        label: Translation.tr("Settings")
+                        tip: Translation.tr("Settings")
+                        onActivated: {
                             GlobalStates.sidebarRightOpen = false;
                             SettingsApp.open("");
                         }
-                        contentItem: MaterialSymbol {
-                            anchors.centerIn: parent
-                            text: "settings"
-                            iconSize: 20
-                            color: Tacit.inkSec
-                        }
-                        StyledToolTip {
-                            text: Translation.tr("Settings")
-                        }
                     }
                     RippleButton {
-                        implicitWidth: 40
-                        implicitHeight: 40
-                        buttonRadius: 20
-                        colBackground: "transparent"
-                        colBackgroundHover: Appearance.colors.colLayer1Hover
+                        implicitWidth: 36
+                        implicitHeight: 36
+                        buttonRadius: width / 2
+                        borderWidth: 0
+                        colBackgroundHover: root.colPillOffHover
                         onClicked: {
                             GlobalStates.sidebarRightOpen = false;
                             GlobalStates.sessionOpen = true;
                         }
-                        contentItem: MaterialSymbol {
+                        contentItem: Symbol {
                             anchors.centerIn: parent
                             text: "mode_off_on"
-                            iconSize: 20
+                            size: Kit.tokens.icon.row
                             // An action that risks something (the session ends) is risk-
                             // coloured, with its warning companion as the tooltip.
                             color: Tacit.risk
                         }
+                        FocusRing {
+                            shown: parent.keyboardFocus
+                            corner: width / 2
+                        }
                         StyledToolTip {
                             text: Translation.tr("Ends the session")
+                        }
+                        Keys.onPressed: event => {
+                            Kit.focusVisible = true;
+                        }
+                        Accessible.role: Accessible.Button
+                        Accessible.name: Translation.tr("Ends the session")
+                    }
+                }
+
+                // The notice's own strip: while the undo line is up, the panel grows a
+                // line at its foot for it (the strip is what the toast draws over), so
+                // the message never covers the working panel.
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: _undoBox.isShown ? undoRow.height + Kit.tokens.space.s : 0
+                    visible: implicitHeight > 0
+                    Behavior on implicitHeight {
+                        NumberAnimation {
+                            duration: Kit.ms(Kit.motion("arriveSmall").ms)
                         }
                     }
                 }
@@ -671,23 +816,23 @@ Item {
 
         // -------------------------------------------------- submenus, a floating layer
         // A toggle with a submenu opens its card floating on top of the panel — pinned
-        // under the toggles block, whose pills stay readable behind nothing — instead of
-        // growing the column in place. The panel grows beneath it only to keep the card
-        // inside the silhouette; a click outside the card closes it, one submenu at a
-        // time (root.only()).
+        // under the toggles block, on the panel's own ground (the frost, no shadow, no
+        // scrim — opening it dims nothing). The panel grows beneath it only to keep the
+        // card inside the silhouette; a click outside the card closes it, one submenu
+        // at a time (root.only()).
         Item {
             id: submenuLayer
             anchors.fill: parent
             z: 250
             readonly property bool active: root.sectionFlags.some(f => root[f])
             // The card hangs under the toggles block: the pill that opened it stays visible.
-            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + 12
+            readonly property real cardY: togglesBlock.mapToItem(root, 0, 0).y + togglesBlock.height + Kit.tokens.space.m
             readonly property real cardBottom: cardY + submenuCard.height
 
             opacity: active ? 1 : 0
             Behavior on opacity {
-                Anim {
-                    type: Anim.DefaultEffects
+                NumberAnimation {
+                    duration: Kit.ms(Kit.motion("fade").ms)
                 }
             }
 
@@ -704,49 +849,28 @@ Item {
                 }
             }
 
-            // The scrim, lighter than a dialog's (WindowDialog.qml): the panel behind is
-            // already frosted, so the card is "on top" with a shadow and blurred-back
-            // sunrise rather than a heavy wall.
-            Rectangle {
-                id: submenuScrimRect
-                anchors.fill: parent
-                color: Appearance.colors.colScrim
-                opacity: 0.5
-                visible: submenuLayer.active
-            }
-
-            StyledRectangularShadow {
-                target: submenuCard
-                opacity: submenuLayer.active ? 1 : 0
-            }
-
             Rectangle {
                 id: submenuCard
                 x: root.sidebarPadding
-                y: submenuLayer.active ? submenuLayer.cardY : submenuLayer.cardY - 12
+                y: submenuLayer.active ? submenuLayer.cardY : submenuLayer.cardY - Kit.tokens.space.m
                 width: root.togglesWidth
                 height: submenuColumn.implicitHeight + root.sidebarPadding * 2
-                radius: Appearance.rounding.normal
-                // Opaque, and opaque for real: frost is translucent by design (see-
-                // through to the wallpaper), which is right for the panel but wrong for
-                // a card floating over it — it read transparent over the dim dimmed
-                // behind. So the card takes the surface colour untinted; the shadow and
-                // the scrim do the lifting, no hairline border (a border drawn for one
-                // screen is a generic pattern).
-                color: Appearance.m3colors.m3surfaceContainerHigh
+                radius: Kit.tokens.radius.panel
+                // The card is the panel's own ground (the frost, the same colour the
+                // panel stands on) — no shadow lifts it, no scrim dims what is behind;
+                // the panel keeps its silhouette and the card its place.
+                color: Appearance.colors.colPanelFrost
 
                 Behavior on y {
-                    Anim {
-                        type: Anim.Emphasized
+                    NumberAnimation {
+                        duration: Kit.ms(Kit.motion("arriveSmall").ms)
                     }
                 }
 
                 ColumnLayout {
                     id: submenuColumn
-                    // Spacious, like a card that owns its surface, not a strip glued to
-                    // the panel's edge (7 px was the in-place inset; a floating card
-                    // gives its content a real interior: 14 at the sides, air above and
-                    // below equal to two slider heights).
+                    // Spacious: a card's interior is its measure's own inset
+                    // (space.l) on every side.
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
@@ -776,14 +900,6 @@ Item {
                     NightLightSection {
                         shown: root.showNightLightDialog
                     }
-
-                    // The footer's calendar, in the same floating card, its month
-                    // navigation's own widget as-is.
-                    Loader {
-                        active: root.showCalendar
-                        Layout.alignment: Qt.AlignHCenter
-                        sourceComponent: CalendarWidget {}
-                    }
                 }
             }
         }
@@ -797,28 +913,28 @@ Item {
             visible: root.dragging
 
             Rectangle {
-                x: root.dragPoint.x - 20
-                y: root.dragPoint.y - 20
-                width: 40
-                height: 40
-                radius: 20
+                x: root.dragPoint.x - Kit.tokens.height.action / 2
+                y: root.dragPoint.y - Kit.tokens.height.action / 2
+                width: Kit.tokens.height.action
+                height: Kit.tokens.height.action
+                radius: width / 2
                 color: root.colPillOn
-                MaterialSymbol {
+                Symbol {
                     anchors.centerIn: parent
                     text: root.dragIcon
-                    iconSize: 22
+                    size: Kit.tokens.icon.nav
                     // The wash on the disc is this one signal too; the glyph is ink, not
                     // an accent colour (accent is a mark for places and playing).
                     color: Tacit.inkMain
                 }
                 Behavior on x {
-                    Anim {
-                        type: Anim.DefaultEffects
+                    NumberAnimation {
+                        duration: Kit.ms(Kit.motion("hover").ms)
                     }
                 }
                 Behavior on y {
-                    Anim {
-                        type: Anim.DefaultEffects
+                    NumberAnimation {
+                        duration: Kit.ms(Kit.motion("hover").ms)
                     }
                 }
             }
@@ -826,32 +942,109 @@ Item {
     }
 
     // ---------------------------------------------------------------- pieces
-    // One-line slider with its glyph on the left and the number at the right (the
-    // slider's own, no tooltip popup: it would close the panel), the same shape the
-    // shipped panel draws (SidebarRightContent.qml).
+    // The undo line, the kit's Notice shape from the shell's own tokens (the kit part
+    // would read Kit.tokens.overlay, which the shell's Tacit does not carry). The line
+    // stays motion.notice while the pointer rests on it or the keyboard is in it.
+    Item {
+        id: _undoBox
+        parent: sidebarRightBackground
+        z: 400
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.sidebarPadding
+        width: undoRow.implicitWidth
+        height: undoRow.implicitHeight
+        property string text: ""
+        property string actionWords: ""
+        property bool isShown: false
+        function show(line, words) {
+            _undoBox.text = line;
+            _undoBox.actionWords = words ?? "";
+            isShown = true;
+            stay.restart();
+        }
+        function hide() {
+            if (!isShown)
+                return;
+            isShown = false;
+            stay.stop();
+        }
+        Timer {
+            id: stay
+            interval: Kit.ms(Kit.motion("notice").ms)
+            onTriggered: _undoBox.hide()
+        }
+        opacity: _undoBox.isShown ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Kit.ms(Kit.motion("fadeFast").ms)
+            }
+        }
+        HoverHandler {
+            onHoveredChanged: if (_undoBox.isShown) hovered ? stay.stop() : stay.restart()
+        }
+        RowLayout {
+            id: undoRow
+            spacing: Kit.tokens.space.s
+
+            StyledText {
+                text: _undoBox.text
+                font.pixelSize: Kit.tokens.size.row
+                color: Tacit.inkMain
+            }
+            RippleButton {
+                implicitWidth: undoWords.implicitWidth + Kit.tokens.space.m * 2
+                implicitHeight: Kit.tokens.height.railRow
+                buttonRadius: height / 2
+                borderWidth: 0
+                toggled: true
+                colBackgroundToggled: Tacit.accent
+                colBackgroundToggledHover: ColorUtils.mix(Tacit.inkMain, Tacit.accent, 0.12)
+                onClicked: {
+                    root.doUndo();
+                    stay.restart();
+                }
+                contentItem: StyledText {
+                    id: undoWords
+                    text: Translation.tr(_undoBox.actionWords)
+                    color: Tacit.inkOnAccent
+                }
+                FocusRing {
+                    shown: parent.keyboardFocus
+                    corner: height / 2
+                }
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Escape) {
+                        _undoBox.hide();
+                        event.accepted = true;
+                    }
+                }
+                Accessible.role: Accessible.Button
+                Accessible.name: Translation.tr("Undo")
+            }
+        }
+    }
+
+    // One-line slider: the pill's glyph on the left and the kit's own Slider for the
+    // bar (its keyboard comes free) and the value as a word at the right.
     component LineSlider: RowLayout {
         id: line
         property string glyph: "tune"
+        property string label: ""
         property alias value: slider.value
         signal moved()
-        spacing: 8
+        spacing: Kit.tokens.space.s
 
-        property bool ready: false
-        Component.onCompleted: line.ready = true
-        onGlyphChanged: if (line.ready) lineMotion.settle()
-        SymbolMotion {
-            id: lineMotion
-            target: lineSymbol
-        }
-        MaterialSymbol {
-            id: lineSymbol
+        Symbol {
             text: line.glyph
-            iconSize: 20
+            size: Kit.tokens.icon.row
             color: Tacit.inkMain
         }
-        TacitSlider {
+        Slider {
             id: slider
             Layout.fillWidth: true
+            label: line.label
+            word: `${Math.round(value * 100)}%`
             onMoved: line.moved()
         }
     }
@@ -859,7 +1052,7 @@ Item {
     component Hairline: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: Appearance.colors.colLayer0Border
+        color: Tacit.hairline
     }
 
     // Dynamic toggle models: each pill builds its own from the catalog so the arrangement
@@ -893,7 +1086,7 @@ Item {
         // Map the pointer into panel coordinates for the ghost and the drop resolve.
         function rootBeginDrag(mouse) {
             const p = pill.mapToItem(root, mouse.x, mouse.y);
-            root.beginDrag(pill.model?.icon ?? "", p);
+            root.beginDrag(pill.model?.icon ?? "", pill.model?.name ?? pill.pillId, p);
             root.dragTarget = pill.pillId;
         }
         function rootMoveDrag(mouse) {
@@ -907,6 +1100,9 @@ Item {
             const p = pill.mapToItem(root, mouse.x, mouse.y);
             root.endDrag(p);
         }
+        function arrowMove(dir) {
+            root.keyboardMove(pill.pillId, pill.model?.name ?? pill.pillId, pill.inDrawer ? "drawer" : "secondary", dir);
+        }
 
         readonly property var entry: pillId.length > 0 ? root.catalogEntry(pillId) : null
         readonly property string dialog: entry?.[2] ?? ""
@@ -915,35 +1111,32 @@ Item {
 
         Component.onCompleted: {
             model = entry[1].createObject(pill);
+            if (root.pendingFocus === pill.pillId) {
+                root.pendingFocus = "";
+                pill.forceActiveFocus();
+            }
         }
 
-        implicitWidth: 40
-        implicitHeight: 40
-        buttonRadius: 20
+        implicitWidth: Kit.tokens.height.action
+        implicitHeight: Kit.tokens.height.action
+        buttonRadius: width / 2
+        borderWidth: 0 // the kit's FocusRing draws the keyboard ring
         toggled: pill.model?.toggled ?? false
         enabled: pill.editMode || pill.dialog.length > 0 || pill.inDrawer
             || (pill.model?.available ?? false) || !!pill.model?.altAction
         // Being carried draws the pill out (the ghost carries its shape); state drives
         // it, not an imperative restore, so a stolen grab heals too.
-        opacity: root.dragging && root.dragTarget === pill.pillId
-            ? 0.3
-            : (!pill.editMode && !pill.inDrawer && !(pill.model?.available ?? true) ? 0.4
-            : (!pill.editMode && pill.model?.busy ? 0.6 : 1))
+        opacity: root.dragging && root.dragTarget === pill.pillId ? 0.3 : 1
         colBackground: root.colPillOff
         colBackgroundHover: root.colPillOffHover
         colBackgroundToggled: root.colPillOn
         colBackgroundToggledHover: root.colPillOnHover
 
-        // Normal use (edit off): click = the pill's action. In edit mode the click moves
-        // the pill instead: a main pill retires, a drawer pill promotes.
+        // Normal use (edit off): click = the pill's action. In edit mode a click is
+        // nothing (the owner's call): drag or the arrows place the pill.
         releaseAction: () => {
-            if (pill.editMode) {
-                if (pill.inDrawer)
-                    pill.promoted(pill.pillId, "secondary");
-                else
-                    pill.demoted(pill.pillId);
+            if (pill.editMode)
                 return;
-            }
             if (pill.dialog.length > 0) {
                 root[pill.dialog] = !root[pill.dialog];
             } else {
@@ -953,25 +1146,44 @@ Item {
         // In edit mode the right button promotes (drawer pills only); otherwise it
         // toggles directly for pills with a list, as the real panel does.
         altAction: pill.editMode
-            ? (pill.inDrawer ? (function() { pill.promoted(pill.pillId, "primary"); }) : null)
+            ? (pill.inDrawer ? (function() { root.pushUndo(`Moved ${pill.name} to the square`); pill.promoted(pill.pillId, "primary"); }) : null)
             : (pill.dialog.length > 0
                 ? (function() { if (pill.model.available) pill.model.mainAction(); })
                 : pill.model?.altAction)
 
-        contentItem: MaterialSymbol {
+        contentItem: Symbol {
             anchors.centerIn: parent
-            text: pill.model?.icon ?? ""
-            fill: pill.toggled ? 1 : 0
-            iconSize: 22
+            text: pill.model?.icon ?? "apps"
+            filled: pill.toggled
+            size: Kit.tokens.icon.nav
             // One signal: the raised wash says "on"; the glyph is ink in both states
             // (the kit's accent is a mark, and an active pill is not a mark).
-            color: Tacit.inkSec
+            // Unavailable (the service behind is not) fades to the faint ink, not
+            // opacity: text is quieter by ink, never by transparency.
+            color: !pill.enabled ? Tacit.inkFaint : Tacit.inkSec
+        }
+        FocusRing {
+            shown: pill.keyboardFocus
+            corner: width / 2
         }
         StyledToolTip {
             text: pill.editMode
                 ? (pill.inDrawer ? Translation.tr("Make secondary · right-click: primary") : Translation.tr("Back to the drawer"))
                 : pill.name
         }
+        Keys.onPressed: event => {
+            Kit.focusVisible = true;
+            switch (event.key) {
+            case Qt.Key_Left: pill.arrowMove("left"); event.accepted = true; break;
+            case Qt.Key_Right: pill.arrowMove("right"); event.accepted = true; break;
+            case Qt.Key_Up: pill.arrowMove("up"); event.accepted = true; break;
+            case Qt.Key_Down: pill.arrowMove("down"); event.accepted = true; break;
+            }
+        }
+        Accessible.role: Accessible.Button
+        Accessible.name: pill.name + (pill.inDrawer ? Translation.tr(", in the drawer") : "")
+        Accessible.checkable: true
+        Accessible.checked: pill.model?.toggled ?? false
     }
 
     // The primary pill's body is a rounded rectangle (the change the proposal puts first),
@@ -992,14 +1204,15 @@ Item {
             enabled: primary.editMode
             cursorShape: Qt.ClosedHandCursor
             onPressed: mouse => primary.rootBeginDrag(mouse)
+            // A lifted grab (the panel closing under the pointer) is not a drop.
+            onCanceled: root.cancelDrag()
             onPositionChanged: mouse => primary.rootMoveDrag(mouse)
             onReleased: mouse => primary.rootEndDrag(mouse)
         }
         function rootBeginDrag(mouse) {
             const p = primary.mapToItem(root, mouse.x, mouse.y);
-            root.beginDrag(primary.model?.icon ?? "", p);
+            root.beginDrag(primary.model?.icon ?? "", primary.model?.name ?? primary.pillId, p);
             root.dragTarget = primary.pillId;
-            primary.opacity = 0.3;
         }
         function rootMoveDrag(mouse) {
             if (!root.dragging)
@@ -1010,8 +1223,10 @@ Item {
             if (!root.dragging)
                 return;
             const p = primary.mapToItem(root, mouse.x, mouse.y);
-            primary.opacity = 1;
             root.endDrag(p);
+        }
+        function arrowMove(dir) {
+            root.keyboardMove(primary.pillId, primary.model?.name ?? primary.pillId, "primary", dir);
         }
 
         readonly property var entry: pillId.length > 0 ? root.catalogEntry(pillId) : null
@@ -1019,24 +1234,27 @@ Item {
 
         Component.onCompleted: {
             model = entry[1].createObject(primary);
+            if (root.pendingFocus === primary.pillId) {
+                root.pendingFocus = "";
+                primary.forceActiveFocus();
+            }
         }
 
-        implicitWidth: 92
-        implicitHeight: 44
-        buttonRadius: 16
+        implicitWidth: (root.togglesWidth - Kit.tokens.space.s) / 2
+        implicitHeight: Kit.tokens.height.action + Kit.tokens.space.l
+        buttonRadius: Kit.tokens.radius.slab
+        borderWidth: 0 // the kit's FocusRing draws the keyboard ring
         toggled: primary.model?.toggled ?? false
         enabled: primary.editMode || (primary.model?.available ?? false) || primary.dialog.length > 0
-        opacity: primary.model?.busy ? 0.6 : 1
+        opacity: root.dragging && root.dragTarget === primary.pillId ? 0.3 : 1
         colBackground: root.colPillOff
         colBackgroundHover: root.colPillOffHover
         colBackgroundToggled: root.colPillOn
         colBackgroundToggledHover: root.colPillOnHover
 
         releaseAction: () => {
-            if (primary.editMode) {
-                primary.demoted(primary.pillId);
-                return;
-            }
+            if (primary.editMode)
+                return; // a click in edit mode is nothing (the owner's call)
             if (primary.dialog.length > 0)
                 root[primary.dialog] = !root[primary.dialog];
             else if (primary.model)
@@ -1050,27 +1268,45 @@ Item {
             id: primaryRow
             anchors.centerIn: parent
             width: primary.width - 28
-            spacing: 6
-            MaterialSymbol {
+            spacing: Kit.tokens.space.s
+
+            Symbol {
                 anchors.verticalCenter: parent.verticalCenter
-                text: primary.model?.icon ?? ""
-                fill: primary.toggled ? 1 : 0
-                iconSize: 20
+                text: primary.model?.icon ?? "apps"
+                filled: primary.toggled
+                size: Kit.tokens.icon.row
                 // One signal: the wash, not a colour change on the glyph.
                 color: Tacit.inkSec
             }
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 20 - parent.spacing
+                width: parent.width - Kit.tokens.icon.row - parent.spacing
                 elide: Text.ElideRight
                 // The pill's own name wiring, as the real panel's row reads it.
                 text: (primary.model?.name ?? "") + (primary.model?.hasStatusText && (primary.model?.statusText ?? "").length > 0 ? " · " + primary.model.statusText : "")
                 color: Tacit.inkMain
             }
         }
+        FocusRing {
+            shown: primary.keyboardFocus
+            corner: Kit.tokens.radius.slab
+        }
         StyledToolTip {
             text: primary.editMode ? Translation.tr("Back to the drawer") : ((primary.model?.name ?? "") + (primary.dialog.length > 0 ? Translation.tr("\nRight-click to turn on/off") : ""))
         }
+        Keys.onPressed: event => {
+            Kit.focusVisible = true;
+            switch (event.key) {
+            case Qt.Key_Left: primary.arrowMove("left"); event.accepted = true; break;
+            case Qt.Key_Right: primary.arrowMove("right"); event.accepted = true; break;
+            case Qt.Key_Up: primary.arrowMove("up"); event.accepted = true; break;
+            case Qt.Key_Down: primary.arrowMove("down"); event.accepted = true; break;
+            }
+        }
+        Accessible.role: Accessible.Button
+        Accessible.name: primary.model?.name ?? primary.pillId
+        Accessible.checkable: true
+        Accessible.checked: primary.model?.toggled ?? false
     }
 
     property bool drawerOpen: false
