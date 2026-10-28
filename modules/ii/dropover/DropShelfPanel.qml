@@ -193,7 +193,9 @@ PanelWindow {
 
             StyledText {
                 Layout.alignment: Qt.AlignHCenter
-                text: Translation.tr("%1 elements").arg(DropShelf.items.length)
+                text: DropShelf.items.length === 0 ? Translation.tr("Drop files here")
+                    : DropShelf.items.length === 1 ? Translation.tr("1 item")
+                    : Translation.tr("%1 items").arg(DropShelf.items.length)
                 font.pixelSize: Appearance.font.pixelSize.normal
                 color: Appearance.colors.colOnLayer0
             }
@@ -209,6 +211,7 @@ PanelWindow {
                     buttonRadius: height / 2
                     colBackground: Appearance.colors.colSecondaryContainer
                     colBackgroundHover: Appearance.colors.colSecondaryContainerHover
+                    enabled: DropShelf.items.length > 0
                     onClicked: DropShelf.copyAll()
                     contentItem: RowLayout {
                         anchors.fill: parent
@@ -230,6 +233,7 @@ PanelWindow {
                     buttonRadius: height / 2
                     colBackground: Appearance.colors.colLayer1
                     colBackgroundHover: Appearance.colors.colLayer1Hover
+                    enabled: DropShelf.items.length > 0
                     onClicked: DropShelf.clear()
                     contentItem: RowLayout {
                         anchors.fill: parent
