@@ -65,7 +65,16 @@ Singleton {
         fetchProc.running = true;
     }
     // the next start installs them; no password (50-tacit-updates.rules)
+    // restarting: the download for the install is under way; restartFailed: it did not finish (Settings shows both)
+    readonly property bool restarting: restartProc.running
+    property bool restartFailed: false
+    // Tonight was chosen: the night's timer is waiting (read with the list, and set at once when chosen)
+    property bool tonightSet: false
     function restartNow() {
+        if (restartProc.running)
+            return;
+        root.restartFailed = false;
+        IslandController.request("copied", { "icon": "system_update", "text": "Getting ready to restart" }, 65);
         restartProc.running = true;
     }
     // the download for the install is made first; when it fails nothing restarts, and the notch says so
@@ -73,17 +82,29 @@ Singleton {
         id: restartProc
         command: ["bash", "-c", "systemctl start tacit-update@now.service && systemctl reboot"]
         onExited: (code, status) => {
-            if (code !== 0)
-                IslandController.request("copied", { "icon": "error", "text": "Couldn't download the update" }, 65);
+            if (code !== 0) {
+                root.restartFailed = true;
+                IslandController.request("copied", { "icon": "error", "text": "Couldn't download the update · check the connection" }, 65);
+            }
         }
     }
     // what changed: Settings' About, where the notes are
     function openNotes() {
         Quickshell.execDetached(["bash", "-c", '"${TACIT_BIN:-$HOME/.local/bin}"/settings-open about 2>/dev/null || settings-open about']);
     }
+    // said only once it is set: a refused start used to read as done
     function tonight() {
-        Quickshell.execDetached(["systemctl", "start", "tacit-update@tonight.service"]);
-        IslandController.request("copied", { "icon": "schedule", "text": "Tonight, on the charger" }, 65);
+        if (!tonightProc.running)
+            tonightProc.running = true;
+    }
+    Process {
+        id: tonightProc
+        command: ["systemctl", "start", "tacit-update@tonight.service"]
+        onExited: (code, status) => {
+            root.tonightSet = code === 0;
+            IslandController.request("copied", code === 0 ? { "icon": "schedule", "text": "Tonight, on the charger" }
+                : { "icon": "error", "text": "Couldn't set it for tonight" }, 65);
+        }
     }
 
     // a look two minutes after start (the night's result, and what the last download left) and every half hour
@@ -107,7 +128,7 @@ Singleton {
         // what is waiting ("name old -> new"), then where each of its files is: file:// once downloaded
         // (only where Tacit installs its updates itself, tacit-session's tacit-update: not on a computer set up by hand,
         // as the owner's Book4 with its held Qt)
-        command: ["bash", "-c", "[ -x /usr/lib/tacit/tacit-update ] || { echo unmanaged; exit 0; }; pacman -Qu 2>/dev/null; echo ---; pacman -Sup --print-format %l 2>/dev/null"]
+        command: ["bash", "-c", "[ -x /usr/lib/tacit/tacit-update ] || { echo unmanaged; exit 0; }; pacman -Qu 2>/dev/null; echo ---; pacman -Sup --print-format %l 2>/dev/null; echo ---; stat -c %Y /var/lib/pacman/sync/*.db 2>/dev/null | sort -n | tail -1; echo ---; systemctl is-active tacit-update-night.timer"]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.trim() === "unmanaged") {
@@ -120,6 +141,11 @@ Singleton {
                     return;
                 }
                 root.lastCheckFailed = root.fetchFailed;
+                // when the package list was really fetched (a read of the local list is not a check), and Tonight's timer
+                const synced = parseInt((halves[2] ?? "").trim()) * 1000;
+                if (synced > 0)
+                    root.lastChecked = synced;
+                root.tonightSet = (halves[3] ?? "").trim() === "active";
                 const waiting = halves[0].split("\n").filter(l => l.includes(" -> "));
                 const files = halves[1].split("\n").filter(l => l.length > 0 && !l.startsWith(":"));
                 root.count = waiting.length;
@@ -129,7 +155,7 @@ Singleton {
                 // only a new Tacit release counts (1.4 over 1.3), not a rebuild of the same one
                 root.tacitVersion = ver.length === 4 && ver[1].split("-")[0] !== ver[3].split("-")[0] ? ver[3].split("-")[0] : "";
                 stateFile.setText(JSON.stringify({ "count": root.count, "ready": root.ready, "tacitVersion": root.tacitVersion,
-                                                   "checked": root.lastChecked || Date.now() }));
+                                                   "checked": root.lastChecked }));
                 if (root.ready && root.tacitVersion.length > 0)
                     nextNotesProc.running = true;
                 else

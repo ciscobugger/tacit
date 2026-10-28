@@ -4748,14 +4748,10 @@ ApplicationWindow {
                 title: "Updates"
                 aside: Updates.currentVersion.length > 0 ? `Tacit ${Updates.currentVersion}` : ""
                 property var state: ({})
-                property bool tonight: false
-                // Restart downloads what is missing first; when that fails nothing restarts, and the row says so
-                property bool restartFailed: false
-                Process {
-                    id: restartProc
-                    command: ["bash", "-c", "systemctl start tacit-update@now.service && systemctl reboot"]
-                    onExited: (code, status) => updatesGroup.restartFailed = code !== 0
-                }
+                // Restart downloads what is missing first, which can take a while; when that fails nothing restarts, and
+                // the row says so (the shell's Updates.qml runs it, so the notch's Restart shows here too)
+                readonly property bool tonight: Updates.tonightSet
+                readonly property bool restartFailed: Updates.restartFailed
                 readonly property bool busy: Updates.phase !== ""
                 readonly property bool ready: !busy && updatesGroup.state.ready === true
                 readonly property int waiting: updatesGroup.state.count ?? 0
@@ -4807,27 +4803,22 @@ ApplicationWindow {
                     description: Updates.phase === "looking" ? "Asking for the newest list"
                         : Updates.phase === "downloading" ? (Updates.totalMB > 0 ? `${Updates.doneMB} of ${Updates.totalMB} MB` : "Starting")
                         : Updates.lastCheckFailed ? "Check that this computer is online, then try again"
+                        : Updates.restarting ? "Getting ready to restart"
                         : updatesGroup.restartFailed ? "Couldn't finish the download · check that this computer is online, then try again"
                         : updatesGroup.tonight ? "Tonight, on the charger"
                         : updatesGroup.ready ? `${updatesGroup.waiting} ${updatesGroup.waiting === 1 ? "update" : "updates"} · they install while the computer restarts`
                         : updatesGroup.waiting > 0 ? "Check for updates gets them now"
                         : updatesGroup.checkedText
                     control: Row {
-                        visible: updatesGroup.ready && !updatesGroup.tonight
+                        visible: updatesGroup.ready && !updatesGroup.tonight && !Updates.restarting
                         spacing: 4
                         TextButton {
                             label: "Tonight"
-                            onPressed: {
-                                Quickshell.execDetached(["systemctl", "start", "tacit-update@tonight.service"]);
-                                updatesGroup.tonight = true;
-                            }
+                            onPressed: Updates.tonight()
                         }
                         TextButton {
                             label: "Restart"
-                            onPressed: {
-                                updatesGroup.restartFailed = false;
-                                restartProc.running = true;
-                            }
+                            onPressed: Updates.restartNow()
                         }
                     }
                 }
