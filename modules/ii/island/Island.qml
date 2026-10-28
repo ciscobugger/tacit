@@ -48,12 +48,29 @@ Scope {
                 // elsewhere cannot take the keyboard back: Escape at the sheet level
                 // (IslandContent) and the shortcut are the ways out.
                 WlrLayershell.keyboardFocus: (IslandController.keyboard && islandContent.open && islandContent.keyScreen) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-                // A fullscreen window on this monitor (a video, a game) gets the whole screen: the notch
-                // unmaps there and maps again when the window leaves fullscreen.
+                // Hyprland buries the Top layer under a fullscreen window. boring.notch's
+                // nowPlayingOnly: ride the Overlay layer while something plays in ANOTHER app, so a
+                // game or a film keeps the music's transport; the fullscreen window's own player (a
+                // video in the browser) is not another app, and the notch stays under it (Discord
+                // 2026-10-27: the notch over YouTube in fullscreen). A maximized window is not fullscreen.
                 readonly property var thisMonitorData: HyprlandData.monitors.find(m => m.name === islandRoot.screen?.name)
-                readonly property bool monitorHasFullscreen: HyprlandData.workspaceHasTrueFullscreen(thisMonitorData?.activeWorkspace?.id)
-                visible: !monitorHasFullscreen
-                WlrLayershell.layer: WlrLayer.Top
+                readonly property var fullscreenWindow: HyprlandData.trueFullscreenWindow(thisMonitorData?.activeWorkspace?.id)
+                readonly property bool overFullscreen: fullscreenWindow !== null && Config.options.island.showInFullscreenWhilePlaying
+                    && IslandController.mediaPresent && MprisController.isPlaying
+                    && !playsIn(fullscreenWindow, MprisController.activePlayer)
+                WlrLayershell.layer: overFullscreen ? WlrLayer.Overlay : WlrLayer.Top
+                // The player belongs to the window: its desktop entry or name is the window's app, or its
+                // bus name carries the window's process (Chromium's and Firefox's instance names do).
+                function playsIn(win, player) {
+                    if (!win || !player)
+                        return false;
+                    const app = String(win.class || win.initialClass || "").toLowerCase();
+                    const entry = String(player.desktopEntry || "").toLowerCase();
+                    const name = String(player.identity || "").toLowerCase();
+                    if (app && (entry === app || entry.endsWith("." + app) || (name && name.includes(app))))
+                        return true;
+                    return win.pid > 0 && new RegExp(`\\D${win.pid}$`).test(String(player.dbusName || ""));
+                }
                 color: "transparent"
 
                 // Window-aware means honest: the reserve is exactly the resting header (34px)

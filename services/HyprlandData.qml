@@ -40,7 +40,12 @@ Singleton {
     // True fullscreen only: a workspace's hasfullscreen is also set by a maximized window
     // (Super+D), and a maximized window must keep the notch. fullscreen is a bit mask, 2 = fullscreen.
     function workspaceHasTrueFullscreen(workspace) {
-        return root.windowList.some(win => win.workspace.id === workspace && win.mapped !== false && (win.fullscreen & 2) !== 0);
+        return root.trueFullscreenWindow(workspace) !== null;
+    }
+
+    // The window filling a workspace in true fullscreen, or null.
+    function trueFullscreenWindow(workspace) {
+        return root.windowList.find(win => win.workspace.id === workspace && win.mapped !== false && (win.fullscreen & 2) !== 0) ?? null;
     }
 
     function clientForToplevel(toplevel) {
