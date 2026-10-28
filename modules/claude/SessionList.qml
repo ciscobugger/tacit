@@ -96,19 +96,6 @@ Item {
     Timer { id: closeTimer; interval: 260; onTriggered: hoverHold.hovering = false }
 
     function focusSearch() { field.forceActiveFocus(); field.selectAll(); }
-    // a heading's count: the sessions (or, under Folders, the folders) until the next heading
-    function countAfter(key) {
-        const i = rail.indexOf(key);
-        if (i < 0) return 0;
-        const folders = key === "l:Folders";
-        let n = 0;
-        for (let j = i + 1; j < rail.rows.length; j++) {
-            const r = rail.rows[j];
-            if (r.type === "label") break;
-            if (folders ? r.type === "folder" : (r.type === "session" || r.type === "hit") && !r.placeholder) n++;
-        }
-        return n;
-    }
     // "Older folders", "Hidden", "Archived" close the list: the first of them sits apart
     function isFooter(r) { return !!r && r.type === "more" && ["older", "hidden", "archived"].includes(r.act); }
     function firstFooter(r) { return rail.isFooter(r) && !rail.isFooter(rail.rows[rail.indexOf(r.key) - 1]); }
@@ -480,7 +467,7 @@ Item {
     Timer { id: dropLeave; interval: 260; onTriggered: if (!targets.active) rail.dragHold = false }
 
     // ── filters: words under the search field ──────────────────────────────
-    readonly property var agentNames: ({ claude: "Claude", codex: "Codex", pi: "pi", opencode: "opencode" })
+    readonly property var agentNames: ({ claude: "Claude", codex: "Codex", pi: "Pi", opencode: "OpenCode" })
     readonly property var wordList: [{ key: "needs", label: "Needs you", line: 0 }, { key: "running", label: "Running", line: 0 },
         { key: "today", label: "Today", line: 0 }, { key: "week", label: "This week", line: 0 }]
         .concat(rail.agents.map(a => ({ key: "agent:" + a, label: rail.agentNames[a] ?? a, line: 1 })))
@@ -1054,8 +1041,7 @@ Item {
                             visible: row.isSession || row.cursor || row.type === "more"
                             anchors { fill: parent; leftMargin: 8; rightMargin: 8; topMargin: row.type === "more" && rail.firstFooter(row.d) ? 19 : 1; bottomMargin: 1 }
                             radius: 8
-                            color: row.current ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.9)
-                                : row.cursor ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.84)
+                            color: row.cursor ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.84)
                                 : (row.isSession || row.type === "more") && (row.hovered || row.held) && !rail.dragging ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.95) : "transparent"
                             Behavior on color { ColorAnimation { duration: 80 } }
                         }
@@ -1219,8 +1205,8 @@ Item {
                 wrapMode: Text.Wrap
                 maximumLineCount: 3
             }
-            // working: a breathing sand dot; waiting for you: a steady one; open in a process: a ring;
-            // past: nothing (a ring on every past row said nothing)
+            // working: a breathing sand dot; waiting for you: a steady one; open or past: nothing (a ring
+            // for "open, idle" read as a radio button)
             Item {
                 x: 20
                 y: title.y + (sp.lineH - height) / 2
@@ -1231,20 +1217,10 @@ Item {
                     visible: sp.d.state === "working" || sp.d.state === "waiting"
                     breathing: sp.d.state === "working"
                 }
-                Rectangle {
-                    anchors.centerIn: parent
-                    visible: sp.d.state === "open"
-                    width: 9
-                    height: 9
-                    radius: 4.5
-                    color: "transparent"
-                    border.width: 1.5
-                    border.color: Appearance.colors.colInkSecondary
-                }
-                HoverHandler { id: markHover; enabled: sp.d.state !== "past" }
+                HoverHandler { id: markHover; enabled: sp.d.state === "working" || sp.d.state === "waiting" }
                 StyledToolTip {
-                    text: ({ working: "Working", waiting: "Waiting for you", open: "Open, idle" })[sp.d.state] ?? ""
-                    extraVisibleCondition: markHover.hovered && sp.d.state !== "past"
+                    text: ({ working: "Working", waiting: "Waiting for you" })[sp.d.state] ?? ""
+                    extraVisibleCondition: markHover.hovered
                 }
             }
             StyledText {
@@ -1520,15 +1496,6 @@ Item {
                     font.pixelSize: 15
                     font.weight: Font.DemiBold
                     color: Appearance.colors.colInkSecondary
-                }
-                StyledText {
-                    readonly property int n: rail.countAfter(lp.d.key)
-                    visible: n > 0
-                    anchors.baseline: parent.children[0].baseline
-                    text: n
-                    font.family: Appearance.font.family.numbers
-                    font.pixelSize: 14
-                    color: Appearance.colors.colInkMeta
                 }
             }
             MaterialSymbol {

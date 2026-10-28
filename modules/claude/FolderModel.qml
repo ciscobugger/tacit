@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.services
 import qs.modules.common
 import qs.modules.common.functions
+import "Titles.js" as Titles
 
 /**
  * The rail's rows and the folders behind them: Pinned, Recent, then one heading per folder.
@@ -49,7 +50,7 @@ Item {
     signal deleted(string id, string error)   // after the host answers a delete; error "" when it went
 
     readonly property string home: Quickshell.env("HOME")
-    readonly property var agentNames: ({ claude: "Claude", codex: "Codex", pi: "pi", opencode: "opencode" })
+    readonly property var agentNames: ({ claude: "Claude", codex: "Codex", pi: "Pi", opencode: "OpenCode" })
     // Files' fixed places, by path (Files.places; this app does not load the Files singleton)
     readonly property var placeNames: {
         const m = {};
@@ -449,7 +450,7 @@ Item {
     }
 
     // ── folders ─────────────────────────────────────────────────────────────
-    function titleOf(s) { return (s.title || s.lastPrompt || s.prompt || "Untitled").replace(/\s*<desktop-context>[\s\S]*$/, ""); }
+    function titleOf(s) { return Titles.of(s); }
     // Which folder a cwd is in, before re-files. Worktrees join their repo; Codex sessions from
     // the Windows years map C:\dev\X to ~/dev/X, and its one-off desktop chats
     // (Documents\Codex\<date>\<slug>) are one folder rather than forty. Then the deepest of: the
@@ -707,7 +708,7 @@ Item {
             else if (state === "working") { liveOf(k).working++; working++; }
             else if (state === "open") liveOf(k).open++;
             if (state === "waiting" || state === "working")
-                needy.push({ id: id, state: state, title: s ? fm.titleOf(s) : (fm.live[id]?.prompt || fm.terminals[id]?.name || "Session"),
+                needy.push({ id: id, state: state, title: s ? fm.titleOf(s) : (Titles.clean(fm.live[id]?.prompt) || fm.terminals[id]?.name || "Session"),
                              at: s ? (s.updated || s.started || 0) : (fm.live[id]?.last || 0) });
         }
         for (const w of fm.presence?.windows ?? []) {

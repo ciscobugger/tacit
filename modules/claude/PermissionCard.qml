@@ -45,6 +45,12 @@ Rectangle {
     // answered: the card stays until the host takes the request away; a second click answered a closed
     // request and put up "That request had already closed"
     property bool sent: false
+    // keys for the card on top (a second card waiting would share them): the buttons were mouse-only
+    property bool keys: true
+    readonly property bool keyed: card.keys && card.visible && !card.sent
+    Shortcut { sequences: ["Ctrl+Return", "Ctrl+Enter"]; enabled: card.keyed; onActivated: { card.sent = true; card.answered(true, null); } }
+    Shortcut { sequence: "Ctrl+Shift+Return"; enabled: card.keyed && card.canAlways; onActivated: { card.sent = true; card.answered(true, card.pending.suggestions); } }
+    Shortcut { sequence: "Ctrl+Shift+Backspace"; enabled: card.keyed; onActivated: { card.sent = true; card.answered(false, null); } }
     opacity: card.sent ? 0.6 : 1
     // still here well after the answer (it did not reach the host): it can be answered again
     Timer { running: card.sent; interval: 5000; onTriggered: card.sent = false }

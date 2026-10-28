@@ -20,6 +20,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 import "modules/claude"
+import "modules/claude/Titles.js" as Titles
 
 ApplicationWindow {
     id: root
@@ -244,7 +245,7 @@ ApplicationWindow {
             }
         });
     }
-    function titleOf(s) { return (s.title || s.lastPrompt || s.prompt || "Untitled").replace(/\s*<desktop-context>[\s\S]*$/, ""); }
+    function titleOf(s) { return Titles.of(s); }
     function projectOf(cwd) {
         if (!cwd) return "";
         if (cwd === root.home) return "~";
