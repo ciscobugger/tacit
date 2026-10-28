@@ -80,7 +80,7 @@ Item {
             d.quit = null;
             d.problem = `${name} could not be closed from here.`;
         } else if (m.op === "trashOld") {
-            d.problem = "The old downloads could not be moved to the bin.";
+            d.problem = "The old downloads could not be moved to the trash.";
         } else if (m.op === "interrupt" || m.op === "close") {
             d.problem = "The session could not be stopped. Praxis may not be running.";
         } else {
@@ -679,7 +679,7 @@ Item {
         const can = [];
         if (k.old.n > 0 && k.old.size >= 5e7)
             can.push({ key: "old", n: "Downloads older than a month", sym: "download", c1: d.diskGb(k.old.size), quit: "", open: false, size: k.old.size,
-                       verbs: [{ text: "Move to the bin", primary: true, act: "trashOld" }] });
+                       verbs: [{ text: "Move to the trash", primary: true, act: "trashOld" }] });
         if (k.caches.size >= 1e8)
             can.push({ key: "caches", n: "Download caches", sym: "cached", c1: d.diskGb(k.caches.size), quit: "", open: false, size: k.caches.size,
                        verbs: [{ text: "Clear", primary: can.length === 0, act: "clearCaches" }] });
