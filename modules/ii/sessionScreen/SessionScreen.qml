@@ -126,7 +126,7 @@ Scope {
                 target: Session
                 function onActionFailed(label, code) {
                     sessionRoot.waitingFor = "";
-                    sessionRoot.failedText = Translation.tr("%1 was refused (exit %2). Nothing happened.").arg(label).arg(code);
+                    sessionRoot.failedText = Translation.tr("%1 was refused. Nothing happened.").arg(label);
                 }
             }
 
@@ -282,7 +282,7 @@ Scope {
                         }
                         Warning {
                             visible: IslandController.workUnsaved
-                            text: "Uncommitted work: " + IslandController.unsavedLine
+                            text: Translation.tr("Unsaved changes: %1").arg(IslandController.unsavedLine)
                         }
                         Warning {
                             visible: SessionWarnings.downloadRunning
