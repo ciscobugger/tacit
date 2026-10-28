@@ -178,8 +178,8 @@ Variants {
         }
 
         Component.onCompleted: {
-            previousWallpaper.source = ""
-            wallpaper.source = bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
+            previousWallpaper.target = ""
+            wallpaper.target = bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
             bgRoot.currentWallpaperSource = bgRoot.wallpaperPath
             bgRoot.previousWallpaperSource = ""
             bgRoot.transitionProgress = 1.0
@@ -194,21 +194,21 @@ Variants {
         onWallpaperPathChanged: {
             bgRoot.videoRevealed = false
             if (wallpaperSafetyTriggered) {
-                previousWallpaper.source = ""
-                wallpaper.source = ""
+                previousWallpaper.target = ""
+                wallpaper.target = ""
                 bgRoot.transitionProgress = 1.0
                 return
             }
             if (bgRoot.wallpaperAnimation === "") {
-                wallpaper.source = wallpaperPath
+                wallpaper.target = wallpaperPath
                 bgRoot.currentWallpaperSource = wallpaperPath
                 if (!bgRoot.wallpaperIsVideo) return
                 bgRoot.videoRevealed = true
                 return
             }
 
-            previousWallpaper.source = bgRoot.currentWallpaperSource
-            wallpaper.source = wallpaperPath
+            previousWallpaper.target = bgRoot.currentWallpaperSource
+            wallpaper.target = wallpaperPath
             bgRoot.currentWallpaperSource = wallpaperPath
             if (bgRoot.wallpaperAnimation === "random") {
                 bgRoot.currentShader = bgRoot.shaderList[Math.floor(Math.random() * bgRoot.shaderList.length)]
@@ -220,7 +220,7 @@ Variants {
             // ago, or it was the wallpaper before): then no status change follows, the crossfade
             // never starts, and the OLD picture stays on screen for good while everything else
             // reports the new one. Start the transition here when the image is already loaded.
-            if (wallpaper.status === Image.Ready)
+            if (wallpaper.loaded)
                 transitionAnim.restart()
         }
 
@@ -228,14 +228,14 @@ Variants {
         // allocation limit) never reaches Image.Ready, so the crossfade would sit at 0 forever
         // with a full-screen shader on top of it. Keep what is on screen and say what failed.
         function abortWallpaperTransition(failedSource) {
-            const keep = String(previousWallpaper.source);
+            const keep = String(previousWallpaper.target);
             transitionAnim.stop();
             bgRoot.transitionProgress = 1.0;
             if (keep.length > 0) {
-                wallpaper.source = keep;
+                wallpaper.target = keep;
                 bgRoot.currentWallpaperSource = keep;
             }
-            previousWallpaper.source = "";
+            previousWallpaper.target = "";
             bgRoot.previousWallpaperSource = "";
             Wallpapers.reportUnloadable(CF.FileUtils.trimFileProtocol(String(failedSource)));
         }
@@ -247,7 +247,7 @@ Variants {
             interval: 5000
             running: bgRoot.wallpaperAnimation !== "" && bgRoot.transitionProgress < 1.0 && !transitionAnim.running
             onTriggered: {
-                previousWallpaper.source = "";
+                previousWallpaper.target = "";
                 bgRoot.transitionProgress = 1.0;
             }
         }
@@ -261,7 +261,7 @@ Variants {
             duration: 1200
             easing.type: Easing.InOutCubic
             onFinished: {
-                previousWallpaper.source = ""
+                previousWallpaper.target = ""
                 bgRoot.previousWallpaperSource = ""
                 bgRoot.transitionProgress = 1.0
                 bgRoot.videoRevealed = bgRoot.wallpaperIsVideo
@@ -296,27 +296,24 @@ Variants {
                 NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
             }
 
-            Image {
+            // The picture is decoded at the size that covers the panel's own pixels and cut to them
+            // (WallpaperImage): a high-megapixel picture never decodes at native size, and during a
+            // crossfade both copies are resident at once.
+            WallpaperImage {
                 id: previousWallpaper
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
                 cache: true
                 mipmap: true
                 smooth: true
-                asynchronous: true
                 layer.enabled: true
+                opacity: 1
                 visible: false
-                // PreserveAspectCrop can never show more than the panel's own pixels. Without
-                // this a high-megapixel picture decodes at native size, and during a crossfade
-                // both copies are resident at once.
-                sourceSize.width: bgRoot.screen.width * bgRoot.screen.devicePixelRatio
-                sourceSize.height: bgRoot.screen.height * bgRoot.screen.devicePixelRatio
+                view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
             }
 
-            StyledImage {
+            WallpaperImage {
                 id: wallpaper
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
                 cache: true
                 smooth: true
                 mipmap: true
@@ -324,13 +321,12 @@ Variants {
                 layer.enabled: blurLoader.active
                 visible: !blurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
-                sourceSize.width: bgRoot.screen.width * bgRoot.screen.devicePixelRatio
-                sourceSize.height: bgRoot.screen.height * bgRoot.screen.devicePixelRatio
+                view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
                 onStatusChanged: {
                     if (status === Image.Ready && bgRoot.transitionProgress === 0.0) {
                         transitionAnim.restart()
                     } else if (status === Image.Error) {
-                        bgRoot.abortWallpaperTransition(wallpaper.source)
+                        bgRoot.abortWallpaperTransition(wallpaper.target)
                     }
                 }
             }

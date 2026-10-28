@@ -495,6 +495,8 @@ Singleton {
                 }
                 property list<string> screenList: [] 
                 property string wallpaperPath: ""
+                // which part of a picture the desktop shows, per picture: { "/path.jpg": [x, y] }, 0..1 (0.5 = the middle)
+                property var wallpaperFocus: ({})
                 property bool centeredWallpaper: false
                 property string centeredWallpaperShape: "Cookie7Sided"
                 property int centeredWallpaperSize: 400

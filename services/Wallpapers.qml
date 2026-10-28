@@ -106,6 +106,25 @@ Singleton {
         usedFile.setText(JSON.stringify(root.used));
     }
 
+    // The part of a picture the desktop shows, kept per picture so it survives a restart: [x, y] in 0..1, the middle
+    // when the person never chose. Newest 60 pictures are kept.
+    function focusFor(path) {
+        const f = Config.options.background.wallpaperFocus?.[FileUtils.trimFileProtocol(String(path ?? ""))];
+        return f && f.length === 2 ? Qt.point(f[0], f[1]) : Qt.point(0.5, 0.5);
+    }
+    function setFocus(path, x, y) {
+        const key = FileUtils.trimFileProtocol(String(path));
+        const next = Object.assign({}, Config.options.background.wallpaperFocus ?? {});
+        delete next[key];
+        if (Math.abs(x - 0.5) > 0.002 || Math.abs(y - 0.5) > 0.002)
+            next[key] = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000];
+        const keys = Object.keys(next);
+        for (let i = 0; i < keys.length - 60; i++)
+            delete next[keys[i]];
+        Config.options.background.wallpaperFocus = next;
+        Config.writeNow();
+    }
+
     // An online picture (OnlineWallpapers.results item): downloaded to Pictures/Wallpapers, then
     // applied. The url and id come out of a provider's JSON: https only, the id reduced to
     // file-name characters, curl given argv (OnlineWallpaperGrid.qml did the same).
