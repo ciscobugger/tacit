@@ -293,7 +293,8 @@ Scope {
             focus: GlobalStates.overviewOpen && !overviewScope.paletteMode
 
             Keys.onPressed: event => {
-                if (event.key === Qt.Key_Escape) {
+                // Left and Right already move to the workspace; Enter stays on the one shown
+                if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     GlobalStates.overviewOpen = false;
                 } else if (event.key === Qt.Key_Left) {
                     if (!panelWindow.searchingText)
