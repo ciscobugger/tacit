@@ -134,6 +134,7 @@ Item {
 
     // the polygons of the matches on a page; the model fills in over a second or two, so it reads `count`
     function polysOn(p) { return rd.searchable && rd.query.length > 0 ? sm.boundingPolygonsOnPage(p) : []; }
+    readonly property bool hasSelection: rd.activeSel !== null && (rd.activeSel.text ?? "").length > 0
     function copy() { if (rd.activeSel) rd.activeSel.copyToClipboard(); }
     // a link in a file we do not trust opens only as a web or mail address
     function open(u) { const s = u.toString(); if (/^(https?|mailto):/i.test(s)) Qt.openUrlExternally(s); }
