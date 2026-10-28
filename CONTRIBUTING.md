@@ -21,10 +21,13 @@ Security problems go to **Report a vulnerability** on this repo's Security tab, 
 - **Ask first:** anything that adds a feature or changes how Tacit looks or behaves. Open an idea issue or ask on
   Discord, with a screenshot or a mock. Tacit's design is deliberate, and a change nobody agreed to is declined
   however good its code is.
-- These three repos take pull requests: [tacit](https://github.com/ciscobugger/tacit) (the desktop and its apps),
-  [thyris](https://github.com/ciscobugger/thyris) (the browser) and
-  [tacit-build](https://github.com/ciscobugger/tacit-build) (packages, installer, ISO). The other parts of Tacit are
-  not public yet.
+- These repos take pull requests: [tacit](https://github.com/ciscobugger/tacit) (the desktop and its apps),
+  [thyris](https://github.com/ciscobugger/thyris) (the browser),
+  [tacit-build](https://github.com/ciscobugger/tacit-build) (packages, installer, ISO),
+  [tacit-kit](https://github.com/ciscobugger/tacit-kit) (the design kit; its guide is
+  [design.tacitos.co](https://design.tacitos.co)) and
+  [tacit-music-example](https://github.com/ciscobugger/tacit-music-example) (an example app to build on). The other
+  parts of Tacit are not public yet.
 - Building and running a part: DEVELOPING.md in its repo. Working with an AI agent? Point it at AGENTS.md, which
   tells it the layout, the checks and the rules.
 

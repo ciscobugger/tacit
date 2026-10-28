@@ -208,6 +208,14 @@ def image():
     return found[0]
 
 
+def local_clock():
+    """Windows keeps the computer's clock in local time and Linux in UTC, so after Tacit Windows showed the time hours off
+    (VIProto, 2026-10-26). With Windows on the computer Tacit keeps it in local time too, as Ubuntu's installer does;
+    this is the file timedatectl set-local-rtc writes, which does not work inside the install's chroot."""
+    with open(f"{TARGET}/etc/adjtime", "w") as f:
+        f.write("0.0 0 0\n0\nLOCAL\n")
+
+
 def windows_elsewhere(disk):
     """Instead, on a disk of its own while Windows is on another (Setup's disk list, 2026-10-18): Windows's loader copied
     from that disk's EFI partition into Tacit's, where systemd-boot lists it by itself, so holding Space still shows
@@ -373,8 +381,11 @@ def install(disk, place, keep):
             os.makedirs(f"{TARGET}/efi/loader/entries", exist_ok=True)
             with open(f"{TARGET}/efi/loader/entries/{vendor}.conf", "w") as f:
                 f.write(f"title {vendor[:1].upper() + vendor[1:]}\nefi /EFI/{vendor}/{os.path.basename(path)}\n")
-    if place == "instead" and windows_elsewhere(disk):
+    elsewhere = place == "instead" and windows_elsewhere(disk)
+    if elsewhere:
         state["other"] = "Windows"
+    if elsewhere or (place == "next" and os.path.isfile(f"{TARGET}/efi/EFI/Microsoft/Boot/bootmgfw.efi")):
+        local_clock()
     progress(0.92, "keys")
     chroot("pacman-key", "--init")
     chroot("pacman-key", "--populate", "archlinux", "tacit")
