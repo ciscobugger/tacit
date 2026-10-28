@@ -87,6 +87,9 @@ Item {
         return p - (p > 0 ? doc.cached.lastIndexOf("\n", p - 1) : -1);
     }
     readonly property string language: (highlighter.definition && highlighter.definition.name) || ""
+    // what the status line says: a file with no known language says nothing rather than "None"
+    readonly property string languageName: doc.language === "None" ? "" : doc.language
+    function lineTotal() { return (doc.cached.match(/\n/g) || []).length + 1; }
     // Prose (Markdown, plain text) wraps at the window's edge and types quotes as typed; code keeps long lines and
     // closes what it opens. Alt+Z turns wrapping either way for this file.
     readonly property bool prose: /\.(md|markdown|txt|rst|adoc)$/i.test(doc.rel) || doc.language === "Markdown"
