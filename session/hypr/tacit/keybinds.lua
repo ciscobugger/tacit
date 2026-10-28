@@ -5,12 +5,12 @@ hl.bind("CTRL+SUPER+ALT+Slash", hl.dsp.exec_cmd("xdg-open ~/.config/hypr/custom/
 -- Appended to ~/.config/hypr/custom/keybinds.lua, loaded after hyprland/keybinds.lua.
 -- Shortcut names are the fork's CompositorGlobalShortcut names:
 --   quickshell:searchToggleRelease -> claimed by modules/ii/commandPalette/CommandPalette.qml
---   quickshell:settingsToggle      -> modules/ii/settings/Settings.qml
+--   quickshell:sessionToggle       -> modules/ii/sessionScreen/SessionScreen.qml
 
--- Super + Escape -> shell settings. Nothing binds this combination upstream
--- (only CTRL + SHIFT + Escape, the task manager), so there is nothing to displace.
-hl.bind("SUPER + Escape", hl.dsp.global("quickshell:settingsToggle"),
-    { description = "Shell: Settings" })
+-- Super + Escape -> the session menu (lock, log out, restart, shut down). Nothing binds this
+-- combination upstream (only CTRL + SHIFT + Escape, the task manager). Settings keeps Super + I.
+hl.bind("SUPER + Escape", hl.dsp.global("quickshell:sessionToggle"),
+    { description = "Shell: Session (lock, log out, power)" })
 
 -- Super (release) -> palette.
 --

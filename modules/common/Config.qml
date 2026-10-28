@@ -614,9 +614,8 @@ Singleton {
                 property list<string> screenList: [] // List of names, like "eDP-1", find out with 'hyprctl monitors' command
                 property int notificationQueueDepth: 3
                 property bool hoverExpand: true
-                // boring.notch hideNotchOption = nowPlayingOnly: stay visible over a fullscreen
-                // window only while something plays (Overlay layer), hide otherwise.
-                property bool showInFullscreenWhilePlaying: true
+                // No longer read: the notch hides over a fullscreen window. Kept so saved configs load.
+                property bool showInFullscreenWhilePlaying: false
                 property JsonObject media: JsonObject {
                     property bool enable: true
                     property int keepPausedMinutes: 5 // a paused player stays in the sheet this long

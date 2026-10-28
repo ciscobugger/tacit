@@ -48,13 +48,12 @@ Scope {
                 // elsewhere cannot take the keyboard back: Escape at the sheet level
                 // (IslandContent) and the shortcut are the ways out.
                 WlrLayershell.keyboardFocus: (IslandController.keyboard && islandContent.open && islandContent.keyScreen) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-                // Hyprland buries the Top layer under a fullscreen window. boring.notch's
-                // nowPlayingOnly: ride the Overlay layer while something plays so a fullscreen
-                // video keeps its transport, drop back to Top the moment it stops.
+                // A fullscreen window on this monitor (a video, a game) gets the whole screen: the notch
+                // unmaps there and maps again when the window leaves fullscreen.
                 readonly property var thisMonitorData: HyprlandData.monitors.find(m => m.name === islandRoot.screen?.name)
-                readonly property bool monitorHasFullscreen: HyprlandData.workspaceById[thisMonitorData?.activeWorkspace?.id]?.hasfullscreen ?? false
-                WlrLayershell.layer: (monitorHasFullscreen && Config.options.island.showInFullscreenWhilePlaying
-                    && IslandController.mediaPresent && MprisController.isPlaying) ? WlrLayer.Overlay : WlrLayer.Top
+                readonly property bool monitorHasFullscreen: HyprlandData.workspaceHasTrueFullscreen(thisMonitorData?.activeWorkspace?.id)
+                visible: !monitorHasFullscreen
+                WlrLayershell.layer: WlrLayer.Top
                 color: "transparent"
 
                 // Window-aware means honest: the reserve is exactly the resting header (34px)

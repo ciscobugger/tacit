@@ -74,12 +74,6 @@ ContentPage {
                 checked: Config.options.island.hoverExpand
                 onSwitched: (value) => { Config.options.island.hoverExpand = value }
             }
-            ConfigSwitch {
-                buttonIcon: "fullscreen"
-                text: Translation.tr("Stay over fullscreen windows while music plays")
-                checked: Config.options.island.showInFullscreenWhilePlaying
-                onSwitched: (value) => { Config.options.island.showInFullscreenWhilePlaying = value }
-            }
             ConfigSpinBox {
                 icon: "vertical_align_top"
                 text: Translation.tr("Distance from the top edge")

@@ -1953,7 +1953,7 @@ Singleton {
             return "off";
         // the notch lies under a full-screen window there
         const m = HyprlandData.monitors.find(x => x.name === screen);
-        if (m && (HyprlandData.workspaceById[m.activeWorkspace?.id]?.hasfullscreen ?? false))
+        if (m && (HyprlandData.workspaceHasTrueFullscreen(m.activeWorkspace?.id)))
             return "off";
         root.signinSocket = socket;
         root.signinScreen = screen;

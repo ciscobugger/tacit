@@ -1380,12 +1380,6 @@ ApplicationWindow {
                     onPicked: value => Config.options.island.hoverExpand = value
                 }
                 SwitchRow {
-                    label: "Stay over full-screen windows while music plays"
-                    enabled: Config.options.island.enable
-                    checked: Config.options.island.showInFullscreenWhilePlaying
-                    onToggled: value => Config.options.island.showInFullscreenWhilePlaying = value
-                }
-                SwitchRow {
                     label: "Say hello when you log in"
                     enabled: Config.options.island.enable
                     checked: Config.options.island.greeting.enable
