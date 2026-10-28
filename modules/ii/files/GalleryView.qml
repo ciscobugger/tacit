@@ -1,16 +1,17 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects
+import QtQuick.Effects
+import Quickshell
 import qs.services
 import qs.modules.common
-import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.tacit
+import Tacit.Kit as K
 
 /**
  * The Gallery: the file the keyboard is on, large, and the folder as a strip under it. Left and Right walk the
  * strip, Enter opens; a click picks, a double click opens, a right click gives the file's menu. A picture shows
- * itself; anything else is said by its glyph and what it is. Where you are in the strip: a wash and the sand
- * tick under it, Praxis's mark turned on its side.
+ * itself; anything else is said by its symbol and what it is. In the strip, as in the grid: the selection is the
+ * accent ring 4 px around a tile, the pointer's hover a 5 % wash, the keyboard's place the kit's focus ring.
  */
 Item {
     id: gallery
@@ -18,6 +19,7 @@ Item {
     property var model                    // the window's folder model
     property int cursor: -1
     property var selectedMap: ({})
+    property bool keysShown: false        // the keyboard's focus ring is showing
     property var shown: name => true      // the window's filter
     signal picked(int index, var mouse)
     signal opened(int index)
@@ -66,27 +68,12 @@ Item {
             onStatusChanged: if (status === Image.Ready) bigIn.restart()
             Anim { id: bigIn; target: big; property: "opacity"; from: 0; to: 1; type: Anim.FastEffects }
         }
-        Rectangle {
+        K.Symbol {
             anchors.centerIn: parent
             visible: gallery.has && !big.visible
-            width: 120
-            height: 120
-            radius: 22
-            color: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.92)
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: gallery.thing?.glyph ?? ""
-                fill: gallery.isDir ? 1 : 0
-                iconSize: 56
-                color: Tacit.inkSec
-            }
-        }
-        StyledText {
-            anchors.centerIn: parent
-            visible: !gallery.has
-            text: "Nothing here"
-            font.pixelSize: 15
-            color: Tacit.inkMeta
+            text: gallery.thing?.glyph ?? ""
+            filled: gallery.isDir
+            size: 56
         }
     }
 
@@ -95,21 +82,19 @@ Item {
         id: caption
         anchors { left: parent.left; right: parent.right; bottom: strip.top; bottomMargin: 12; leftMargin: 16; rightMargin: 16 }
         spacing: 2
-        StyledText {
+        K.TacitText {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
             text: gallery.thing?.name ?? ""
             elide: Text.ElideMiddle
-            font.pixelSize: 16
-            font.weight: Font.DemiBold
-            color: Tacit.inkMain
+            size: "body"
+            weight: "medium"
         }
-        StyledText {
+        K.TacitText {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
             text: gallery.facts
-            font.pixelSize: 13
-            color: Tacit.inkMeta
+            ink: "sec"
         }
     }
 
@@ -121,46 +106,40 @@ Item {
         orientation: ListView.Horizontal
         spacing: 4
         clip: true
-        model: gallery.model
+        model: ScriptModel { values: gallery.model?.rows ?? []; objectProp: "filePath" }
         boundsBehavior: Flickable.StopAtBounds
         GlideWheel { view: strip }
         delegate: Item {
             id: tile
             required property int index
-            required property string fileName
-            required property string filePath
-            required property bool fileIsDir
+            required property var modelData
+            readonly property string fileName: tile.modelData.fileName
+            readonly property string filePath: tile.modelData.filePath
+            readonly property bool fileIsDir: tile.modelData.fileIsDir
             readonly property bool shownHere: gallery.shown(tile.fileName)
             readonly property bool here: tile.index === gallery.cursor
+            readonly property bool chosen: gallery.selectedMap[tile.filePath] === true
             readonly property var thing: Things.describe(tile.filePath + (tile.fileIsDir ? "/" : ""))
             width: tile.shownHere ? 88 : 0
             height: 96
             visible: tile.shownHere
-            Rectangle {
-                anchors { fill: parent; bottomMargin: 8 }
-                radius: 12
-                color: tile.here ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.88)
-                    : gallery.selectedMap[tile.filePath] ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.92)
-                    : tileArea.containsMouse ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.95) : "transparent"
-                Behavior on color { ColorAnimation { duration: 80 } }
-            }
             Item {
                 id: art
                 x: 8
                 y: 8
                 width: 72
                 height: 72
+                // no picture of itself: its symbol on the field's wash
                 Rectangle {
                     anchors.fill: parent
-                    radius: 8
-                    color: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.92)
+                    radius: Tacit.radius.row
+                    color: Qt.alpha(Tacit.inkMain, Tacit.wash.action)
                     visible: tile.thing.kind !== "image" || thumb.status !== Image.Ready
-                    MaterialSymbol {
+                    K.Symbol {
                         anchors.centerIn: parent
                         text: tile.thing.glyph
-                        fill: tile.fileIsDir ? 1 : 0
-                        iconSize: 28
-                        color: Tacit.inkSec
+                        filled: tile.fileIsDir
+                        size: 28
                     }
                 }
                 Loader {
@@ -174,20 +153,35 @@ Item {
                         sourceSize.height: 144
                         fillMode: Image.PreserveAspectCrop
                         layer.enabled: true
-                        layer.effect: OpacityMask {
-                            maskSource: Rectangle { width: 72; height: 72; radius: 8 }
-                        }
+                        layer.effect: MultiEffect { maskEnabled: true; maskSource: artMask }
                     }
                 }
-            }
-            // where you are: the sand tick, under the tile
-            Rectangle {
-                visible: tile.here
-                anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 1 }
-                width: 16
-                height: 3
-                radius: 1.5
-                color: Tacit.accent
+                Rectangle { id: artMask; visible: false; width: 72; height: 72; radius: Tacit.radius.row; layer.enabled: true }
+                // hover and press: the main ink over the tile
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Tacit.radius.row
+                    color: Tacit.inkMain
+                    opacity: tileArea.pressed ? Tacit.wash.pressed : tileArea.containsMouse ? Tacit.wash.hover : 0
+                    Behavior on opacity { NumberAnimation { duration: Tacit.motion.hover.ms } }
+                }
+                Rectangle {
+                    id: ring
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    radius: Tacit.radius.row + 4
+                    color: "transparent"
+                    border.width: 2
+                    border.color: Tacit.accent
+                    visible: tile.chosen
+                }
+                Item {
+                    anchors.fill: tile.chosen ? ring : parent
+                    K.FocusRing {
+                        shown: gallery.keysShown && tile.here
+                        corner: tile.chosen ? ring.radius : Tacit.radius.row
+                    }
+                }
             }
             MouseArea {
                 id: tileArea
@@ -195,6 +189,7 @@ Item {
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 cursorShape: Qt.PointingHandCursor
+                onPressed: K.Kit.focusVisible = false
                 onClicked: mouse => {
                     if (mouse.button === Qt.RightButton) {
                         const p = tileArea.mapToItem(null, mouse.x, mouse.y);
@@ -203,7 +198,7 @@ Item {
                 }
                 onDoubleClicked: gallery.opened(tile.index)
             }
-            StyledToolTip { text: tile.fileName; extraVisibleCondition: tileArea.containsMouse }
+            K.Tooltip { text: tile.fileName; shown: tileArea.containsMouse }
         }
     }
 }

@@ -44,7 +44,8 @@ Singleton {
         thumbnailsInFlight = Math.max(0, thumbnailsInFlight - 1);
         while (thumbnailQueue.length > 0 && thumbnailsInFlight < maxConcurrentThumbnails) {
             const next = thumbnailQueue.shift();
-            if (next) next.requestGeneration();
+            // a tile destroyed while queued is not null but a dead object: calling it throws, and the loop must go on
+            try { if (next) next.requestGeneration(); } catch (e) {}
         }
     }
 

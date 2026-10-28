@@ -1,259 +1,305 @@
 import QtQuick
 import Qt5Compat.GraphicalEffects
-import qs
+import Qt.labs.folderlistmodel
+import Quickshell.Io
 import qs.services
 import qs.modules.common
 import qs.modules.common.functions
-import qs.modules.common.widgets
+import Tacit.Kit as K
 
 /**
- * The third column: what the selection is, and what can be done with it. A picture shows
- * itself; anything else shows its glyph. Under it: the name, the facts (kind, size, when,
- * where it came from, path), then the actions - the same list the right-click gives, laid
- * out as rows. With nothing selected it describes the folder. Opens on its own when the
- * window is wide enough to afford it; Space toggles it otherwise.
+ * The docked panel's face for the selection (kit v0, "Docked panel"): its content, one Slab, actions as words, the
+ * trash last in the risk ink. A picture shows itself; a song its cover and what its tags say; a video its poster, its
+ * size and length; a text its first lines; a folder how much is in it; several files their count and size. Each fact
+ * once: the row already says name, source, size and time, so the face says what the row cannot. Tags, EXIF and posters
+ * come from the Viewer's probe (scripts/viewer/probe.py), asked a beat after the selection settles.
  */
 Item {
-    id: preview
+    id: face
 
-    property string path: ""            // "" = the folder itself
-    property string folder: ""
+    property string path: ""            // the file the keyboard is on
     property bool isDir: false
     property double size: 0
-    property date modified: new Date(0)
-    property int count: 0
-    property double folderBytes: 0
-    property var actions: []
-    property int many: 0            // more than one selected: a sum, not a file
+    property bool showHidden: false
+    property int many: 0                // more than one selected: a sum, not a file
+    property int manyDirs: 0
     property double manyBytes: 0
+    property var actions: []
+    property bool showLook: true        // the Gallery shows the picture itself: here only what it is
+    property bool sizeSaid: true        // a list row says the size; a grid cell does not
+    signal open()
+    signal more(Item at)
 
-    readonly property bool hasFile: preview.path.length > 0
-    property bool showLook: true          // the Gallery shows the picture itself: here only what it is
-    readonly property var thing: Things.describe(preview.hasFile ? preview.path + (preview.isDir ? "/" : "") : preview.folder + "/")
-    readonly property bool picture: preview.hasFile && preview.thing.kind === "image"
-    readonly property string name: preview.many > 0 ? Voice.count(preview.many, "item") : (preview.hasFile ? preview.thing.name : Files.placeName(preview.folder))
+    readonly property var thing: Things.describe(face.path + (face.isDir ? "/" : ""))
+    readonly property string kind: face.path.length > 0 ? face.thing.kind : ""
+    readonly property bool looks: face.many === 0 && (face.kind === "image" || face.kind === "audio" || face.kind === "video")
+    readonly property bool reads: face.many === 0 && (face.kind === "text" || face.kind === "code")
+    readonly property var facts: face.probed[face.path] ?? null
+    readonly property real side: width - 2 * K.Kit.tokens.space.xl
 
-    function kindWord(k) {
-        switch (k) {
-        case "folder": return "Folder";
-        case "image": return "Picture";
-        case "video": return "Video";
-        case "audio": return "Audio";
-        case "pdf": return "PDF";
-        case "doc": return "Document";
-        case "archive": return "Archive";
-        case "code": return "Code";
-        case "text": return "Text";
+    // ---- what the probe and the first bytes say, per path
+    property var probed: ({})
+    property string headPath: ""
+    property var head: []
+    readonly property string probeScript: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/viewer/probe.py`
+    function ask() {
+        if (!face.visible || face.many > 0 || face.path.length === 0)
+            return;
+        if (face.looks && face.probed[face.path] === undefined && !probe.running) {
+            probe.target = face.path;
+            probe.running = true;
         }
-        return "File";
+        if (face.reads && face.headPath !== face.path && !headProc.running) {
+            headProc.target = face.path;
+            headProc.running = true;
+        }
     }
-    function when(d) {
-        const t = d.getTime();
-        if (t <= 0)
-            return "";
-        const age = Voice.age(t);
-        const full = Qt.formatDateTime(d, "d MMM yyyy, HH:mm");
-        return age === "now" ? full : `${full} · ${age}`;
+    Timer { id: settle; interval: 120; onTriggered: face.ask() }
+    onPathChanged: settle.restart()
+    onVisibleChanged: settle.restart()
+    Process {
+        id: probe
+        property string target: ""
+        command: ["nice", "-n", "10", "python3", face.probeScript, "facts", probe.target]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let r = null;
+                try { r = JSON.parse(text); } catch (e) {}
+                face.probed = Object.assign({}, face.probed, { [probe.target]: r ?? {} });
+            }
+        }
+        onExited: face.ask()   // the selection may have moved on meanwhile
+    }
+    Process {
+        id: headProc
+        property string target: ""
+        command: ["head", "-c", "4096", "--", headProc.target]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                face.headPath = headProc.target;
+                face.head = text.indexOf("\u0000") >= 0 ? [] : text.replace(/\r/g, "").replace(/\t/g, "    ").split("\n");
+            }
+        }
+        onExited: face.ask()
+    }
+    // a folder: how much is in it
+    FolderListModel {
+        id: inside
+        folder: face.isDir && face.many === 0 && face.visible ? "file://" + face.path : ""
+        showHidden: face.showHidden
+        showDotAndDotDot: false
     }
 
-    // the divider
-    Rectangle {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: 1
-        color: Appearance.colors.colOutlineVariant
-        opacity: 0.5
+    function clock(sec) {
+        const s = Math.round(sec), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = String(s % 60).padStart(2, "0");
+        return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${r}` : `${m}:${r}`;
+    }
+    function dims(f) {
+        return f && f.w > 0 && f.h > 0 ? `${f.w} × ${f.h}` : "";
+    }
+    // EXIF's "2026:10:22 18:04:12" as "22 October 2026 at 18:04"
+    function taken(s) {
+        const m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/.exec(s ?? "");
+        if (!m)
+            return "";
+        const month = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+                       "November", "December"][Number(m[2]) - 1] ?? "";
+        return `${Number(m[3])} ${month} ${m[1]} at ${m[4]}:${m[5]}`;
+    }
+    // the one line under the name: what the row cannot say
+    readonly property string line: {
+        const f = face.facts;
+        const sz = face.sizeSaid || face.isDir ? "" : Voice.size(face.size);
+        switch (face.kind) {
+        case "folder":
+            return inside.status === FolderListModel.Ready ? Voice.count(inside.count, "item") : "";
+        case "image": {
+            const ex = f?.exif ?? {};
+            const when = face.taken(ex.taken);
+            const on = (ex.model ?? "").length > 0 ? ex.model : (ex.make ?? "");
+            const first = when.length > 0 ? `Taken ${when}${on.length > 0 ? " on " + on : ""}` : "";
+            const rest = [face.dims(f), sz].filter(x => x.length > 0).join(", ");
+            return first.length > 0 && rest.length > 0 ? `${first}. ${rest}.` : first + rest;
+        }
+        case "audio": {
+            const t = f?.tags ?? {};
+            const year = /\d{4}/.exec(t.date ?? t.year ?? "")?.[0] ?? "";
+            const album = (t.album ?? "").length > 0 ? t.album + (year ? ` (${year})` : "") : year;
+            return [t.artist ?? t.album_artist ?? "", album, f?.duration > 0 ? face.clock(f.duration) : "", sz].filter(x => x.length > 0).join(", ");
+        }
+        case "video":
+            return [face.dims(f), f?.duration > 0 ? face.clock(f.duration) : "", sz].filter(x => x.length > 0).join(", ");
+        }
+        return sz;
+    }
+    // "3 files, 2.9 GB"; folders' sizes are not summed, so with a folder in it the size is not said
+    readonly property string sum: {
+        const files = face.many - face.manyDirs;
+        return [files > 0 ? Voice.count(files, "file") : "", face.manyDirs > 0 ? Voice.count(face.manyDirs, "folder") : "",
+                face.manyDirs === 0 && face.manyBytes > 0 ? Voice.size(face.manyBytes) : ""].filter(x => x.length > 0).join(", ");
+    }
+
+    // ---- the actions: what Enter does as the Slab, a few as words, the rest behind More…, the trash last
+    readonly property var slabAction: face.actions.find(a => a.id === "open" || a.id === "restore")
+        ?? (face.many > 0 ? face.actions.find(a => a.id === "park") : null) ?? null
+    readonly property var riskAction: face.actions.find(a => a.id === "trash") ?? face.actions.find(a => a.id === "delete") ?? null
+    readonly property var wordIds: face.many > 0 ? ["renamemany", "compress", "hand"]
+        : face.kind === "folder" ? ["terminal", "pin", "unpin", "park", "rename"]
+        : face.reads ? ["openwith", "hand", "path"]
+        : face.looks ? ["openwith", "park", "phone", "rename"]
+        : ["openwith", "extract", "park", "phone", "rename"]
+    readonly property var words: face.wordIds.map(id => face.actions.find(a => a.id === id)).filter(a => !!a).slice(0, 4)
+    readonly property bool moreThere: face.actions.length > face.words.length + (face.slabAction ? 1 : 0) + (face.riskAction ? 1 : 0)
+
+    // the content changing with the selection fades in (kit: Fade, fast)
+    readonly property string subject: face.many > 0 ? "many" : face.path
+    onSubjectChanged: fadeIn.restart()
+    NumberAnimation {
+        id: fadeIn
+        target: content; property: "opacity"; from: 0; to: 1
+        duration: K.Kit.tokens.motion.fadeFast.ms
+        easing.type: Easing.BezierSpline; easing.bezierCurve: K.Kit.tokens.motion.fadeFast.curve
     }
 
     Flickable {
+        id: flick
         anchors.fill: parent
-        anchors.leftMargin: 20
-        anchors.rightMargin: 8
-        anchors.topMargin: 12
-        contentHeight: column.implicitHeight
-        clip: true
+        contentHeight: content.height + 2 * K.Kit.tokens.space.xl
         boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+        clip: true
 
         Column {
-            id: column
-            width: parent.width
-            spacing: 14
+            id: content
+            x: K.Kit.tokens.space.xl
+            y: K.Kit.tokens.space.xl
+            width: face.side
 
-            // the look: a picture shows itself; anything else is said by a small tile beside its name (below)
+            // the look: a picture itself, a song's cover, a video's poster; whole, at its own shape
             Item {
-                width: parent.width
-                visible: preview.picture && preview.showLook
-                height: preview.picture && preview.showLook ? Math.min(width * 0.75, 260) : 0
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 14
-                    color: Appearance.colors.colLayer1
-                    visible: !preview.picture || big.status !== Image.Ready
-                    MaterialSymbol {
-                        anchors.centerIn: parent
-                        text: preview.many > 0 ? "select_all" : preview.thing.glyph
-                        fill: preview.thing.kind === "folder" ? 1 : 0
-                        iconSize: 56
-                        color: preview.thing.kind === "folder" ? Appearance.colors.colPrimary : Tacit.inkSec
-                    }
-                }
+                id: art
+                readonly property string source: face.many > 0 || !face.showLook ? ""
+                    : face.kind === "image" ? "file://" + face.path
+                    : face.looks && (face.facts?.thumb ?? "").length > 0 ? "file://" + face.facts.thumb : ""
+                readonly property real ratio: look.implicitHeight > 0 ? look.implicitWidth / look.implicitHeight : 1
+                // what the panel's height leaves after the words under it, so the actions stay in view
+                readonly property real cap: Math.max(160, Math.min(face.side, face.height - 2 * K.Kit.tokens.space.xl - 20 - info.height))
+                width: Math.min(face.side, art.cap * art.ratio)
+                height: look.status === Image.Ready ? Math.min(art.cap, art.width / art.ratio) : 0
+                visible: height > 0
                 Image {
-                    id: big
+                    id: look
                     anchors.fill: parent
-                    visible: preview.picture && preview.many === 0 && status === Image.Ready
-                    source: preview.picture ? "file://" + preview.path : ""
+                    source: art.source
                     asynchronous: true
                     cache: false
                     autoTransform: true
-                    sourceSize.width: 640
-                    sourceSize.height: 640
+                    sourceSize.width: 720
+                    sourceSize.height: 720
                     fillMode: Image.PreserveAspectCrop
-                    layer.enabled: true
-                    layer.effect: OpacityMask {
-                        maskSource: Rectangle { width: big.width; height: big.height; radius: 14 }
+                    visible: false
+                }
+                OpacityMask {
+                    anchors.fill: parent
+                    source: look
+                    maskSource: Rectangle { width: art.width; height: art.height; radius: K.Kit.tokens.radius.slab }
+                }
+            }
+            Item { width: 1; height: art.visible ? 20 : 0 }
+
+            Column {
+                id: info
+                width: parent.width
+
+                // several: how many, how much
+                K.TacitText {
+                    visible: face.many > 0
+                    width: parent.width
+                    text: face.sum
+                    size: "section"; weight: "strong"
+                    wrapMode: Text.Wrap
+                }
+                // a text: the text itself (no name: the row says it)
+                Column {
+                    id: lines
+                    visible: face.reads
+                    width: parent.width
+                    readonly property int fits: Math.max(4, Math.floor((face.height - 2 * K.Kit.tokens.space.xl - actionsBlock.height) / 22))
+                    Repeater {
+                        model: face.reads && face.headPath === face.path ? face.head.slice(0, lines.fits) : []
+                        K.TacitText {
+                            required property string modelData
+                            readonly property bool heading: face.path.toLowerCase().endsWith(".md") && /^#{1,6}\s/.test(modelData)
+                            width: lines.width
+                            height: 22
+                            verticalAlignment: Text.AlignVCenter
+                            text: modelData.length > 0 ? modelData : " "
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            size: "fileText"; cut: "code"
+                            ink: heading ? "main" : "sec"
+                            weight: heading ? "medium" : "regular"
+                        }
                     }
                 }
-            }
-
-            // the name, then its origin title when it has one; beside them, for anything but a picture, its glyph
-            Row {
-                width: parent.width
-                spacing: 12
-            Rectangle {
-                visible: !preview.picture || !preview.showLook
-                width: 44
-                height: 44
-                radius: 10
-                color: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.92)
-                MaterialSymbol {
-                    anchors.centerIn: parent
-                    text: preview.many > 0 ? "select_all" : preview.thing.glyph
-                    fill: preview.thing.kind === "folder" ? 1 : 0
-                    iconSize: 22
-                    color: Tacit.inkSec
-                }
-            }
-            Column {
-                width: parent.width - (preview.picture && preview.showLook ? 0 : 56)
-                anchors.verticalCenter: preview.picture && preview.showLook ? undefined : parent.verticalCenter
-                spacing: 2
-                StyledText {
+                // anything else: its name, then the line the row cannot say
+                K.TacitText {
+                    visible: face.many === 0 && !face.reads
                     width: parent.width
-                    text: preview.name
+                    text: face.thing.name
+                    size: "body"; weight: "medium"
                     wrapMode: Text.WrapAnywhere
                     maximumLineCount: 3
                     elide: Text.ElideRight
-                    font.pixelSize: Tacit.size.section
-                    font.weight: Font.DemiBold
-                    color: Tacit.inkMain
                 }
-                StyledText {
+                Item { width: 1; height: face.many === 0 && !face.reads && face.line.length > 0 ? 6 : 0 }
+                K.TacitText {
+                    visible: face.many === 0 && !face.reads && face.line.length > 0
                     width: parent.width
-                    visible: preview.hasFile && preview.thing.from.length > 0
-                    text: preview.thing.from
+                    text: face.line
+                    ink: "sec"
                     wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                    font.pixelSize: 14
-                    color: Tacit.inkSec
                 }
-            }
 
-            }
-            // the facts
-            Column {
-                width: parent.width
-                spacing: 6
-                component Fact: Row {
-                    property string label: ""
-                    property string value: ""
+                Column {
+                    id: actionsBlock
                     width: parent.width
-                    visible: value.length > 0
-                    spacing: 10
-                    StyledText {
-                        width: 64
-                        text: label
-                        font.pixelSize: Tacit.size.meta
-                        font.weight: Font.DemiBold
-                        color: Tacit.inkMeta
+                    Item { width: 1; height: face.slabAction ? 22 : 6 }
+                    K.Slab {
+                        visible: !!face.slabAction
+                        text: face.slabAction?.label ?? ""
+                        tone: "default"
+                        // Open goes through the window, as Enter does: a folder opens here, a pick is a choice
+                        onPicked: face.slabAction.id === "open" ? face.open() : face.slabAction.run()
                     }
-                    StyledText {
-                        width: parent.width - 74
-                        text: value
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 3
-                        elide: Text.ElideMiddle
-                        font.pixelSize: 14
-                        color: Tacit.inkMain
-                    }
-                }
-                Fact { label: "Kind"; value: preview.many > 0 ? "Selection" : preview.hasFile ? preview.kindWord(preview.thing.kind) : "Folder" }
-                Fact { label: "Size"; value: preview.many > 0 ? (preview.manyBytes > 0 ? Voice.size(preview.manyBytes) : "") : preview.hasFile ? (preview.isDir ? "" : Voice.size(preview.size)) : Voice.facts([Voice.count(preview.count, "item"), preview.folderBytes > 0 ? Voice.size(preview.folderBytes) : ""]) }
-                Fact { label: "Modified"; value: preview.many === 0 && preview.hasFile ? preview.when(preview.modified) : "" }
-                // a path breaks only after a slash
-                Fact { label: "Where"; value: (preview.many > 0 ? preview.folder.replace(Files.home, "~") : preview.hasFile ? preview.path.replace(Files.home, "~") : preview.folder.replace(Files.home, "~")).replace(/\//g, "/\u200b") }
-            }
-
-            // the actions, one clean list; Tacit's kit only by meaning (2026-10-08): what Enter does first, its word in
-            // the accent and its key at the row's end; the ones that risk something in the risk colour with a warning
-            Column {
-                width: parent.width
-                spacing: 2
-                Repeater {
-                    model: preview.actions.filter(a => a.id === "open" || a.id === "restore").concat(preview.actions.filter(a => a.id !== "open" && a.id !== "restore"))
-                    delegate: Item {
-                        required property var modelData
-                        readonly property bool risky: modelData.id === "trash" || modelData.id === "delete"
-                        readonly property bool enter: modelData.id === "open" || modelData.id === "restore"
-                        width: parent.width
-                        height: 34
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 8
-                            color: actArea.containsMouse ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.90) : "transparent"
-                        }
-                        MaterialSymbol {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: parent.risky ? "warning" : modelData.glyph
-                            iconSize: 18
-                            color: parent.risky ? Tacit.risk : parent.enter ? Tacit.accent : Tacit.inkSec
-                        }
-                        StyledText {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 36
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
+                    Item { width: 1; height: face.slabAction ? 16 : 0 }
+                    Repeater {
+                        model: face.words
+                        K.WordAction {
+                            required property var modelData
+                            width: face.side
                             text: modelData.label
-                            elide: Text.ElideRight
-                            font.pixelSize: Tacit.size.row
-                            font.weight: parent.enter ? Font.DemiBold : Font.Normal
-                            color: parent.risky ? Tacit.risk : parent.enter ? Tacit.accent : Tacit.inkMain
+                            onPicked: modelData.run()
                         }
-                        // Enter's row: its key at the end
-                        Rectangle {
-                            visible: parent.enter
-                            anchors.right: parent.right
-                            anchors.rightMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            height: 18
-                            width: 22
-                            radius: 5
-                            color: ColorUtils.transparentize(Tacit.accent, 0.84)
-                            StyledText { anchors.centerIn: parent; text: "↵"; font.pixelSize: 11; font.weight: Font.DemiBold; color: Tacit.accent }
-                        }
-                        MouseArea {
-                            id: actArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: modelData.run()
-                        }
+                    }
+                    K.WordAction {
+                        id: moreWord
+                        visible: face.moreThere
+                        width: face.side
+                        text: "More…"
+                        onPicked: face.more(moreWord)
+                    }
+                    Item { width: 1; height: face.riskAction && (face.words.length > 0 || face.moreThere) ? 10 : 0 }
+                    K.WordAction {
+                        visible: !!face.riskAction
+                        width: face.side
+                        text: face.riskAction?.label ?? ""
+                        risk: true
+                        onPicked: face.riskAction.run()
                     }
                 }
             }
         }
     }
+    K.Glide { view: flick }
 }

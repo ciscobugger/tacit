@@ -40,12 +40,17 @@ Singleton {
     // 11) never match it (it is written with an alpha, ']11;[100]#...') and fall back to this; foot's own ground is one
     // step from it
     readonly property color windowGround: root.ground
-    // a docked panel, a field in use; drawn at windowSeeThrough; never a group inside content
-    readonly property color container: Appearance.m3colors.m3surfaceContainer
+    // a field in use (the search field open); drawn at windowSeeThrough; never a group inside content. Not the docked
+    // panel: a solid layer over the see-through page read as a flat grey patch (2026-10-25); the panel is the page
+    // lifted by wash.action
+    readonly property color container: Appearance.m3colors.m3surfaceContainerHigh
     // context lines: lyrics still to come, an unplayed waveform
     readonly property color quiet: root.quieter(root.inkMain, root.windowGround, 38)
     // lyrics already sung, the empty track of a line
     readonly property color past: root.quieter(root.inkMain, root.windowGround, 18)
+    // a menu or sheet over content: solid (text under it must not show through), the window's ground a fifth of the way
+    // to the accent's container, as Praxis's menus and sheets have it
+    readonly property color overlay: ColorUtils.mix(root.windowGround, Appearance.m3colors.m3primaryContainer, 0.8)
 
     // ---- washes: inkMain over the ground at these amounts
     readonly property QtObject wash: QtObject {
@@ -53,6 +58,21 @@ Singleton {
         readonly property real current: 0.1
         readonly property real pressed: 0.22
         readonly property real action: 0.06
+        readonly property real hoverSmall: 0.08
+        readonly property real currentHover: 0.13
+    }
+    // ---- families
+    readonly property QtObject font: QtObject {
+        readonly property string main: "Tacit Sans"
+        readonly property string display: "Tacit Sans Display"
+        readonly property string numbers: "Tacit Sans"
+        readonly property string code: "Tacit Code"
+    }
+    // ---- weights on the wght axis
+    readonly property QtObject weight: QtObject {
+        readonly property int regular: 450
+        readonly property int medium: 500
+        readonly property int strong: 600
     }
     // ---- type sizes; hierarchy by size and weight
     readonly property QtObject size: QtObject {
@@ -84,6 +104,7 @@ Singleton {
         readonly property int action: 40
         readonly property int field: 36
         readonly property int band: 84
+        readonly property int menuRow: 34
     }
     // ---- widths
     readonly property QtObject width: QtObject {
