@@ -165,7 +165,7 @@ PanelWindow {
 
                 StyledToolTip {
                     z: 9999
-                    text: Translation.tr("Key input")
+                    text: Translation.tr("Google Cloud key")
                 }
             }
 
@@ -180,7 +180,7 @@ PanelWindow {
                     ToolbarTextField {
                         id: keyInput
                         implicitWidth: 400
-                        placeholderText: Translation.tr("Paste service account key JSON here")
+                        placeholderText: Translation.tr("Paste your Google Cloud key here")
                         inputMethodHints: Qt.ImhSensitiveData
                         onAccepted: submit()
 
