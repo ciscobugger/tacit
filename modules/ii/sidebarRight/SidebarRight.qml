@@ -7,11 +7,34 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+// PROTOTYPE: exists for the swapped content below; remove with the swap to revert.
+import "proto"
+import Tacit.Kit
 
 Scope {
     id: root
-    property int sidebarWidth: Appearance.sizes.sidebarWidth
+    // PROTOTYPE: the window hugs the prototype content's measure (seven 40 px cells —
+    // the secondary row — plus the body's two 16 px paddings); revert to
+    // Appearance.sizes.sidebarWidth with the swap when the layout idea is settled.
+    // !!! Update together with the content's own paddings (SidebarRightContentProto's
+    // sidebarPadding) and togglesWidth — this stale once already and cut the content.
+    property int sidebarWidth: Kit.tokens.height.action * 7 + Kit.tokens.space.s * 6 + Kit.tokens.space.l * 2
     readonly property bool centerOnly: Config.options.bar.layouts.leftLayout.length === 0 && Config.options.bar.layouts.rightLayout.length === 0 && !Config.options.bar.vertical
+
+    // PROTOTYPE: quickshell target for opening the panel without the notch, for the
+    // reshuffle and screenshots; revert with the swap.
+    IpcHandler {
+        target: "sidebar-right"
+        function toggle(): void {
+            GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+        }
+        function open(): void {
+            GlobalStates.sidebarRightOpen = true;
+        }
+        function close(): void {
+            GlobalStates.sidebarRightOpen = false;
+        }
+    }
 
     PanelWindow {
         id: panelWindow
@@ -38,7 +61,9 @@ Scope {
 
         Timer {
             id: closeAnimTimer
-            interval: Appearance.animationCurves.expressiveDefaultSpatialDuration // matches Anim {}
+            // Matches Anim.Standard's own duration (the normal one); a little extra
+            // would only keep the window a moment later, never empty the mask.
+            interval: Appearance.animationCurves.normalDuration
             onTriggered: panelWindow.reallyVisible = false
         }
 
@@ -119,15 +144,20 @@ Scope {
                 readonly property bool open: GlobalStates.sidebarRightOpen
                 readonly property real contentHeight: (sidebarContentLoader.item?.implicitHeight ?? 0) + panelWindow.cove
                 // The palette's motion, turned to this edge: the whole panel rises out of the
-                // bottom edge as one piece and settles with the slight overshoot of the spatial
-                // curve (caelestia launcher Wrapper.qml). No fade: Hyprland blurs only pixels
-                // above ignore_alpha, so a fading panel would pop its blur in mid-way.
+                // bottom edge as one piece (caelestia launcher Wrapper.qml). A standard
+                // curve, not the overshooting spatial one: a docked silhouette that
+                // overshoots lifts off the edge it docks into, and the small panel made
+                // that gap unmistakable (2026-10-25, prototype feedback). No fade: Hyprland
+                // blurs only pixels above ignore_alpha, so a fading panel would pop its
+                // blur in mid-way.
                 property real offsetScale: open ? 0 : 1
                 height: contentHeight
                 transform: Translate { y: entranceWrapper.contentHeight * entranceWrapper.offsetScale }
 
                 Behavior on offsetScale {
-                    Anim {}
+                    Anim {
+                        type: Anim.Standard
+                    }
                 }
 
                 MouseArea {
@@ -159,7 +189,10 @@ Scope {
                         }
                     }
 
-                    sourceComponent: SidebarRightContent {
+                    // PROTOTYPE: the content shown is the rearranged panel
+                    // (proto/SidebarRightContentProto.qml); swap back to
+                    // SidebarRightContent and drop the "proto" import below to revert.
+                    sourceComponent: SidebarRightContentProto {
                         maxHeight: panelWindow.panelMaxHeight
                     }
                 }
