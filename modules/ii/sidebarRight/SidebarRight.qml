@@ -7,34 +7,15 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
-// PROTOTYPE: exists for the swapped content below; remove with the swap to revert.
-import "proto"
 import Tacit.Kit
 
 Scope {
     id: root
-    // PROTOTYPE: the window hugs the prototype content's measure (seven 40 px cells —
-    // the secondary row — plus the body's two 16 px paddings); revert to
-    // Appearance.sizes.sidebarWidth with the swap when the layout idea is settled.
-    // !!! Update together with the content's own paddings (SidebarRightContentProto's
-    // sidebarPadding) and togglesWidth — this stale once already and cut the content.
+    // The window hugs the content's measure: seven action-height cells (the secondary row)
+    // with their gaps, plus the body's two paddings. Update together with the content's
+    // own paddings (SidebarRightContent's sidebarPadding) and togglesWidth.
     property int sidebarWidth: Kit.tokens.height.action * 7 + Kit.tokens.space.s * 6 + Kit.tokens.space.l * 2
     readonly property bool centerOnly: Config.options.bar.layouts.leftLayout.length === 0 && Config.options.bar.layouts.rightLayout.length === 0 && !Config.options.bar.vertical
-
-    // PROTOTYPE: quickshell target for opening the panel without the notch, for the
-    // reshuffle and screenshots; revert with the swap.
-    IpcHandler {
-        target: "sidebar-right"
-        function toggle(): void {
-            GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
-        }
-        function open(): void {
-            GlobalStates.sidebarRightOpen = true;
-        }
-        function close(): void {
-            GlobalStates.sidebarRightOpen = false;
-        }
-    }
 
     PanelWindow {
         id: panelWindow
@@ -189,10 +170,7 @@ Scope {
                         }
                     }
 
-                    // PROTOTYPE: the content shown is the rearranged panel
-                    // (proto/SidebarRightContentProto.qml); swap back to
-                    // SidebarRightContent and drop the "proto" import below to revert.
-                    sourceComponent: SidebarRightContentProto {
+                    sourceComponent: SidebarRightContent {
                         maxHeight: panelWindow.panelMaxHeight
                     }
                 }
