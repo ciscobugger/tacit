@@ -31,6 +31,8 @@ Item {
     signal now(var item)            // a row of what is happening: click reveals or stops
     signal largeOld()
     property bool largeOldShown: false
+    signal phone()                  // the phone's page
+    property bool phoneShown: false
     // re-evaluate the dots when arrivals change
     property int arrivalsTick: 0
     Connections { target: Recents; function onItemsChanged() { rail.arrivalsTick++; } }
@@ -165,7 +167,7 @@ Item {
                     required property var modelData
                     glyph: modelData.glyph
                     label: Files.placeName(modelData.path)
-                    current: rail.folder === modelData.path
+                    current: !rail.phoneShown && rail.folder === modelData.path
                     fresh: !current && rail.arrivalsTick >= 0 && Files.hasNew(modelData.path)
                     dropPath: modelData.path
                     onPicked: rail.go(modelData.path)
@@ -180,7 +182,7 @@ Item {
                     required property var modelData
                     glyph: "folder"
                     label: Files.placeName(modelData)
-                    current: rail.folder === modelData
+                    current: !rail.phoneShown && rail.folder === modelData
                     fresh: !current && rail.arrivalsTick >= 0 && Files.hasNew(modelData)
                     dropPath: modelData
                     onPicked: rail.go(modelData)
@@ -189,7 +191,7 @@ Item {
             }
 
             // disks: a click mounts and enters; the eject symbol unmounts and, for USB, powers off
-            K.RailSection { visible: Devices.list.length > 0; text: "Drives" }
+            K.RailSection { text: "Devices" }
             Repeater {
                 model: Devices.list
                 delegate: Place {
@@ -202,7 +204,7 @@ Item {
                     // the room left; under the pointer it gives way to the eject (Praxis's rows: the context gives
                     // way to the row's own actions)
                     context: eject.visible ? "" : free
-                    current: mounted && (rail.folder === modelData.mountpoint || rail.folder.startsWith(modelData.mountpoint + "/"))
+                    current: !rail.phoneShown && mounted && (rail.folder === modelData.mountpoint || rail.folder.startsWith(modelData.mountpoint + "/"))
                     onPicked: if (!eject.hovered) rail.device(modelData)   // the eject's own tap reaches the row too
 
                     function readFree() { if (drive.mounted) freeProbe.running = true; }
@@ -232,6 +234,14 @@ Item {
                     }
                 }
             }
+
+            // the phone is a place from the start: its page connects it, then lists what was sent
+            Place {
+                glyph: "smartphone"
+                label: PhoneLink.paired ? PhoneLink.phoneName : "Your phone"
+                current: rail.phoneShown
+                onPicked: rail.phone()
+            }
         }
 
         // the trash at the rail's foot (16 from the bottom, as the approved design), unless the places run past it.
@@ -255,7 +265,7 @@ Item {
                 glyph: "delete"
                 label: "Trash"
                 context: Files.trashCount > 0 ? String(Files.trashCount) : ""
-                current: rail.folder === Files.trashDir
+                current: !rail.phoneShown && rail.folder === Files.trashDir
                 dropPath: Files.trashDir
                 onPicked: rail.go(Files.trashDir)
                 onMenu: (x, y) => rail.placeActions("Trash", Files.trashDir, x, y)

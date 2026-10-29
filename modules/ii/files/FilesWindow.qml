@@ -806,6 +806,7 @@ FloatingWindow {
     property string diskLine: ""
     function showLargeOld() {
         win.editingIndex = -1;
+        win.phoneShown = false;
         win.shelfShown = false;
         win.searching = true;
         win.recentShown = false;
@@ -842,6 +843,7 @@ FloatingWindow {
     property bool shelfShown: false
     function showShelf() {
         win.editingIndex = -1;
+        win.phoneShown = false;
         win.searching = true;
         win.recentShown = false;
         win.largeOld = false;
@@ -858,8 +860,27 @@ FloatingWindow {
         target: DropShelf
         function onItemsChanged() { if (win.shelfShown) win.showShelf(); }
     }
+    // The phone's page (the rail's "Your phone"): a view of its own, in the list's place (services/PhoneLink.qml).
+    property bool phoneShown: false
+    function showPhone() {
+        win.editingIndex = -1;
+        win.shelfShown = false;
+        win.largeOld = false;
+        win.recentShown = false;
+        win.searching = true;
+        win.phoneShown = true;
+        win.searchQuery = "";
+        win.hits = [];
+        win.searchCursor = -1;
+        win.clearSelection();
+        fdProc.running = false;
+        recentProc.running = false;
+        largeProc.running = false;
+        Qt.callLater(() => phonePage.focusFirst());
+    }
     function showRecent() {
         win.editingIndex = -1;
+        win.phoneShown = false;
         win.shelfShown = false;
         win.largeOld = false;
         win.searching = true;
@@ -957,6 +978,7 @@ FloatingWindow {
         return true;
     }
     function deepSearch(q) {
+        win.phoneShown = false;
         win.recentShown = false;
         win.shelfShown = false;
         const query = (q ?? "").trim();
@@ -981,6 +1003,7 @@ FloatingWindow {
         win.recentShown = false;
         win.largeOld = false;
         win.shelfShown = false;
+        win.phoneShown = false;
         fdProc.running = false;
         win.searching = false;
         win.hits = [];
@@ -1061,7 +1084,7 @@ FloatingWindow {
     // ------------------------------------------------------------------ navigation
     function go(path, push) {
         const p = Files.trim(path);
-        if (win.searching) { fdProc.running = false; recentProc.running = false; largeProc.running = false; win.searching = false; win.recentShown = false; win.largeOld = false; win.shelfShown = false; win.hits = []; win.searchCursor = -1; win.query = ""; }
+        if (win.searching) { fdProc.running = false; recentProc.running = false; largeProc.running = false; win.searching = false; win.recentShown = false; win.largeOld = false; win.shelfShown = false; win.phoneShown = false; win.hits = []; win.searchCursor = -1; win.query = ""; }
         if (p === win.folder) {
             if (win.gone.length > 0 || win.unreadable)   // asked for again (the drive mounted from the rail): look again
                 existsProbe.running = true;
@@ -1883,8 +1906,8 @@ FloatingWindow {
             return;
         const what = paths.length === 1 ? paths[0].split("/").pop() : Voice.count(paths.length, "item");
         let list = [];
-        if (Things.phoneReachable)
-            list.push({ "id": "phone", "label": `${Things.phoneName} · on the network`, "glyph": "smartphone", "run": () => { for (const p of paths) Things.toPhone(p); } });
+        if (PhoneLink.paired)
+            list.push({ "id": "phone", "label": `${PhoneLink.phoneName} · on the network`, "glyph": "smartphone", "run": () => PhoneLink.send(paths) });
         list.push({ "id": "shelf", "label": "The shelf · carry it anywhere", "glyph": "stacks", "run": () => DropShelf.addItems(paths.map(p => "file://" + p)) });
         list.push({ "id": "claude", "label": "Praxis · a new session here", "glyph": "smart_toy", "run": () => Recents.launch(win.folder, `Look at ${paths.join(", ")}. What is this, and what should I do about it?`) });
         sheet.title = `Send ${what} to`;
@@ -2193,6 +2216,8 @@ FloatingWindow {
                     onShelf: win.showShelf()
                     largeOldShown: win.largeOld
                     onLargeOld: win.showLargeOld()
+                    phoneShown: win.phoneShown
+                    onPhone: win.showPhone()
                     onNow: item => {
                         if (item.kind === "file") win.show(Files.parent(item.path), item.path, "");
                         else if (item.kind === "device" && item.dev.mountpoint.length > 0) win.go(item.dev.mountpoint);
@@ -2225,8 +2250,8 @@ FloatingWindow {
                         id: headerBox
                         Layout.fillWidth: true
                         Layout.preferredHeight: header.implicitHeight
-                        readonly property bool aView: win.recentShown || win.largeOld || win.shelfShown
-                        readonly property string placeWord: aView ? (win.recentShown ? "Recent" : win.shelfShown ? "Shelf" : "Large & old")
+                        readonly property bool aView: win.recentShown || win.largeOld || win.shelfShown || win.phoneShown
+                        readonly property string placeWord: aView ? (win.recentShown ? "Recent" : win.shelfShown ? "Shelf" : win.phoneShown ? (PhoneLink.paired ? PhoneLink.phoneName : "Your phone") : "Large & old")
                             : win.crumbs.length ? win.crumbs[win.crumbs.length - 1].name : Files.placeName(win.folder)
                         readonly property var parents: aView ? [] : win.crumbs.slice(Math.max(0, win.crumbs.length - 3), Math.max(0, win.crumbs.length - 1))
 
@@ -2250,6 +2275,7 @@ FloatingWindow {
 
                             K.SearchField {
                                 id: search
+                                visible: !win.phoneShown
                                 anchors.verticalCenter: parent.verticalCenter
                                 scope: headerBox.placeWord
                                 // tiled narrow, the path needs the room more than the field
@@ -2552,6 +2578,14 @@ FloatingWindow {
                             onOpened: i => win.openIndex(i)
                             onContextRequested: (i, x, y) => win.showActions(i, x, y)
                         }
+                        // the phone's page (rail: Your phone): connect it, then what was sent
+                        FilesPhone {
+                            id: phonePage
+                            anchors.fill: parent
+                            visible: win.phoneShown
+                            inset: Tacit.space.page - filesArea.x   // the page inset: where a list's names start
+                            outset: Tacit.space.page - 20           // and as far from the window's edge (less its 12 and the area's 8)
+                        }
                         // deep search hits: name, its place under this folder, in the same rows
                         ListView {
                             id: hitList
@@ -2560,7 +2594,7 @@ FloatingWindow {
                             anchors.rightMargin: filesArea.ringSpace
                             topMargin: filesArea.ringSpace
                             bottomMargin: (win.forPick ? 64 : 0) + filesArea.ringSpace   // the last rows scroll clear of the pick bar
-                            visible: win.searching
+                            visible: win.searching && !win.phoneShown
                             model: win.hits
                             spacing: 0
                             boundsBehavior: Flickable.StopAtBounds
@@ -2744,7 +2778,7 @@ FloatingWindow {
                             failure: win.gone.length > 0 || win.unreadable
                             text: {
                                 if (win.searching) {
-                                    if (win.searchRunning || win.hits.length > 0)
+                                    if (win.searchRunning || win.hits.length > 0 || win.phoneShown)
                                         return "";
                                     if (win.shelfShown)
                                         return "Nothing is parked on the shelf.";

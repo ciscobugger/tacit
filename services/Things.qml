@@ -75,28 +75,10 @@ Singleton {
         };
     }
 
-    // The phone, when one is paired and reachable (kdeconnect-cli -a), by name.
-    property string phoneId: ""
-    property string phoneName: ""
-    readonly property bool phoneReachable: root.phoneId.length > 0
-    Process {
-        id: phoneProc
-        command: ["bash", "-c", "kdeconnect-cli -a 2>/dev/null | sed -n 's/^- \\(.*\\): \\([0-9a-f]*\\) .*/\\2\\t\\1/p' | head -1"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const f = text.trim().split("\t");
-                root.phoneId = f.length === 2 ? f[0] : "";
-                root.phoneName = f.length === 2 ? f[1] : "";
-            }
-        }
-    }
-    Timer {
-        interval: 60000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: phoneProc.running = true
-    }
+    // The phone, when one is connected and reachable (services/PhoneLink.qml), by name.
+    readonly property string phoneId: PhoneLink.phoneId
+    readonly property string phoneName: PhoneLink.phoneName
+    readonly property bool phoneReachable: PhoneLink.phoneReachable
 
     // [{ id, label, glyph, run }]
     function actions(path) {
@@ -108,11 +90,12 @@ Singleton {
         if (t.kind === "folder" || t.kind === "code" || t.kind === "text" || t.kind === "file")
             list.push({ "id": "code", "label": "Open in Graphis", "glyph": "code", "run": () => root.openInCode(path, t.kind === "folder") });
         list.push({ "id": "show", "label": "Show in Files", "glyph": "folder_open", "run": () => root.reveal(path) });
+        // Not a folder: the daemon sends files. Before a phone is connected it leads to the phone's page in Files.
+        if (t.kind !== "folder")
+            list.push({ "id": "phone", "label": PhoneLink.menuWords, "glyph": "smartphone", "run": () => root.toPhone(path) });
         if (!DropShelf.items.includes(path))
             list.push({ "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + path]) });
         list.push({ "id": "hand", "label": "Hand to Praxis", "glyph": "smart_toy", "run": () => root.hand(path) });
-        if (root.phoneReachable)
-            list.push({ "id": "phone", "label": `To ${root.phoneName}`, "glyph": "smartphone", "run": () => root.toPhone(path) });
         if (t.kind === "image")
             list.push({ "id": "wallpaper", "label": "Set as wallpaper", "glyph": "wallpaper", "run": () => Wallpapers.apply(path) });
         list.push({ "id": "path", "label": "Copy path", "glyph": "content_copy", "run": () => root.copyPath(path) });
@@ -165,10 +148,7 @@ Singleton {
         IslandController.request("copied", { "icon": "smart_toy", "text": `Handed to Praxis · ${path.split("/").pop()}` }, 70);
     }
     function toPhone(path) {
-        if (!root.phoneReachable)
-            return;
-        Quickshell.execDetached(["kdeconnect-cli", "-d", root.phoneId, "--share", path]);
-        IslandController.request("copied", { "icon": "smartphone", "text": `To ${root.phoneName} · ${path.split("/").pop()}` }, 70);
+        PhoneLink.send([path]);
     }
     function copyPath(path) {
         Quickshell.execDetached(["bash", "-c", `printf '%s' '${StringUtils.shellSingleQuoteEscape(path)}' | wl-copy`]);
