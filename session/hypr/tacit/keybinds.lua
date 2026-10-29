@@ -66,3 +66,13 @@ hl.define_submap("flow", function()
     end, { description = "Flow: cancel" })
     hl.bind("SUPER + SHIFT + F23", hl.dsp.global("quickshell:flowHold"), { description = "Flow: hold to dictate" }) -- # [hidden] (the same key inside the flow submap)
 end)
+
+-- Alt + Tab -> the window switcher: the workspace overview with a ring on the window you were in before; Tab and
+-- Shift + Tab move it, letting go of Alt focuses it (modules/ii/overview/Overview.qml). Hyprland sees the keys before
+-- any window, so the open overview does not need to hold them; the Alt release binds are the same kind as Super's above
+-- (release, any modifier state, passed on) and do nothing in the shell unless a switch is going.
+hl.bind("ALT + Tab", hl.dsp.global("quickshell:altTabNext"), { description = "Shell: Switch windows" })
+hl.bind("ALT + SHIFT + Tab", hl.dsp.global("quickshell:altTabPrev"), { description = "Shell: Switch windows, back" })
+hl.bind("ALT + Escape", hl.dsp.global("quickshell:altTabCancel"), { description = "Shell: Leave the window switcher" })
+hl.bind("ALT_L", hl.dsp.global("quickshell:altTabRelease"), { ignore_mods = true, transparent = true, release = true })
+hl.bind("ALT_R", hl.dsp.global("quickshell:altTabRelease"), { ignore_mods = true, transparent = true, release = true })
