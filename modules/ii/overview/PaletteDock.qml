@@ -75,6 +75,9 @@ Item {
     function entryFor(appId) {
         return DesktopEntries.heuristicLookup(appId);
     }
+    // Quickshell reads the menu entries only when something first asks for their list, and a lookup before that
+    // finds nothing: on a fresh session the first click on a closed program did nothing (2026-10-29). Asked at start.
+    readonly property int entryCount: DesktopEntries.applications.values.length
     // A program's own name; when its menu entry cannot be found, its id made readable ("brave-browser" is Brave,
     // "app.zen_browser.zen" is Zen), never the raw id
     function nameFor(appId) {
