@@ -2627,6 +2627,7 @@ FloatingWindow {
                             id: phonePage
                             anchors.fill: parent
                             visible: win.phoneShown
+                            z: 7   // over the ground (4) and its band (5): the page's own buttons take the click
                             inset: Tacit.space.page - filesArea.x   // the page inset: where a list's names start
                             outset: Tacit.space.page - 20           // and as far from the window's edge (less its 12 and the area's 8)
                         }
