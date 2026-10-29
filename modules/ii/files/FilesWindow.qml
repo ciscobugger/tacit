@@ -2345,7 +2345,7 @@ FloatingWindow {
                         id: viewBar
                         objectName: "viewBar"
                         Layout.fillWidth: true
-                        Layout.rightMargin: panel.width
+                        Layout.rightMargin: win.panelRoom   // a covering panel starts under the bar, so the bar keeps its width
                         Layout.preferredHeight: win.searching ? 0 : implicitHeight
                         visible: !win.searching
                         count: Voice.count(win.shownCount, "item")
@@ -2874,7 +2874,7 @@ FloatingWindow {
         K.DockedPanel {
             id: panel
             anchors.right: parent.right
-            y: page.y + pageColumn.y + headerBox.y + headerBox.height
+            y: page.y + pageColumn.y + (win.panelCovers ? viewBar.y + viewBar.height : headerBox.y + headerBox.height)
             height: parent.height - y - K.Kit.tokens.space.xl
             open: win.panelShown
 
