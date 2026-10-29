@@ -1316,13 +1316,33 @@ Item {
                 // One signal: the wash, not a colour change on the glyph.
                 color: Tacit.inkSec
             }
-            StyledText {
+            // The name on its own line and the state under it, one ink level quieter: the
+            // two never share a line, so neither is cut for the other. A toggle with no state
+            // (hasStatusText off, or nothing to say) shows the name alone.
+            Column {
+                id: primaryText
+                readonly property string state: primary.model?.hasStatusText && (primary.model?.statusText ?? "").length > 0 ? primary.model.statusText : ""
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - Kit.tokens.icon.row - parent.spacing
-                elide: Text.ElideRight
-                // The pill's own name wiring, as the real panel's row reads it.
-                text: (primary.model?.name ?? "") + (primary.model?.hasStatusText && (primary.model?.statusText ?? "").length > 0 ? " · " + primary.model.statusText : "")
-                color: Tacit.inkMain
+                StyledText {
+                    width: parent.width
+                    elide: Text.ElideRight
+                    text: primary.model?.name ?? ""
+                    color: Tacit.inkMain
+                }
+                StyledText {
+                    visible: primaryText.state.length > 0
+                    width: parent.width
+                    // A name the person chose (a network, a headset, a VPN) can be long: it
+                    // takes a second line before it is ever cut.
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    lineHeight: 0.9
+                    text: primaryText.state
+                    font.pixelSize: Appearance.font.pixelSize.tiny
+                    color: Tacit.inkSec
+                }
             }
         }
         FocusRing {
