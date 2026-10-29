@@ -354,7 +354,7 @@ Singleton {
                         // off, as on the owner's desktop (2026-10-16): a new account came up with a clock card on it
                         property bool enable: false
                         property bool showOnlyWhenLocked: false
-                        property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
+                        property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 100
                         property real y: 100
                         property string style: "cookie"        // Options: "cookie", "digital"
