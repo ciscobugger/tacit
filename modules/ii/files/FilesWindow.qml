@@ -502,14 +502,18 @@ FloatingWindow {
     onSelectedPathsChanged: if (win.selectedPaths.length === 0) win.panelOpen = false
     // The rail folds to glyphs by its own toggle (Ctrl+B too), remembered; a very narrow
     // window folds it regardless. Folded, it expands over the list while the pointer rests on it.
-    readonly property bool railCompact: Files.railPref === "compact" || win.width < 720
+    readonly property bool railCompact: Files.railPref === "compact" || win.width < win.railFoldWidth
+    // The view bar's controls at their widest ("Smallest first", Filter, the four views) with the margins they keep, and
+    // the full rail's width: a window where the bar would not hold its controls folds the rail instead.
+    readonly property int barNeed: 544
+    readonly property int railFoldWidth: 312 + win.barNeed
     // no panel over a search, the shelf, Recent or Large & old: those rows are their own view; renaming many is the
     // panel's face whatever the panel was
     readonly property bool panelShown: (win.panelOpen && !win.searching && win.selectedPaths.length > 0) || renameSheet.active
     property bool panelBefore: false      // open before renaming many took the panel over
     // The list narrows once when the panel opens, by the panel's width. Where that would leave too little list (a
     // window at half width), the panel covers the list from the right instead and the list is cut at its edge.
-    readonly property bool panelCovers: headerBox.width - K.Kit.tokens.width.panel < 440
+    readonly property bool panelCovers: headerBox.width - K.Kit.tokens.width.panel < Math.max(440, win.barNeed)
     readonly property real panelRoom: win.panelCovers ? 0 : panel.width
     readonly property string previewPath: win.cursor >= 0 && win.selectedPaths.length > 0 ? win.cursorPath : ""
     function actionsFor(i) {
@@ -2248,12 +2252,49 @@ FloatingWindow {
                     // The order, the views and the filter are the view bar's, under the header's line. A click on the empty header edits the path.
                     Item {
                         id: headerBox
+                        objectName: "headerBox"
                         Layout.fillWidth: true
                         Layout.preferredHeight: header.implicitHeight
                         readonly property bool aView: win.recentShown || win.largeOld || win.shelfShown || win.phoneShown
                         readonly property string placeWord: aView ? (win.recentShown ? "Recent" : win.shelfShown ? "Shelf" : win.phoneShown ? (PhoneLink.paired ? PhoneLink.phoneName : "Your phone") : "Large & old")
                             : win.crumbs.length ? win.crumbs[win.crumbs.length - 1].name : Files.placeName(win.folder)
                         readonly property var parents: aView ? [] : win.crumbs.slice(Math.max(0, win.crumbs.length - 3), Math.max(0, win.crumbs.length - 1))
+
+                        // What the title and the search leave each other. The title gives way first (the outer parent,
+                        // then the other), then the search shortens to its one word, then the folder's name is cut with
+                        // an ellipsis: never two things on the same stretch of the line.
+                        K.TacitText { id: probeHere; visible: false; size: "headline"; cut: "display"; weight: "strong" }
+                        K.TacitText { id: probeParent; visible: false; size: "headline"; cut: "display" }
+                        K.TacitText { id: probeSearch; visible: false }
+                        K.TacitText { id: probeCount; visible: false; ink: "meta"; cut: "numbers"; text: Voice.count(win.shownCount, "item") }
+                        FontMetrics { id: hereFm; font: probeHere.font }
+                        FontMetrics { id: parentFm; font: probeParent.font }
+                        FontMetrics { id: searchFm; font: probeSearch.font }
+                        // FontMetrics does not tell when its font changes (the kit's fonts arrive after the first layout):
+                        // every measure goes through here, which reads the fonts
+                        readonly property string fontKey: `${probeHere.font.family}|${probeHere.font.pixelSize}|${probeHere.font.weight}|${probeParent.font.pixelSize}|${probeSearch.font.pixelSize}`
+                        function adv(fm, text) { headerBox.fontKey; return fm.advanceWidth(text); }
+                        readonly property real titleX: 16 + 2 * 36 + 4 + 8 + 4   // after back and forward
+                        readonly property real searchQuiet: 36 + headerBox.adv(searchFm, "Search " + headerBox.placeWord) + 14
+                        readonly property real searchShort: 36 + headerBox.adv(searchFm, "Search") + 14
+                        function searchWidth(quiet) { return search.visible ? quiet + (search.fieldWidth - quiet) * search.openness : 0; }
+                        function roomFor(quiet) { return header.width - headerBox.titleX - K.Kit.tokens.space.xl - 24 - headerBox.searchWidth(quiet); }
+                        function titleWidth(k) {
+                            let w = headerBox.adv(hereFm, headerBox.placeWord);
+                            const sep = headerBox.adv(parentFm, "›"), gap = K.Kit.tokens.space.s;
+                            for (const c of headerBox.parents.slice(headerBox.parents.length - k))
+                                w += headerBox.adv(parentFm, c.name) + 2 * gap + sep + gap;
+                            return w + 2;
+                        }
+                        readonly property int parentsKept: {
+                            const room = headerBox.roomFor(headerBox.searchQuiet);
+                            for (let k = headerBox.parents.length; k > 0; k--)
+                                if (headerBox.titleWidth(k) <= room) return k;
+                            return 0;
+                        }
+                        readonly property bool searchShortened: headerBox.titleWidth(headerBox.parentsKept) > headerBox.roomFor(headerBox.searchQuiet)
+                        readonly property var shownParents: headerBox.parents.slice(headerBox.parents.length - headerBox.parentsKept)
+                        readonly property string hereShown: (headerBox.fontKey, hereFm.elidedText(headerBox.placeWord, Qt.ElideRight, Math.max(40, headerBox.roomFor(headerBox.searchShortened ? headerBox.searchShort : headerBox.searchQuiet) - 2)))
 
                         MouseArea {   // the empty header ground: click to edit the path
                             anchors.fill: parent
@@ -2263,21 +2304,22 @@ FloatingWindow {
                             id: header
                             // its line runs to the window's edge: the docked panel hangs from it
                             width: parent.width + page.anchors.rightMargin
-                            crumbs: win.editingPath ? [] : headerBox.parents.map(c => c.name)
-                            here: win.editingPath ? "" : headerBox.placeWord
+                            objectName: "pageHeader"
+                            crumbs: win.editingPath ? [] : headerBox.shownParents.map(c => c.name)
+                            here: win.editingPath ? "" : headerBox.hereShown
                             canGoBack: win.historyIndex > 0
                             canGoForward: win.historyIndex < win.history.length - 1
                             // a folder still being read (a slow drive), a search or a view still looking
                             loading: folderModel.status === FolderListModel.Loading || win.searchRunning
                             onBack: win.back()
                             onForward: win.forward()
-                            onCrumbPicked: i => win.go(headerBox.parents[i].path)
+                            onCrumbPicked: i => win.go(headerBox.shownParents[i].path)
 
                             K.SearchField {
                                 id: search
                                 visible: !win.phoneShown
                                 anchors.verticalCenter: parent.verticalCenter
-                                scope: headerBox.placeWord
+                                scope: headerBox.searchShortened ? "" : headerBox.placeWord
                                 // tiled narrow, the path needs the room more than the field
                                 fieldWidth: Math.max(180, Math.min(300, win.width * 0.28))
                                 onTextChanged: {
@@ -2348,7 +2390,9 @@ FloatingWindow {
                         Layout.rightMargin: win.panelRoom   // a covering panel starts under the bar, so the bar keeps its width
                         Layout.preferredHeight: win.searching ? 0 : implicitHeight
                         visible: !win.searching
-                        count: Voice.count(win.shownCount, "item")
+                        // "3 items" is the first to go: it stays while it and the controls (the bar's last child) both fit
+                        readonly property bool countFits: width - K.Kit.tokens.space.l - children[children.length - 1].implicitWidth >= 28 + probeCount.implicitWidth + K.Kit.tokens.space.xl
+                        count: countFits ? Voice.count(win.shownCount, "item") : ""
                         filtering: win.filterOpen || win.filterActive
                         active: win.filterActive
                         shown: `${win.shownCount} of ${folderModel.total}`

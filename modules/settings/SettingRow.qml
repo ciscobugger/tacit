@@ -33,8 +33,9 @@ Item {
     signal activated()
 
     Layout.fillWidth: true
+    // the words wrap instead of being cut, so a narrow row grows with what it says
     implicitHeight: row.stacked ? labels.implicitHeight + 12 + 8 + slot.implicitHeight + 14
-        : Math.max(row.description.length > 0 ? 62 : 48, slot.implicitHeight + 18)
+        : Math.max(row.description.length > 0 ? 62 : 48, slot.implicitHeight + 18, labels.implicitHeight + 22)
 
     // Tab reaches every row; Enter or Space does what a click on it does. A row whose control is a
     // stepper or a set of choices takes the arrow keys as well (StepperRow, ChoiceRow).
@@ -113,7 +114,7 @@ Item {
     }
 
     // one edge for every label, with or without a glyph (Praxis's rail: the mark hangs left of it)
-    ColumnLayout {
+    Column {
         id: labels
         x: row.edge
         width: row.stacked ? row.width - row.edge - 20 : Math.max(0, slot.x - 16 - row.edge)
@@ -121,22 +122,20 @@ Item {
         spacing: 3
 
         StyledText {
-            Layout.fillWidth: true
+            width: labels.width
             text: row.label
             font.pixelSize: 15
             font.weight: row.selected ? Font.Medium : Font.Normal
             color: row.enabled && !row.muted ? Appearance.colors.colInkMain : Appearance.colors.colInkFaint
-            elide: Text.ElideRight
+            wrapMode: Text.Wrap
         }
         StyledText {
-            Layout.fillWidth: true
+            width: labels.width
             visible: row.description.length > 0
             text: row.description
             font.pixelSize: 13
             color: row.enabled ? Tacit.inkMeta : Appearance.colors.colInkFaint
             wrapMode: Text.Wrap
-            maximumLineCount: 2
-            elide: Text.ElideRight
         }
     }
 

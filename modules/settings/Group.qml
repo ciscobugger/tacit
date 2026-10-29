@@ -37,7 +37,7 @@ ColumnLayout {
             font.pixelSize: 22
             font.weight: Font.DemiBold
             color: Appearance.colors.colInkMain
-            elide: Text.ElideRight
+            wrapMode: Text.Wrap
         }
         StyledText {
             visible: group.aside.length > 0
