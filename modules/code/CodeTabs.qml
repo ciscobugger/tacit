@@ -40,6 +40,13 @@ ListView {
         readonly property bool isCurrent: tabs.current === tab.index
         readonly property bool dirty: tab.modelData.doc ? tab.modelData.doc.dirty : false
         readonly property bool missing: tab.modelData.doc ? tab.modelData.doc.missing : false
+        // two open files with the same name show their folder, so the tabs can be told apart
+        readonly property string base: tab.modelData.rel.split("/").pop()
+        readonly property string title: {
+            const twin = tabs.docs.some((d, i) => i !== tab.index && d.rel.split("/").pop() === tab.base);
+            const parts = tab.modelData.rel.split("/");
+            return twin && parts.length > 1 ? `${parts[parts.length - 2]}/${tab.base}` : tab.base;
+        }
         width: label.implicitWidth + 76
         height: ListView.view.height
         HoverHandler { id: tabHover }
@@ -79,7 +86,7 @@ ListView {
             anchors.left: glyph.right
             anchors.leftMargin: 6
             anchors.verticalCenter: parent.verticalCenter
-            text: tab.modelData.rel.split("/").pop()
+            text: tab.title
             font.pixelSize: Appearance.font.pixelSize.smallie
             font.family: Appearance.font.family.condensed
             font.strikeout: tab.missing      // the tree's mark for a file that is not there

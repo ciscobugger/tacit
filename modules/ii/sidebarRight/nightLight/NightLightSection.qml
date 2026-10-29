@@ -221,7 +221,7 @@ Item {
                 font.pixelSize: Appearance.font.pixelSize.small
                 color: Appearance.colors.colOnLayer0
             }
-            TacitSlider {
+            PanelSlider {
                 Layout.fillWidth: true
                 showNumber: false
                 from: sl.from

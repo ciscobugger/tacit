@@ -126,7 +126,7 @@ Scope {
                 target: Session
                 function onActionFailed(label, code) {
                     sessionRoot.waitingFor = "";
-                    sessionRoot.failedText = Translation.tr("%1 was refused (exit %2). Nothing happened.").arg(label).arg(code);
+                    sessionRoot.failedText = Translation.tr("%1 was refused. Nothing happened.").arg(label);
                 }
             }
 
@@ -149,7 +149,10 @@ Scope {
                     const n = sessionRoot.actions.length;
                     const back = event.key === Qt.Key_Left || event.key === Qt.Key_Backtab;
                     if (event.key === Qt.Key_Escape) {
+                        // hide() tears this window down: nothing below may touch it again
                         sessionRoot.hide();
+                        event.accepted = true;
+                        return;
                     } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Tab) {
                         sessionRoot.focusIndex = (sessionRoot.focusIndex + 1) % n;
                     } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Backtab) {
@@ -159,6 +162,8 @@ Scope {
                         sessionRoot.focusIndex = (sessionRoot.focusIndex + 4) % n;
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
                         sessionRoot.activate(sessionRoot.focusIndex);
+                        event.accepted = true;
+                        return;
                     } else {
                         return;
                     }
@@ -282,7 +287,7 @@ Scope {
                         }
                         Warning {
                             visible: IslandController.workUnsaved
-                            text: "Uncommitted work: " + IslandController.unsavedLine
+                            text: Translation.tr("Unsaved changes: %1").arg(IslandController.unsavedLine)
                         }
                         Warning {
                             visible: SessionWarnings.downloadRunning

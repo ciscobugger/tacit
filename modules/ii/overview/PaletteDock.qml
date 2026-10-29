@@ -168,6 +168,40 @@ Item {
         if (app)
             root.activate(app);
     }
+    // The keys for what the pointer does with a pill: Shift+Enter is the middle click (a new window), Ctrl+P the
+    // right click (pin or unpin), Alt+Left/Right the drag. The wash stays on the program when the row re-forms.
+    function keepFocusOn(appId) {
+        const was = root.focusIndex;
+        Qt.callLater(() => {
+            const at = root.programs.findIndex(app => app.appId === appId);
+            root.focusIndex = at >= 0 ? at : Math.min(was, root.programs.length - 1);
+        });
+    }
+    function launchFocused() {
+        const app = root.programs[root.focusIndex];
+        if (app)
+            root.launch(app.appId);
+    }
+    function togglePinFocused() {
+        const app = root.programs[root.focusIndex];
+        if (!app)
+            return;
+        TaskbarApps.togglePin(app.appId);
+        root.keepFocusOn(app.appId);
+    }
+    function moveFocusedBy(delta) {
+        const app = root.programs[root.focusIndex];
+        if (!app || !app.pinned)
+            return;
+        const pins = (Config.options.dock.pinnedApps ?? []).slice();
+        const from = pins.findIndex(id => id.toLowerCase() === app.appId);
+        const to = from + delta;
+        if (from < 0 || to < 0 || to >= pins.length)
+            return;
+        pins.splice(to, 0, pins.splice(from, 1)[0]);
+        Config.options.dock.pinnedApps = pins;
+        root.keepFocusOn(app.appId);
+    }
 
     // ------------------------------------------------------------- reordering
     property string draggingId: ""
@@ -499,7 +533,7 @@ Item {
                             anchors.centerIn: parent
                             visible: pill.symbol.length === 0 && mark.iconPath.length === 0
                             text: root.nameFor(pill.appId).charAt(0).toUpperCase()
-                            font.pixelSize: 15
+                            font.pixelSize: Tacit.size.row
                             font.weight: Font.DemiBold
                             color: pill.ink
                         }
@@ -523,13 +557,13 @@ Item {
                 // a closed program's name, above it while pointed at (an open one shows its windows instead)
                 Rectangle {
                     id: nameTag
-                    readonly property bool wanted: pill.hovered && !pill.open && !pill.named && !pill.dragging
+                    readonly property bool wanted: (pill.hovered || root.focusIndex === pill.index) && !pill.open && !pill.named && !pill.dragging
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.top
                     anchors.bottomMargin: 12
                     width: tagText.implicitWidth + 22
                     height: 28
-                    radius: 14
+                    radius: Tacit.radius.panel
                     color: Appearance.m3colors.m3surfaceContainerHigh
                     border.width: 1
                     border.color: Tacit.hairline
@@ -546,7 +580,7 @@ Item {
                         id: tagText
                         anchors.centerIn: parent
                         text: root.nameFor(pill.appId)
-                        font.pixelSize: 14
+                        font.pixelSize: Tacit.size.fileText
                         color: Tacit.inkMain
                     }
                 }

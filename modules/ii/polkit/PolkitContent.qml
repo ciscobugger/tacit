@@ -30,7 +30,7 @@ Item {
     readonly property var request: {
         const m = PolkitService.cleanMessage.match(/^Authentication is needed to run [`'](.+)[`'] as (the super user|user (.+))$/);
         if (m)
-            return { "title": m[3] ? `Run as ${m[3]}` : "Run as administrator", "detail": m[1] };
+            return { "title": m[3] ? Translation.tr("Run as %1").arg(m[3]) : Translation.tr("Run as administrator"), "detail": m[1] };
         return { "title": PolkitService.cleanMessage, "detail": "" };
     }
 
@@ -201,7 +201,7 @@ Item {
                         colBackground: "transparent"
                         focus: true
                         enabled: PolkitService.interactionAvailable
-                        placeholderText: root.failed ? "Incorrect password" : PolkitService.cleanPrompt
+                        placeholderText: root.failed ? Translation.tr("Incorrect password") : PolkitService.cleanPrompt
                         font.pixelSize: Appearance.font.pixelSize.large
                         echoMode: root.usePasswordChars ? TextInput.Password : TextInput.Normal
                         inputMethodHints: Qt.ImhSensitiveData
@@ -243,7 +243,7 @@ Item {
 
                 StyledText {
                     Layout.bottomMargin: 14
-                    text: root.failed ? "Try again, or Esc to cancel" : "Enter allows · Esc cancels"
+                    text: root.failed ? Translation.tr("Try again, or Esc to cancel") : Translation.tr("Enter allows · Esc cancels")
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     color: root.failed ? Appearance.colors.colError : Appearance.colors.colSubtext
                 }

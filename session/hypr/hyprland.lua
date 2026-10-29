@@ -24,6 +24,33 @@ local function layer(name)
     if theirs("custom/" .. name) then safe_require("custom." .. name) end
 end
 
+-- Every shortcut Tacit and the person's own files bind is written down as it is made (hl.bind is wrapped), so the keys
+-- the person chose in Settings can move a shortcut to other keys later (tacit/shortcuts.lua). The wrapper changes
+-- nothing else: it passes every call through and returns what hl.bind returns.
+TACIT_BINDS = {}
+do
+    hl.__tacit_bind = hl.__tacit_bind or hl.bind
+    hl.__tacit_define_submap = hl.__tacit_define_submap or hl.define_submap
+    local bind, define = hl.__tacit_bind, hl.__tacit_define_submap
+    local inSubmap = false
+    hl.bind = function(...)
+        local handle = bind(...)
+        if not inSubmap then
+            local a = { ... }
+            TACIT_BINDS[#TACIT_BINDS + 1] = { keys = a[1], dispatcher = a[2], opts = a[3], handle = handle }
+        end
+        return handle
+    end
+    -- the keys of a submap belong to that submap: a moved key would land in the main one
+    hl.define_submap = function(...)
+        local was = inSubmap
+        inSubmap = true
+        local ok, err = pcall(define, ...)
+        inSubmap = was
+        if not ok then error(err, 0) end
+    end
+end
+
 -- Internal stuff --
 require("hyprland.lib")
 safe_require("hyprland.services")
@@ -73,6 +100,19 @@ if is_file_exists("/usr/share/tacit/hypr/tacit/browser.lua") then
     safe_require("tacit.browser")  -- Thyris's sign-in page in the notch (the tacit-thyris package)
 end
 layer("keybinds")
+-- the keys the person chose in Settings > Keyboard & touchpad > Shortcuts, over Tacit's and their own files: a bad file
+-- or entry is skipped and says so in the log, the keys before it stay as they were
+if theirs("hyprland/shellOverrides/shortcuts") then
+    local ok, mod = pcall(require, "tacit.shortcuts")
+    if ok then
+        local ran, err = pcall(mod.apply, HOME .. "/.config/hypr/hyprland/shellOverrides/shortcuts.lua")
+        if not ran then print("[tacit] the chosen shortcuts did not load: " .. tostring(err)) end
+    else
+        print("[tacit] the chosen shortcuts did not load: " .. tostring(mod))
+    end
+end
+-- the capture submap Settings enters while it listens for new keys (its own watchdog leaves it)
+safe_require("tacit.shortcut_capture")
 
 -- nwg-displays support --
 if theirs("workspaces") then safe_require("workspaces") end

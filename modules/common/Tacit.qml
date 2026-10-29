@@ -18,8 +18,11 @@ Singleton {
     readonly property color inkMain: Appearance.colors.colInkMain
     // facts: size, time, length, details
     readonly property color inkSec: ColorUtils.mix(Appearance.colors.colInkMain, Appearance.colors.colInkSecondary, 0.25)
-    // a name beside a name, ordinals, rail counts
+    // kept at the shell's own value; the kit's is kitInkMeta, which Tacit.kit hands out as inkMeta:
     readonly property color inkMeta: ColorUtils.mix(Appearance.colors.colInkSecondary, Appearance.colors.colInkMeta, 0.4)
+    // a name beside a name, ordinals, rail counts. Lc 75 on the ground under the pointer on a selected row
+    // (currentHoverGround), about 80 on the plain ground
+    readonly property color kitInkMeta: root.inkOn(75, root.currentHoverGround, Appearance.m3colors.m3onBackground)
     // unavailable
     readonly property color inkFaint: Appearance.colors.colInkFaint
     // the one line under a header, rail to page
@@ -29,8 +32,11 @@ Singleton {
     // text on an accent fill. Was onAccent, which QML takes for a signal handler (on + capital): its binding never ran
     // and the text was black
     readonly property color inkOnAccent: Appearance.m3colors.m3onPrimary
-    // a destructive action, always last, always with the warning symbol
+    // kept at the shell's own value; the kit's is kitRisk, which Tacit.kit hands out as risk:
     readonly property color risk: Appearance.m3colors.m3error
+    // a destructive action, always last, always with the warning symbol. Solved along the palette's error colour to Lc
+    // 75 on the ground, as the text inks are (it was the palette's error itself: Lc 71)
+    readonly property color kitRisk: root.inkOn(75, root.ground, Appearance.m3colors.m3error)
     // the ground slabs and panels stand on (the shell's)
     readonly property color ground: Appearance.m3colors.m3surfaceContainerLow
     // a slab raised from the shell's ground; not inside app windows
@@ -40,12 +46,56 @@ Singleton {
     // 11) never match it (it is written with an alpha, ']11;[100]#...') and fall back to this; foot's own ground is one
     // step from it
     readonly property color windowGround: root.ground
-    // a docked panel, a field in use; drawn at windowSeeThrough; never a group inside content
+    // kept at the shell's own value; the kit's is kitContainer, which Tacit.kit hands out as container:
     readonly property color container: Appearance.m3colors.m3surfaceContainer
+    // a field in use (the search field open); drawn at windowSeeThrough; never a group inside content. Not the docked
+    // panel: a solid layer over the see-through page read as a flat grey patch (2026-10-25); the panel is the page
+    // lifted by wash.action
+    readonly property color kitContainer: Appearance.m3colors.m3surfaceContainerHigh
     // context lines: lyrics still to come, an unplayed waveform
     readonly property color quiet: root.quieter(root.inkMain, root.windowGround, 38)
     // lyrics already sung, the empty track of a line
     readonly property color past: root.quieter(root.inkMain, root.windowGround, 18)
+    // a menu over content: solid (text under it must not show through), the window's ground a fifth of the way to the
+    // accent's container, as Praxis's menus have it
+    readonly property color overlay: ColorUtils.mix(root.windowGround, Appearance.m3colors.m3primaryContainer, 0.8)
+    // the ground under the pointer on a selected row: wash.currentHover of the main ink over the ground. The meta ink
+    // is solved on it
+    readonly property color currentHoverGround: ColorUtils.mix(root.inkMain, root.ground, 0.13)
+    // a menu line under the cursor or the pointer: wash.current of the main ink over the overlay. The overlay inks are
+    // solved on it
+    readonly property color overlayLit: ColorUtils.mix(root.inkMain, root.overlay, 0.1)
+    // meta text on the overlay (a menu's headings and details): Lc 75 on overlayLit, so on every line
+    readonly property color overlayMeta: root.inkOn(75, root.overlayLit, Appearance.m3colors.m3onBackground)
+    // the risk ink on the overlay (a menu's risk line): Lc 75 on overlayLit
+    readonly property color overlayRisk: root.inkOn(75, root.overlayLit, Appearance.m3colors.m3error)
+    // a document's page (white paper, as it prints): the main ink, so it carries the wallpaper's hue
+    readonly property color paper: root.inkMain
+    // a document's own text on the page
+    readonly property color paperInk: root.ground
+    // quieter document text on the page: bylines, captions, table heads. Solved to Lc 78 on the paper, above the small-
+    // text floor of 75
+    readonly property color paperInkSec: root.inkOn(78, root.paper, root.ground)
+    // rules and table lines on the page
+    readonly property color paperRule: ColorUtils.mix(root.ground, root.paper, 0.16)
+    // the app's own marks on the page (caret, link, comment underline): the accent, moved until Lc 75 on the paper
+    readonly property color paperMark: root.inkOn(75, root.paper, Appearance.m3colors.m3primary)
+    // a highlight on the page (selection, a comment's text, what an action changed): the accent at 20 % over the paper
+    readonly property color paperWash: ColorUtils.mix(Appearance.m3colors.m3primary, root.paper, 0.2)
+    // the first point on ground -> base -> white (or black) that reaches Lc: Appearance.inkFor along the colour `base`
+    function inkOn(lc, ground, base) {
+        const far = ground.hslLightness < 0.5 ? "#ffffff" : "#000000";
+        const at = t => t <= 1 ? ColorUtils.mix(base, ground, t) : ColorUtils.mix(far, base, t - 1);
+        let lo = 0, hi = 2;
+        for (let i = 0; i < 18; i++) {
+            const mid = (lo + hi) / 2;
+            if (Math.abs(ColorUtils.apcaLc(at(mid), ground)) < lc)
+                lo = mid;
+            else
+                hi = mid;
+        }
+        return at(hi);
+    }
 
     // ---- washes: inkMain over the ground at these amounts
     readonly property QtObject wash: QtObject {
@@ -53,6 +103,21 @@ Singleton {
         readonly property real current: 0.1
         readonly property real pressed: 0.22
         readonly property real action: 0.06
+        readonly property real hoverSmall: 0.08
+        readonly property real currentHover: 0.13
+    }
+    // ---- families
+    readonly property QtObject font: QtObject {
+        readonly property string main: "Tacit Sans"
+        readonly property string display: "Tacit Sans Display"
+        readonly property string numbers: "Tacit Sans"
+        readonly property string code: "Tacit Code"
+    }
+    // ---- weights on the wght axis
+    readonly property QtObject weight: QtObject {
+        readonly property int regular: 450
+        readonly property int medium: 500
+        readonly property int strong: 600
     }
     // ---- type sizes; hierarchy by size and weight
     readonly property QtObject size: QtObject {
@@ -84,6 +149,7 @@ Singleton {
         readonly property int action: 40
         readonly property int field: 36
         readonly property int band: 84
+        readonly property int menuRow: 34
     }
     // ---- widths
     readonly property QtObject width: QtObject {
@@ -91,6 +157,7 @@ Singleton {
         readonly property int railFolded: 56
         readonly property int panel: 400
         readonly property int list: 720
+        readonly property int scrollBar: 4
     }
     // ---- corners
     readonly property QtObject radius: QtObject {
@@ -116,13 +183,64 @@ Singleton {
         readonly property QtObject fade: QtObject { readonly property var curve: [0.34, 0.8, 0.34, 1.0, 1, 1]; readonly property int ms: 200 }
         readonly property QtObject fadeFast: QtObject { readonly property var curve: [0.31, 0.94, 0.34, 1.0, 1, 1]; readonly property int ms: 150 }
         readonly property QtObject hover: QtObject { readonly property var curve: []; readonly property int ms: 80 }
+        readonly property QtObject scroll: QtObject { readonly property var curve: [0, 0, 0, 1, 1, 1]; readonly property int ms: 200 }
         readonly property QtObject spring: QtObject { readonly property var curve: [0.42, 1.67, 0.21, 0.9, 1, 1]; readonly property int ms: 350 }
+        readonly property QtObject notice: QtObject { readonly property var curve: []; readonly property int ms: 6000 }
+        readonly property QtObject barStays: QtObject { readonly property var curve: []; readonly property int ms: 900 }
+        readonly property QtObject confirmWait: QtObject { readonly property var curve: []; readonly property int ms: 4000 }
+        readonly property QtObject press: QtObject { readonly property var curve: [0.215, 0.61, 0.355, 1.0, 1, 1]; readonly property int ms: 120 }
+        readonly property QtObject tone: QtObject { readonly property var curve: []; readonly property int ms: 140 }
+        readonly property QtObject reveal: QtObject { readonly property var curve: []; readonly property int ms: 110 }
+        readonly property QtObject dismiss: QtObject { readonly property var curve: []; readonly property int ms: 100 }
+        readonly property QtObject follow: QtObject { readonly property var curve: []; readonly property int ms: 120 }
+        readonly property QtObject sweep: QtObject { readonly property var curve: [0.455, 0.03, 0.515, 0.955, 1, 1]; readonly property int ms: 1400 }
     }
     // ---- states
     readonly property QtObject state: QtObject {
         readonly property real pressScale: 0.97
         readonly property real focusRing: 2
         readonly property real focusGap: 2
+    }
+    // ---- the tokens as the kit reads them (Kit.tokens = Tacit.kit): the kit's value for each kept role, the shell's for the rest
+    readonly property QtObject kit: QtObject {
+        readonly property color inkMain: root.inkMain
+        readonly property color inkSec: root.inkSec
+        readonly property color inkMeta: root.kitInkMeta
+        readonly property color inkFaint: root.inkFaint
+        readonly property color hairline: root.hairline
+        readonly property color accent: root.accent
+        readonly property color inkOnAccent: root.inkOnAccent
+        readonly property color risk: root.kitRisk
+        readonly property color ground: root.ground
+        readonly property color raised: root.raised
+        readonly property color raisedHot: root.raisedHot
+        readonly property color windowGround: root.windowGround
+        readonly property color container: root.kitContainer
+        readonly property color quiet: root.quiet
+        readonly property color past: root.past
+        readonly property color overlay: root.overlay
+        readonly property color currentHoverGround: root.currentHoverGround
+        readonly property color overlayLit: root.overlayLit
+        readonly property color overlayMeta: root.overlayMeta
+        readonly property color overlayRisk: root.overlayRisk
+        readonly property color paper: root.paper
+        readonly property color paperInk: root.paperInk
+        readonly property color paperInkSec: root.paperInkSec
+        readonly property color paperRule: root.paperRule
+        readonly property color paperMark: root.paperMark
+        readonly property color paperWash: root.paperWash
+        readonly property real windowSeeThrough: root.windowSeeThrough
+        readonly property var wash: root.wash
+        readonly property var font: root.font
+        readonly property var weight: root.weight
+        readonly property var size: root.size
+        readonly property var space: root.space
+        readonly property var height: root.height
+        readonly property var width: root.width
+        readonly property var radius: root.radius
+        readonly property var icon: root.icon
+        readonly property var motion: root.motion
+        readonly property var state: root.state
     }
     // <<< tacit-kit tokens
 

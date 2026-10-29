@@ -35,6 +35,7 @@ Item {
     activeFocusOnTab: canOpen || quitText !== ""
     onActiveFocusChanged: if (!activeFocus && !quitVerb.activeFocus) confirming = false
     Keys.onReturnPressed: if (canOpen) r.opened(r.item)
+    Keys.onSpacePressed: if (canOpen) r.opened(r.item)
     Keys.onDeletePressed: if (quitText !== "") { r.confirming = true; quitVerb.forceActiveFocus(); }
     Keys.onEscapePressed: event => { if (r.confirming) { r.confirming = false; r.forceActiveFocus(); } else event.accepted = false; }
 

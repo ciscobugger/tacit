@@ -63,7 +63,30 @@ Item {
                 d.apply();
         } else if (m.ev === "disk") {
             d.disk = m.disk;
+        } else if (m.ev === "done" && m.ok === false) {
+            d.failed(m);
         }
+    }
+    // an action the sampler could not carry out: say so in a line on the page, which goes after a while
+    property string problem: ""
+    Timer {
+        id: problemGone
+        interval: 8000
+        onTriggered: d.problem = ""
+    }
+    function failed(m) {
+        if (m.op === "quit") {
+            const name = d.quit?.name ?? "That app";
+            d.quit = null;
+            d.problem = `${name} could not be closed from here.`;
+        } else if (m.op === "trashOld") {
+            d.problem = "The old downloads could not be moved to the trash.";
+        } else if (m.op === "interrupt" || m.op === "close") {
+            d.problem = "The session could not be stopped. Praxis may not be running.";
+        } else {
+            return;
+        }
+        problemGone.restart();
     }
     property var wattsSeen: []
     function smooth(m) {
@@ -344,7 +367,7 @@ Item {
         const left = groups.filter(g => g.kind === "left" && g.mem >= 50 * 1048576).map(g => {
             const app = d.appName(g.id);
             return { key: g.key, kind: "left", id: g.id, n: `Left running in ${app}`, quitName: `what ${app} left running`,
-                     detail: g.n === 1 ? "1 program" : `${g.n} programs`, sym: "more_horiz", icon: "",
+                     detail: "", sym: "more_horiz", icon: "",
                      mem: g.mem, cpu: g.cpu, windows: [], parts: [], busyFor: g.busyFor, pids: g.pids, open: false };
         });
         return groups.filter(g => g.kind === "app" && g.id !== "activity").map(g => d.itemOf(g)).concat(left);
@@ -656,7 +679,7 @@ Item {
         const can = [];
         if (k.old.n > 0 && k.old.size >= 5e7)
             can.push({ key: "old", n: "Downloads older than a month", sym: "download", c1: d.diskGb(k.old.size), quit: "", open: false, size: k.old.size,
-                       verbs: [{ text: "Move to the bin", primary: true, act: "trashOld" }] });
+                       verbs: [{ text: "Move to the trash", primary: true, act: "trashOld" }] });
         if (k.caches.size >= 1e8)
             can.push({ key: "caches", n: "Download caches", sym: "cached", c1: d.diskGb(k.caches.size), quit: "", open: false, size: k.caches.size,
                        verbs: [{ text: "Clear", primary: can.length === 0, act: "clearCaches" }] });

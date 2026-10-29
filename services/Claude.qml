@@ -10,6 +10,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import "../modules/claude"
+import "../modules/claude/Titles.js" as Titles
 
 /**
  * Claude as one system (plan: ~/book4-edge/claude-unified-plan.md). What every shell surface
@@ -59,9 +60,8 @@ Singleton {
             if (r.ev !== "history" || !Array.isArray(r.sessions)) return;
             const t = {};
             for (const e of r.sessions) {
-                const name = (e.title ?? "") + "";
+                const name = Titles.clean(e.title) || Titles.clean(e.prompt);   // the rail's words (Titles.js)
                 if (name.length) t[e.id] = name;
-                else if ((e.prompt ?? "").length) t[e.id] = e.prompt + "";
             }
             root.historyTitles = t;
         })

@@ -1953,7 +1953,7 @@ Singleton {
             return "off";
         // the notch lies under a full-screen window there
         const m = HyprlandData.monitors.find(x => x.name === screen);
-        if (m && (HyprlandData.workspaceById[m.activeWorkspace?.id]?.hasfullscreen ?? false))
+        if (m && (HyprlandData.workspaceHasTrueFullscreen(m.activeWorkspace?.id)))
             return "off";
         root.signinSocket = socket;
         root.signinScreen = screen;
@@ -2275,9 +2275,12 @@ Singleton {
             root.openAsk("capture", [Claude.fileChip(path)], "");
         }
 
-        // a question, asked in the notch
+        // a question for the notch: it lands in the box and the person presses Enter.
+        // (It used to send at once, which let any program running as the user start an agent.)
         function askSend(text: string): void {
-            root.openAsk("ipc", [], text);
+            root.openAsk("ipc", [], "");
+            if (text.length)
+                Claude.draftText = text;
         }
 
         // `island poll`: run the pull request and disk checks now (after a push, or a test).

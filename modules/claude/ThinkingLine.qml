@@ -58,7 +58,7 @@ Item {
             weight: Font.Medium
             active: think.live
             rests: true
-            opacity: think.live ? 1 : 0.85
+            color: think.live ? Appearance.colors.colInkMain : Appearance.colors.colInkSecondary
         }
         StyledText {
             anchors { left: name.right; leftMargin: 8; right: parent.right; verticalCenter: parent.verticalCenter }

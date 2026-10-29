@@ -27,6 +27,9 @@ mkdir -p "$dir"
 # the recording tells. Only that session goes quiet; every other one still reports.
 quiet=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/notch-quiet-sessions
 [ -f "$quiet" ] && grep -qxF "$sid" "$quiet" && exit 0
+# Praxis's sessions run under agent-host, a login-scoped service started before the compositor: they have no
+# WAYLAND_DISPLAY, and without it `qs ipc` finds no shell. The user manager has it (the session imports it).
+[ -n "${WAYLAND_DISPLAY:-}" ] || export WAYLAND_DISPLAY=$(systemctl --user show-environment 2>/dev/null | sed -n 's/^WAYLAND_DISPLAY=//p')
 # Bounded: the hooks run synchronously, so a shell that is reloading or wedged used to hold
 # every prompt submit for the hook's own 20 s timeout. The notch losing one event costs
 # nothing; the keyboard stalling costs the session.

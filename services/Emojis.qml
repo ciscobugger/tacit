@@ -33,6 +33,18 @@ Singleton {
         });
     }
 
+    // Copy it, then type it into the window the person was in once the palette has closed. If typing is not
+    // possible (no wtype, or no window holds the keyboard) the notice says it was copied, so the pick is never lost.
+    function insert(glyph: string) {
+        Quickshell.clipboardText = glyph;
+        const copied = StringUtils.shellSingleQuoteEscape(Translation.tr("Copied - paste it where you want it"));
+        const title = StringUtils.shellSingleQuoteEscape(Translation.tr("Emoji"));
+        Quickshell.execDetached(["bash", "-c",
+            `for i in $(seq 1 40); do hyprctl layers | grep -q 'quickshell:overview' || break; sleep 0.05; done; sleep 0.15; `
+            + `[ -n "$(hyprctl activewindow -j | jq -r '.address // empty')" ] && wtype -- "$1" `
+            + `|| notify-send '${title}' '${copied}' -a "Tacit"`, "emoji", glyph]);
+    }
+
     function load() {
         emojiFileView.reload()
     }

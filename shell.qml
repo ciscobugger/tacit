@@ -1,6 +1,7 @@
 //@ pragma UseQApplication
 //@ pragma Env QS_NO_RELOAD_POPUP=1
-// the notch's sand (Tacit.Sand, native/sand/build.sh) is installed in ~/.local/lib/qml
+// Tacit.Kit, Tacit.Sand and Tacit.Edit are in /usr/lib/qt6/qml on an install (Qt finds them there); this folder is the
+// owner's own (the kit linked to tacit-kit, the sand built by native/sand/build.sh) and is ignored where it does not exist
 //@ pragma Env QML_IMPORT_PATH=/home/abdul/.local/lib/qml
 //@ pragma Env QT_QUICK_CONTROLS_STYLE=Basic
 //@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000

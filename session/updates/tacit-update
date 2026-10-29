@@ -46,8 +46,10 @@ night)
 		[ "$(loginctl show-session "$s" -p Active --value)" = yes ] && [ "$(loginctl show-session "$s" -p Type --value)" = wayland ] \
 			&& [ "$(loginctl show-session "$s" -p LockedHint --value)" != yes ] && exit 0
 	done
-	systemctl stop tacit-update-night.timer
+	# the timer is stopped only once the download is here: offline at three, the next night tries again (it was stopped
+	# first, and Tonight was lost without a word)
 	ready || exit 1
+	systemctl stop tacit-update-night.timer
 	ln -sfn /var/cache/pacman/pkg /system-update
 	systemctl reboot
 	;;

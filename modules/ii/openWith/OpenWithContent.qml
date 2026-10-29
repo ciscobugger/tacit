@@ -97,6 +97,15 @@ Item {
                 font.pixelSize: 14; color: root.ink2
             }
 
+            // Nothing can open it: say so, since Enter and a click have nothing to choose.
+            StyledText {
+                visible: root.apps.length === 0
+                Layout.fillWidth: true; Layout.leftMargin: 10; Layout.rightMargin: 10; Layout.bottomMargin: 6
+                wrapMode: Text.Wrap
+                text: qsTr("No app on this computer can open this file. Press Esc to close.")
+                font.pixelSize: 14; color: root.ink
+            }
+
             Flickable {
                 id: list
                 Layout.fillWidth: true; Layout.fillHeight: true
@@ -160,9 +169,10 @@ Item {
             }
             }
 
-            Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; Layout.bottomMargin: 6; implicitHeight: 1; color: root.hair }
+            Rectangle { visible: root.apps.length > 0; Layout.fillWidth: true; Layout.topMargin: 6; Layout.bottomMargin: 6; implicitHeight: 1; color: root.hair }
 
             Item {
+                visible: root.apps.length > 0
                 Layout.leftMargin: 10; Layout.bottomMargin: 6
                 implicitWidth: always.implicitWidth; implicitHeight: 28
                 MouseArea { anchors.fill: parent; onClicked: root.always = !root.always }

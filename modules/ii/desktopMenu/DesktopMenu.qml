@@ -132,13 +132,19 @@ Scope {
                 submenuOpenTimer.restart()
             }
 
+            // Hover waits on the pointer; a click or Enter on the row opens its panel at once, which
+            // is also the only way to it from the keyboard.
+            function openSubmenu(component, row) {
+                submenuOpenTimer.stop()
+                submenuCloseTimer.stop()
+                menuWindow.submenuAnchorY = menuCard.y + row.mapToItem(menuCard, 0, 0).y
+                menuWindow.openSubmenuComponent = component
+            }
+
             Timer {
                 id: submenuOpenTimer
                 interval: 250
-                onTriggered: {
-                    menuWindow.submenuAnchorY = menuCard.y + menuWindow.pendingRow.mapToItem(menuCard, 0, 0).y
-                    menuWindow.openSubmenuComponent = menuWindow.pendingSubmenu
-                }
+                onTriggered: menuWindow.openSubmenu(menuWindow.pendingSubmenu, menuWindow.pendingRow)
             }
 
             Timer {
@@ -223,7 +229,7 @@ Scope {
                         HoverHandler {
                             onHoveredChanged: menuWindow.rowHovered(hovered, wallpaperSubmenu, wallpaperRow)
                         }
-                        onClicked: GlobalStates.desktopMenuOpen = false
+                        onClicked: menuWindow.openSubmenu(wallpaperSubmenu, wallpaperRow)
                     }
 
                     // Widgets
@@ -239,6 +245,16 @@ Scope {
                         }
                         HoverHandler {
                             onHoveredChanged: menuWindow.rowHovered(hovered, widgetsSubmenu, widgetsRow)
+                        }
+                        onClicked: menuWindow.openSubmenu(widgetsSubmenu, widgetsRow)
+                    }
+
+                    MenuRow {
+                        glyph: "desktop_windows"
+                        label: DesktopIcons.hidden ? "Show icons" : "Hide icons"
+                        onClicked: {
+                            GlobalStates.desktopMenuOpen = false
+                            DesktopIcons.setHidden(!DesktopIcons.hidden)
                         }
                     }
 
@@ -299,6 +315,14 @@ Scope {
                 scale: active ? 1.0 : 0.9
                 opacity: active ? 1.0 : 0.0
                 transformOrigin: Item.Center
+
+                // Keys pressed inside the panel do not reach the card, which is its sibling.
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Escape) {
+                        GlobalStates.desktopMenuOpen = false
+                        event.accepted = true
+                    }
+                }
 
                 Behavior on scale {
                     animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)

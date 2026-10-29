@@ -669,8 +669,10 @@ PKEXEC = ["pkexec", "--disable-internal-agent", "/usr/bin/env", "LC_ALL=C", "/us
 
 def why(code, lines):
     text = "\n".join(lines[-30:]).lower()
-    if code in (126, 127):
+    if code == 126:      # pkexec: the password dialog was dismissed
         return "cancelled"
+    if code == 127:      # pkexec: the password was not accepted
+        return "denied"
     if "unable to lock database" in text:
         return "busy"
     if "returned error: 403" in text or "returned error: 404" in text or "returned error: 410" in text:

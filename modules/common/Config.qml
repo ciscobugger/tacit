@@ -495,6 +495,8 @@ Singleton {
                 }
                 property list<string> screenList: [] 
                 property string wallpaperPath: ""
+                // which part of a picture the desktop shows, per picture: { "/path.jpg": [x, y] }, 0..1 (0.5 = the middle)
+                property var wallpaperFocus: ({})
                 property bool centeredWallpaper: false
                 property string centeredWallpaperShape: "Cookie7Sided"
                 property int centeredWallpaperSize: 400
@@ -613,7 +615,7 @@ Singleton {
                 property int notificationQueueDepth: 3
                 property bool hoverExpand: true
                 // boring.notch hideNotchOption = nowPlayingOnly: stay visible over a fullscreen
-                // window only while something plays (Overlay layer), hide otherwise.
+                // window only while something plays in another app (Overlay layer), hide otherwise.
                 property bool showInFullscreenWhilePlaying: true
                 property JsonObject media: JsonObject {
                     property bool enable: true

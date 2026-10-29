@@ -15,7 +15,11 @@ QuickToggleModel {
     // state until NetworkManager agrees.
     toggled: Network.wifiRadioPending ? Network.wifiRadioWanted : Network.wifiEnabled
     busy: Network.wifiConnecting
-    statusText: Network.wifiConnecting ? Translation.tr("Connecting…") : Network.networkName
+    // Short words for what a person has not named themselves; a Wi-Fi name is theirs and shows as it is.
+    statusText: Network.wifiConnecting ? Translation.tr("Connecting…")
+        : Network.ethernet ? Translation.tr("Wired")
+        : !toggled ? Translation.tr("Off")
+        : Network.networkName.length > 0 ? Network.networkName : Translation.tr("Not connected")
     mainAction: () => Network.toggleWifi()
     hasMenu: true
 }

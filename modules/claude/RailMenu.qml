@@ -71,7 +71,7 @@ FocusScope {
     readonly property bool showing: menu.mode !== "" || menu.shown > 0
 
     // ── what it says ────────────────────────────────────────────────────────
-    readonly property var agentNames: ({ claude: "Claude", codex: "Codex", pi: "pi", opencode: "opencode" })
+    readonly property var agentNames: ({ claude: "Claude", codex: "Codex", pi: "Pi", opencode: "OpenCode" })
     function baseName(p) {
         const parts = (p ?? "").split(/[\\/]/).filter(x => x.length);
         return parts.length ? parts[parts.length - 1] : (p ?? "");

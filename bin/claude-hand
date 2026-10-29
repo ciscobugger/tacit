@@ -1,6 +1,6 @@
 #!/bin/sh
 # Open or start a Claude session in the Claude app (claude.qml) and bring it forward.
-#   claude-hand new <folder> <prompt>   a new session in <folder>, already working on <prompt>
+#   claude-hand new <folder> <prompt>   a new session in <folder>, with <prompt> in the box (the person presses Enter)
 #   claude-hand open <session-id>       show that session
 #   claude-hand attach <file>           attach a file to the open session (region selector)
 #   claude-hand show                    just the app (claude-app, the launcher)
