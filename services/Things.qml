@@ -102,7 +102,12 @@ Singleton {
     function actions(path) {
         const t = root.describe(path);
         const list = [];
-        list.push({ "id": "open", "label": "Open", "glyph": "open_in_new", "run": () => root.open(path) });
+        if (root.isLauncher(path)) {
+            list.push({ "id": "start", "label": "Start", "glyph": "play_arrow", "run": () => root.start(path) });
+            list.push({ "id": "open", "label": "Open as text", "glyph": "code", "run": () => root.openInCode(path, false) });
+        } else {
+            list.push({ "id": "open", "label": "Open", "glyph": "open_in_new", "run": () => root.open(path) });
+        }
         // The desktop's own editor, from wherever you met the file: a folder opens as a project,
         // a file at its first line - the two entry points the Claude app's rows already use.
         if (t.kind === "folder" || t.kind === "code" || t.kind === "text" || t.kind === "file")
@@ -126,7 +131,33 @@ Singleton {
     // did nothing looked like a click that never registered - so one open at a time is watched
     // and whoever asked is told why.
     signal openFailed(string path, string reason)
+    // A launcher (a .desktop file) double-clicked starts its app when it is marked as a program (the executable bit, as
+    // GNOME and KDE ask): one that came from a download opens as text in Graphis until then (no app opens a launcher
+    // for xdg-open). Start in its menu runs it either way.
     function open(path) {
+        if (root.isLauncher(path)) {
+            launcherCheck.path = path;
+            launcherCheck.running = true;
+            return;
+        }
+        root.openFile(path);
+    }
+    Process {
+        id: launcherCheck
+        property string path: ""
+        command: ["test", "-x", launcherCheck.path]
+        onExited: code => code === 0 ? root.start(launcherCheck.path) : root.openInCode(launcherCheck.path, false)
+    }
+    function isLauncher(path) {
+        return /\.desktop$/i.test(path ?? "");
+    }
+    // its app in its own scope, as the dock and the launcher start apps (AppScope), and detached as they are: a watched
+    // process takes the app it started down with it when it ends. Without the runner, as it is
+    function start(path) {
+        const name = path.split("/").pop().replace(/\.desktop$/i, "");
+        Quickshell.execDetached(["bash", "-c", '[ -x "$0" ] && exec "$0" "$@"; shift; exec "$@"', AppScope.runner, name, "gio", "launch", path]);
+    }
+    function openFile(path) {
         if (openProc.running) {   // a second open while one is in flight: nothing to watch it with
             Quickshell.execDetached(["xdg-open", path]);
             return;
