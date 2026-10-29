@@ -166,6 +166,7 @@ ApplicationWindow {
     }
     readonly property var outcomeWords: ({
         "cancelled": ["Not installed", "The password was not given, so nothing changed."],
+        "denied": ["Not installed", "The password was not accepted, so nothing changed."],
         "busy": ["Another update is running", "Try again when it has finished."],
         "offline": ["No internet connection", "Connect to the internet, then try again."],
         "space": ["Not enough space", "Free up some space, then try again."],
@@ -1177,7 +1178,7 @@ ApplicationWindow {
                     Body { text: (root.outcomeWords[appPage.w] ?? ["", ""])[0]; font.weight: Font.DemiBold }
                     Small { text: (root.outcomeWords[appPage.w] ?? ["", ""])[1]; font.pixelSize: 16 }
                     Item { width: 1; height: 8 }
-                    Word { visible: ["cancelled", "busy", "offline", "failed"].includes(appPage.w); text: "Try again"; glyph: "refresh"; ink: root.inkMain; onPicked: root.get(appPage.a.pkg) }
+                    Word { visible: ["cancelled", "denied", "busy", "offline", "failed"].includes(appPage.w); text: "Try again"; glyph: "refresh"; ink: root.inkMain; onPicked: root.get(appPage.a.pkg) }
                 }
                 Item { width: 1; height: 44 }
                 Rectangle { width: root.cw; height: 1; color: root.inkMain; opacity: 0.1 }

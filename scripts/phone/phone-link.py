@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """phone-link.py <command> [args]: the shell's one way to the phone daemon (kdeconnectd), over D-Bus with busctl.
 
+  start                  start the daemon for this session (as at sign-in), wait until it answers, ask it to look for phones
   state                  JSON: installed, running, this computer's name, and every device it knows
   refresh                ask the daemon to look for devices again
   accept <id>            accept a pairing the phone asked for (asks for one when the phone has not)
@@ -19,6 +20,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 
 NAME = "org.kde.kdeconnect"
 DAEMON = "/modules/kdeconnect"
@@ -85,6 +87,24 @@ def state():
     return s
 
 
+def start():
+    """The daemon starts at every sign-in (session/hypr/hyprland/execs.lua); right after the part is got it is started
+    here. A second copy of a running daemon exits at once, so this is safe to call twice."""
+    exe = shutil.which("kdeconnectd")
+    if exe is None:
+        print("daemon missing", file=sys.stderr)
+        return 1
+    subprocess.Popen([exe], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    for _ in range(40):
+        try:
+            call(DAEMON, I_DAEMON, "forceOnNetworkChange")
+            return 0
+        except Exception:
+            time.sleep(0.25)
+    print("daemon did not answer", file=sys.stderr)
+    return 1
+
+
 def send(i, path):
     if not os.path.isfile(path) or not os.access(path, os.R_OK):
         print("file missing or unreadable", file=sys.stderr)
@@ -119,7 +139,9 @@ def main(argv):
         return 1
     cmd, rest = argv[1], argv[2:]
     try:
-        if cmd == "state":
+        if cmd == "start":
+            return start()
+        elif cmd == "state":
             print(json.dumps(state()))
         elif cmd == "refresh":
             call(DAEMON, I_DAEMON, "forceOnNetworkChange")

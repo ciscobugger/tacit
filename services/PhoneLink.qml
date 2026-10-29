@@ -111,6 +111,69 @@ Singleton {
         }
     }
 
+    // ------------------------------------------------------------------ getting the part
+    // The part that talks to phones is not on every computer. The first time someone sets up a phone it is got the way
+    // the Apps window gets a part of the system (stored.py: Tacit's own password ask, the whole system brought up to
+    // date in the same step). setup: "" | "working" | "cancelled" | "denied" | "offline" | "space" | "busy" | "failed"
+    property string setup: ""
+    property real setupProgress: 0
+    property string setupPhase: ""
+    property string setupResult: ""
+    readonly property string installer: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/store/stored.py`
+    readonly property string setupWords: ({
+        "cancelled": "The password was not given, so nothing changed.",
+        "denied": "The password was not accepted, so nothing changed.",
+        "offline": "There is no internet connection. Connect, then try again.",
+        "space": "There is not enough space on this computer. Free up some, then try again.",
+        "busy": "Another update is running. Try again when it has finished.",
+        "failed": "It did not work, and nothing was changed. Try again."
+    })[root.setup] ?? ""
+    function setupPhone() {
+        if (root.setup === "working" || installProc.running || startProc.running)
+            return;
+        root.setup = "working";
+        root.setupProgress = 0;
+        root.setupPhase = "Starting";
+        root.setupResult = "";
+        installProc.running = true;
+    }
+    Process {
+        id: installProc
+        command: ["python3", "-I", root.installer, "install", "kdeconnect", "--everything"]
+        stdout: SplitParser {
+            onRead: line => {
+                let j = null;
+                try { j = JSON.parse(line); } catch (e) { return; }
+                if (j.progress !== undefined) {
+                    root.setupProgress = j.progress;
+                    root.setupPhase = j.phase;
+                }
+                if (j.result !== undefined)
+                    root.setupResult = j.result;
+            }
+        }
+        onExited: code => {
+            if (root.setupResult === "ok") {
+                // continue straight into pairing: the daemon starts now, as it does at every sign-in
+                root.setupPhase = "Starting";
+                startProc.running = true;
+            } else {
+                // "update" cannot be answered here (the system is brought up to date in the same step): a plain failure
+                const r = root.setupResult;
+                root.setup = ["cancelled", "denied", "offline", "space", "busy"].includes(r) ? r : "failed";
+            }
+        }
+    }
+    Process {
+        id: startProc
+        command: ["python3", "-I", root.script, "start"]
+        onExited: code => {
+            // a daemon that did not answer leaves the page's own sentence (it starts at sign-in)
+            root.setup = "";
+            root.read();
+        }
+    }
+
     // ------------------------------------------------------------------ answering the phone
     // Connect (and send what was waiting: the waiting files go as soon as the phone is connected and reachable)
     function connect() {

@@ -13,8 +13,9 @@ import Tacit.Kit as K
  * Not connected: "Connect your phone" (the sentence, three steps, the code to scan on a paper tile, the waiting line).
  * The phone asked: its name, the code both screens must show, Connect and Not now. Connected: the files sent, each
  * with its state (bar, Sent, or Not sent with Try again) and Forget this phone. Files waiting for a phone are listed
- * on the connect page and go when it is connected. A drop on the page sends. The part that talks to phones missing
- * or not running is said in one sentence. State and sending are services/PhoneLink.qml's.
+ * on the connect page and go when it is connected. A drop on the page sends. Without the part that talks to phones the
+ * page says what it is for and has one action that gets it (PhoneLink.setupPhone), with progress and a plain failure;
+ * a part that is not running is said in one sentence. State and sending are services/PhoneLink.qml's.
  */
 Item {
     id: page
@@ -109,12 +110,42 @@ Item {
             width: Math.max(0, page.width - page.inset - page.outset)
             spacing: page.t.space.m
 
-            // the part that talks to phones is not here, or not running
+            // the part that talks to phones is not here: what it is for, and the one action that gets it
+            Column {
+                visible: PhoneLink.loaded && !PhoneLink.installed && PhoneLink.setup === ""
+                width: col.width
+                spacing: page.t.space.l
+                K.SectionHeading { x: -page.t.space.l; text: "Your phone" }
+                K.TacitText {
+                    width: Math.min(560, parent.width)
+                    wrapMode: Text.WordWrap
+                    ink: "sec"
+                    text: "Send files from this computer to your phone over Wi-Fi. This computer needs one more part for that. Setting it up asks for your password and brings the whole system up to date, so it can take a few minutes."
+                }
+                K.Slab { text: "Set up your phone"; tone: "default"; onPicked: PhoneLink.setupPhone() }
+            }
+            // getting it
+            Column {
+                visible: PhoneLink.setup === "working"
+                width: Math.min(440, col.width)
+                spacing: page.t.space.s
+                K.SectionHeading { x: -page.t.space.l; text: "Setting up your phone" }
+                K.Progress { width: parent.width; value: PhoneLink.setupProgress }
+                K.TacitText { text: PhoneLink.setupPhase; ink: "meta" }
+            }
+            // it did not happen: nothing was changed, and the way to try again
             K.PageState {
-                visible: PhoneLink.loaded && !PhoneLink.usable
+                visible: PhoneLink.setup !== "" && PhoneLink.setup !== "working"
+                failure: PhoneLink.setup !== "cancelled"
+                text: PhoneLink.setupWords
+                action: "Try again"
+                onActed: PhoneLink.setupPhone()
+            }
+            // the part is here but not running
+            K.PageState {
+                visible: PhoneLink.loaded && PhoneLink.installed && !PhoneLink.running && PhoneLink.setup === ""
                 failure: true
-                text: !PhoneLink.installed ? "This computer does not have the part that talks to phones yet, so it can't send files to one."
-                    : "The part that talks to phones is not running. It starts when you sign in."
+                text: "The part that talks to phones is not running. It starts when you sign in."
             }
 
             // ---- not connected, nobody asking: the way in
