@@ -593,9 +593,7 @@ FloatingWindow {
                 if (apps.length === 0)
                     apps = [{ "id": "none", "label": `Nothing here opens ${type || "this"}`, "glyph": "block", "run": () => {} }];
                 actions.model = apps;
-                actions.x = win.openWithX;
-                actions.y = Math.min(win.openWithY, body.height - (apps.length * 35 + 20));
-                actions.open();
+                win.openActionsAt(win.openWithX, win.openWithY);
             }
         }
     }
@@ -1719,12 +1717,27 @@ FloatingWindow {
     function pictureFor(path, isDir) {
         return !isDir && /\.(jpe?g|png|webp|gif|bmp)$/i.test(path) ? win.fileUrl(path) : "";
     }
+    // One line of the actions menu, the space between its lines, and its width: the menu's height is counted from
+    // these and the number of actions, never asked of the popup (its Repeater fills a frame after the model is set,
+    // so the size it reports there is the last menu's) and never guessed (an empty folder's six actions are 221 px,
+    // more than the 160 the ground kept for them, and the last lines fell off the window's bottom).
+    readonly property int actionWidth: 236
+    readonly property int actionLine: 34
+    readonly property int actionGap: 1
+    // where the actions menu opens: from a point in the body, whole inside the window, 8 px from its edges. A menu
+    // taller than the window keeps its head on screen rather than going off the top.
+    function openActionsAt(px, py) {
+        const edge = 8;
+        const n = actions.model.length;
+        const h = 2 * actions.padding + n * win.actionLine + Math.max(0, n - 1) * win.actionGap;
+        actions.x = Math.max(edge, Math.min(px, body.width - win.actionWidth - 2 * actions.padding - edge));
+        actions.y = Math.max(edge, Math.min(py, body.height - h - edge));
+        actions.open();
+    }
     function openMenuAt(item, model) {
         actions.model = model;
         const p = item.mapToItem(body, 0, item.height + 6);
-        actions.x = Math.min(p.x, body.width - 244 - 12);
-        actions.y = p.y;
-        actions.open();
+        win.openActionsAt(p.x, p.y);
     }
     readonly property string trashDir: Files.trashDir
     // Every folder inside the trash is in the trash: an exact match on the root offered
@@ -2038,11 +2051,7 @@ FloatingWindow {
         // a right-click inside a multi-selection acts on all of it, as the column beside it does
         actions.model = win.selectedPaths.length > 1 ? win.selectionActions : win.actionsFor(i);
         const pos = body.mapFromItem(null, x, y);
-        actions.x = Math.min(pos.x, body.width - 236 - 12 - 8);
-        // a full row menu is tall: keep its head on screen in a short window rather than
-        // pushing it off the top
-        actions.y = Math.max(8, Math.min(pos.y, body.height - (actions.model.length * 35 + 12) - 8));
-        actions.open();
+        win.openActionsAt(pos.x, pos.y);
     }
 
     // The Claude app's material (and the code editor's, and foot's): the terminal background
@@ -2234,9 +2243,7 @@ FloatingWindow {
                             { "id": "path", "label": "Copy path", "glyph": "content_copy", "run": () => Things.copyPath(path) }
                         ].concat(Files.pins.includes(path) ? [{ "id": "unpin", "label": "Unpin", "glyph": "keep_off", "run": () => Files.unpin(path) }] : []);
                         const pos = railView.mapToItem(body, x, y);
-                        actions.x = Math.min(pos.x, body.width - 244);
-                        actions.y = Math.min(pos.y, body.height - 140);
-                        actions.open();
+                        win.openActionsAt(pos.x, pos.y);
                     }
                 }
 
@@ -2706,9 +2713,7 @@ FloatingWindow {
                                                 actions.model = [{ "id": "unpark", "label": "Take off the shelf", "glyph": "remove", "run": () => DropShelf.remove(hit.modelData.path + (hit.modelData.isDir ? "/" : "")) },
                                                                  { "id": "clear", "label": "Clear the shelf", "glyph": "delete_sweep", "run": () => DropShelf.clear() }].concat(actions.model);
                                             const pos = body.mapFromItem(null, hit.mapToItem(null, mouse.x, mouse.y).x, hit.mapToItem(null, mouse.x, mouse.y).y);
-                                            actions.x = Math.min(pos.x, body.width - 256);
-                                            actions.y = Math.min(pos.y, body.height - (actions.model.length * 35 + 20));
-                                            actions.open();
+                                            win.openActionsAt(pos.x, pos.y);
                                         }
                                     }
                                     onDoubleClicked: mouse => { if (mouse.button === Qt.LeftButton) win.openHit(hit.index); }
@@ -2791,9 +2796,7 @@ FloatingWindow {
                                 if (mouse.button === Qt.RightButton) {
                                     actions.model = win.folderActions;
                                     const pos = ground.mapToItem(body, mouse.x, mouse.y);
-                                    actions.x = Math.min(pos.x, body.width - 244);
-                                    actions.y = Math.min(pos.y, body.height - 160);
-                                    actions.open();
+                                    win.openActionsAt(pos.x, pos.y);
                                 } else if (mouse.button === Qt.LeftButton) {
                                     win.clearSelection();
                                 }
@@ -2974,13 +2977,13 @@ FloatingWindow {
                 border.color: Tacit.hairline
             }
             contentItem: Column {
-                spacing: 1
+                spacing: win.actionGap
                 Repeater {
                     model: actions.model
                     delegate: Item {
                         required property var modelData
-                        width: 236
-                        height: 34
+                        width: win.actionWidth
+                        height: win.actionLine
                         Rectangle {
                             anchors.fill: parent
                             radius: 8
