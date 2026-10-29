@@ -46,6 +46,20 @@ restore_from_home_trash() {
     return 1
 }
 
+# Put back by the name a file has in the home trash (Files' Trash lists Trash/files): its record says where it came
+# from. gio trash --restore does this only where GVfs runs, and a fresh install said "Operation not supported", so Put
+# back left everything in the trash (Discord 2026-10-29); gio stays for trash on other disks.
+restore_by_name() {
+    local name=$1 tdir="${XDG_DATA_HOME:-$HOME/.local/share}/Trash" info path
+    info="$tdir/info/$name.trashinfo"
+    [ -e "$info" ] && [ -e "$tdir/files/$name" ] || return 2
+    path=$(sed -n 's/^Path=//p' "$info" | head -1 | python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().rstrip("\n")))')
+    case $path in /*) ;; *) return 1 ;; esac
+    [ -e "$path" ] && return 3
+    mkdir -p "$(dirname -- "$path")" && mv -- "$tdir/files/$name" "$path" && rm -f -- "$info" && return 0
+    return 1
+}
+
 write() {
     local ended_json=$ended
     jq -nc --arg id "$id" --arg op "$op" --arg dest "$dest" --arg state "$state" \
@@ -158,7 +172,10 @@ restore)
     total=$#; write
     for item in "$@"; do
         current=$item; write
-        if ! gio trash --restore "trash:///$item" 2>/dev/null; then error="Could not put $item back"; finish failed; fi
+        restore_by_name "$item"; r=$?
+        if [ $r = 2 ]; then gio trash --restore "trash:///$item" 2>/dev/null && r=0 || r=1; fi
+        if [ $r = 3 ]; then error="$item is already back where it came from"; finish failed; fi
+        if [ $r != 0 ]; then error="Could not put $item back"; finish failed; fi
         done_=$((done_+1)); write
     done
     finish done ;;
