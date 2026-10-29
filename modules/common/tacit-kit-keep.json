@@ -1,0 +1,5 @@
+{
+  "inkMeta": ["mix", ["ink", "secondary"], ["ink", "meta"], 0.4],
+  "risk": ["palette", "error"],
+  "container": ["palette", "surface_container"]
+}

@@ -88,7 +88,7 @@ Item {
     Rectangle {
         visible: tag.editing
         anchors.fill: parent; radius: tag.corner; color: Tacit.windowGround
-        border.width: Tacit.state.focusRing; border.color: tag.taken ? Tacit.risk : Tacit.accent
+        border.width: Tacit.state.focusRing; border.color: tag.taken ? Tacit.kit.risk : Tacit.accent
         K.Symbol { x: tag.pad; y: (parent.height - height) / 2; text: tag.glyph; size: Tacit.icon.row; color: Tacit.inkMain }
         TextInput {
             id: field

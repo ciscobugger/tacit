@@ -72,7 +72,7 @@ FloatingWindow {
         }
     }
     Component.onCompleted: {
-        K.Kit.tokens = Tacit;   // the kit's parts follow the wallpaper with the shell
+        K.Kit.tokens = Tacit.kit;   // the kit's parts follow the wallpaper with the shell
         win.forPick = Files.picking !== null;
         Files.windows++;
         restoreTimer.restart();
@@ -2851,7 +2851,7 @@ FloatingWindow {
                                 visible: foot.said.startsWith("Can't")
                                 text: "warning"
                                 size: 15
-                                color: Tacit.risk
+                                color: Tacit.kit.risk
                             }
                             K.TacitText {
                                 anchors.verticalCenter: parent.verticalCenter

@@ -254,7 +254,7 @@ Item {
                 color: Appearance.colors.colOnLayer0
                 opacity: (app.node?.audio?.muted ?? false) ? 0.5 : 1
             }
-            TacitSlider {
+            PanelSlider {
                 id: level
                 Layout.preferredWidth: 140
                 showNumber: false

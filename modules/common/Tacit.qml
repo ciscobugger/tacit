@@ -18,9 +18,11 @@ Singleton {
     readonly property color inkMain: Appearance.colors.colInkMain
     // facts: size, time, length, details
     readonly property color inkSec: ColorUtils.mix(Appearance.colors.colInkMain, Appearance.colors.colInkSecondary, 0.25)
+    // kept at the shell's own value; the kit's is kitInkMeta, which Tacit.kit hands out as inkMeta:
+    readonly property color inkMeta: ColorUtils.mix(Appearance.colors.colInkSecondary, Appearance.colors.colInkMeta, 0.4)
     // a name beside a name, ordinals, rail counts. Lc 75 on the ground under the pointer on a selected row
     // (currentHoverGround), about 80 on the plain ground
-    readonly property color inkMeta: root.inkOn(75, root.currentHoverGround, Appearance.m3colors.m3onBackground)
+    readonly property color kitInkMeta: root.inkOn(75, root.currentHoverGround, Appearance.m3colors.m3onBackground)
     // unavailable
     readonly property color inkFaint: Appearance.colors.colInkFaint
     // the one line under a header, rail to page
@@ -30,9 +32,11 @@ Singleton {
     // text on an accent fill. Was onAccent, which QML takes for a signal handler (on + capital): its binding never ran
     // and the text was black
     readonly property color inkOnAccent: Appearance.m3colors.m3onPrimary
+    // kept at the shell's own value; the kit's is kitRisk, which Tacit.kit hands out as risk:
+    readonly property color risk: Appearance.m3colors.m3error
     // a destructive action, always last, always with the warning symbol. Solved along the palette's error colour to Lc
     // 75 on the ground, as the text inks are (it was the palette's error itself: Lc 71)
-    readonly property color risk: root.inkOn(75, root.ground, Appearance.m3colors.m3error)
+    readonly property color kitRisk: root.inkOn(75, root.ground, Appearance.m3colors.m3error)
     // the ground slabs and panels stand on (the shell's)
     readonly property color ground: Appearance.m3colors.m3surfaceContainerLow
     // a slab raised from the shell's ground; not inside app windows
@@ -42,10 +46,12 @@ Singleton {
     // 11) never match it (it is written with an alpha, ']11;[100]#...') and fall back to this; foot's own ground is one
     // step from it
     readonly property color windowGround: root.ground
+    // kept at the shell's own value; the kit's is kitContainer, which Tacit.kit hands out as container:
+    readonly property color container: Appearance.m3colors.m3surfaceContainer
     // a field in use (the search field open); drawn at windowSeeThrough; never a group inside content. Not the docked
     // panel: a solid layer over the see-through page read as a flat grey patch (2026-10-25); the panel is the page
     // lifted by wash.action
-    readonly property color container: Appearance.m3colors.m3surfaceContainerHigh
+    readonly property color kitContainer: Appearance.m3colors.m3surfaceContainerHigh
     // context lines: lyrics still to come, an unplayed waveform
     readonly property color quiet: root.quieter(root.inkMain, root.windowGround, 38)
     // lyrics already sung, the empty track of a line
@@ -194,6 +200,47 @@ Singleton {
         readonly property real pressScale: 0.97
         readonly property real focusRing: 2
         readonly property real focusGap: 2
+    }
+    // ---- the tokens as the kit reads them (Kit.tokens = Tacit.kit): the kit's value for each kept role, the shell's for the rest
+    readonly property QtObject kit: QtObject {
+        readonly property color inkMain: root.inkMain
+        readonly property color inkSec: root.inkSec
+        readonly property color inkMeta: root.kitInkMeta
+        readonly property color inkFaint: root.inkFaint
+        readonly property color hairline: root.hairline
+        readonly property color accent: root.accent
+        readonly property color inkOnAccent: root.inkOnAccent
+        readonly property color risk: root.kitRisk
+        readonly property color ground: root.ground
+        readonly property color raised: root.raised
+        readonly property color raisedHot: root.raisedHot
+        readonly property color windowGround: root.windowGround
+        readonly property color container: root.kitContainer
+        readonly property color quiet: root.quiet
+        readonly property color past: root.past
+        readonly property color overlay: root.overlay
+        readonly property color currentHoverGround: root.currentHoverGround
+        readonly property color overlayLit: root.overlayLit
+        readonly property color overlayMeta: root.overlayMeta
+        readonly property color overlayRisk: root.overlayRisk
+        readonly property color paper: root.paper
+        readonly property color paperInk: root.paperInk
+        readonly property color paperInkSec: root.paperInkSec
+        readonly property color paperRule: root.paperRule
+        readonly property color paperMark: root.paperMark
+        readonly property color paperWash: root.paperWash
+        readonly property real windowSeeThrough: root.windowSeeThrough
+        readonly property var wash: root.wash
+        readonly property var font: root.font
+        readonly property var weight: root.weight
+        readonly property var size: root.size
+        readonly property var space: root.space
+        readonly property var height: root.height
+        readonly property var width: root.width
+        readonly property var radius: root.radius
+        readonly property var icon: root.icon
+        readonly property var motion: root.motion
+        readonly property var state: root.state
     }
     // <<< tacit-kit tokens
 

@@ -629,7 +629,7 @@ Item {
                                 text: root.dragging ? Translation.tr("Drop it on the top buttons or the row to place it. Anywhere else puts it in More.") : ""
                                 visible: root.dragging
                                 font.pixelSize: Kit.tokens.size.meta
-                                color: Tacit.inkMeta
+                                color: Tacit.kit.inkMeta
                                 Layout.fillWidth: true
                                 wrapMode: Text.WordWrap
                             }
@@ -780,7 +780,7 @@ Item {
                             Layout.alignment: Qt.AlignLeft
                             text: DateTime.longDate
                             font.pixelSize: Kit.tokens.size.meta
-                            color: Tacit.inkMeta
+                            color: Tacit.kit.inkMeta
                         }
                     }
 
@@ -813,7 +813,7 @@ Item {
                             size: Kit.tokens.icon.row
                             // An action that risks something (the session ends) is risk-
                             // coloured, with its warning companion as the tooltip.
-                            color: Tacit.risk
+                            color: Tacit.kit.risk
                         }
                         FocusRing {
                             shown: parent.keyboardFocus

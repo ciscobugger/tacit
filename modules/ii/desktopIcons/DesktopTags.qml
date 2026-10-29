@@ -30,7 +30,7 @@ Scope {
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
         mask: Region { regions: maskMaker.instances }
-        Component.onCompleted: K.Kit.tokens = Tacit
+        Component.onCompleted: K.Kit.tokens = Tacit.kit
 
         Variants {
             id: maskMaker

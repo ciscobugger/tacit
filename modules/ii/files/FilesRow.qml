@@ -236,7 +236,7 @@ Item {
             K.FocusRing {
                 shown: nameEdit.activeFocus
                 corner: Tacit.radius.slab
-                border.color: row.taken ? Tacit.risk : Tacit.accent
+                border.color: row.taken ? Tacit.kit.risk : Tacit.accent
             }
             TextInput {
                 id: nameEdit
@@ -244,7 +244,7 @@ Item {
                 width: parent.width - 2 * Tacit.space.m
                 anchors.verticalCenter: parent.verticalCenter
                 clip: true
-                color: row.taken ? Tacit.risk : Tacit.inkMain
+                color: row.taken ? Tacit.kit.risk : Tacit.inkMain
                 selectionColor: Qt.alpha(Tacit.accent, 0.4)
                 selectedTextColor: Tacit.inkMain
                 font.family: Tacit.font.main
