@@ -1872,7 +1872,7 @@ ApplicationWindow {
             Group {
                 visible: dk.viewing === "widgets"
                 title: "Desktop widgets"
-                note: "Drag a widget to move it, or pick its placement from ⋯. Lock them to keep them in place."
+                note: "Drag a widget to move it, or let it find a calm or busy spot on the wallpaper from ⋯, unless they are kept in place."
                 Repeater {
                     model: dk.widgetList
                     SettingRow {
@@ -1883,17 +1883,17 @@ ApplicationWindow {
                         readonly property string strategy: cfg?.placementStrategy ?? "free"
                         glyph: modelData.glyph
                         label: modelData.label
-                        description: strategy === "leastBusy" ? "Least busy area"
-                            : strategy === "mostBusy" ? "Most busy area" : "Free to drag"
+                        description: strategy === "leastBusy" ? "Calm spot"
+                            : strategy === "mostBusy" ? "Busy spot" : "Free to drag"
                         muted: !isShown
                         onActivated: if (cfg) cfg.enable = !isShown
                         control: Row {
                             spacing: 4
                             RowMenu {
                                 items: [
-                                    { label: "Free (draggable)", checked: wRow.strategy === "free", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "free"; } },
-                                    { label: "Least busy area", checked: wRow.strategy === "leastBusy", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "leastBusy"; } },
-                                    { label: "Most busy area", checked: wRow.strategy === "mostBusy", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "mostBusy"; } }
+                                    { label: "Free to drag", checked: wRow.strategy === "free", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "free"; } },
+                                    { label: "Calm spot", checked: wRow.strategy === "leastBusy", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "leastBusy"; } },
+                                    { label: "Busy spot", checked: wRow.strategy === "mostBusy", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "mostBusy"; } }
                                 ]
                             }
                             Item {
