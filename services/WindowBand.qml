@@ -31,11 +31,12 @@ Singleton {
     function command(verb, address) {
         Quickshell.execDetached(["hyprctl", "tacitgrip", verb, address]);
     }
-    // several windows back at once, one after another in the order given: the last one ends in front
+    // several windows back at once (the plugin brings them in the reverse of the order they went, the last one in front)
     function reopenAll(addresses) {
         const a = addresses.filter(x => /^0x[0-9a-fA-F]+$/.test(x));
+        // a plugin from before reopen-all answers without "back": then one at a time
         if (a.length > 0)
-            Quickshell.execDetached(["sh", "-c", a.map(x => `hyprctl tacitgrip reopen ${x}`).join("; ")]);
+            Quickshell.execDetached(["sh", "-c", `hyprctl tacitgrip reopen-all ${a.join(" ")} | grep -q back || for x in ${a.join(" ")}; do hyprctl tacitgrip reopen $x; done`]);
     }
     // the menu's rows and the notch's pill
     function act(verb, address) {
@@ -45,10 +46,39 @@ Singleton {
 
     // a window the band holds away, by the plugin's special workspaces: "hidden", "closed" (closed after a few seconds
     // unless reopened), or "" for any other
+    // the windows the plugin holds away, by address: "hidden" or "closed". Kept from the plugin's own events (and asked
+    // for once at start), not from Hyprland's workspaces: the places it holds windows in are its own, and the shell's
+    // view of their workspace was not reliable (a dock click found nothing to bring back, 2026-10-29)
+    property var held: ({})
+    function setHeld(address, kind) {
+        const h = Object.assign({}, root.held);
+        if (kind)
+            h[root.norm(address)] = kind;
+        else
+            delete h[root.norm(address)];
+        root.held = h;
+    }
+    function norm(a) {
+        return (a ?? "").replace(/^0x/, "");
+    }
     function heldAs(toplevel) {
-        const h = Hyprland.toplevels.values.find(x => x.wayland === toplevel);
-        const ws = h?.workspace?.name ?? "";
-        return ws === "special:tacit-hidden" ? "hidden" : ws === "special:tacit-closed" ? "closed" : "";
+        const a = Hyprland.toplevels.values.find(x => x.wayland === toplevel)?.address ?? "";
+        return a.length > 0 ? (root.held[root.norm(a)] ?? "") : "";
+    }
+    Process {
+        id: heldQuery
+        running: true
+        command: ["hyprctl", "tacitgrip", "held"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const h = {};
+                    for (const w of JSON.parse(this.text))
+                        h[root.norm(w.address)] = w.kind;
+                    root.held = h;
+                } catch (e) {}   // no plugin: nothing held
+            }
+        }
     }
     function addressOf(toplevel) {
         const a = Hyprland.toplevels.values.find(x => x.wayland === toplevel)?.address ?? "";
@@ -65,6 +95,8 @@ Singleton {
     }
     // the button lit for the window that lands in it (PaletteDock), when it lands
     signal landed(string appId)
+    // the right button that opened the window's menu let go (WindowMenu: held, moved and let go picks a place)
+    signal menuReleased(string address)
 
     // where the held window goes, for the plugin's flight: the dock's button (on the dock's screen, from PaletteDock)
     // or the notch as it is (it goes in under their glass)
@@ -75,12 +107,12 @@ Singleton {
         Quickshell.execDetached(["hyprctl", "tacitgrip", "target", root.dragAddress, "hide",
                                  `${s.x + x}`, `${s.y + y}`, `${w}`, `${h}`]);
     }
-    function reportClose() {
-        if (root.dragAddress.length === 0)
+    function reportClose(address = root.dragAddress) {
+        if (address.length === 0)
             return;
-        const s = root.screenOf(root.dragAddress);
+        const s = root.screenOf(address);
         const g = IslandController.geometryFor("window");
-        Quickshell.execDetached(["hyprctl", "tacitgrip", "target", root.dragAddress, "close",
+        Quickshell.execDetached(["hyprctl", "tacitgrip", "target", address, "close",
                                  `${s.x + (s.width - g.w) / 2}`, `${s.y + Config.options.island.topMargin}`, `${g.w}`, `${g.h}`]);
     }
     // again once the notch has grown to say "Close <app>", so the window goes into the notch as it then is
@@ -98,7 +130,13 @@ Singleton {
         }
     }
 
+    // the names the dock gives Tacit's own programs (PaletteDock.known), so the notch and the dock say the same
+    readonly property var known: ({ "org.quickshell": "Pinax", "praxis": "Praxis", "browser": "Thyris", "browser-cef": "Thyris",
+                                    "thyris": "Thyris", "viewer": "Viewer", "graphis": "Graphis", "settings": "Settings",
+                                    "foot": "Terminal" })
     function nameFor(cls) {
+        if (root.known[cls])
+            return root.known[cls];
         const e = DesktopEntries.byId(cls) ?? DesktopEntries.heuristicLookup(cls);
         return e?.name || (cls.length > 0 ? cls.charAt(0).toUpperCase() + cls.slice(1) : "Window");
     }
@@ -170,6 +208,19 @@ Singleton {
                     IslandController.dismiss();
                 }
                 break;
+            // a window on its way into the dock or the notch, however it was sent (the hand, a flick, the menu, a key): the
+            // dock rises for it and its button tells the plugin where it is; the notch's place is named at once
+            case "fold":
+                if (f[2] === "hide") {
+                    dockRetreat.stop();
+                    root.dragAddress = f[1];
+                    root.dragApp = root.toplevelAt(f[1])?.wayland?.appId ?? "";
+                    root.dropInto = root.dragApp;
+                    root.holdDock = true;
+                } else if (f[2] === "close") {
+                    root.reportClose(f[1]);
+                }
+                break;
             case "drop":
                 // a window let go over the bottom flies into its button: the dock stays to take it (hidden, below)
                 if (root.zone !== "hide") {
@@ -184,11 +235,14 @@ Singleton {
                 root.dragAddress = "";
                 break;
             case "closed":
+                root.setHeld(f[1], "closed");
                 root.mark("close");
                 root.say(`${root.nameFor(f[2] ?? "")} closed`, "close", "Reopen", "reopen", f[1], 7000);
                 break;
             case "hidden":
+                root.setHeld(f[1], "hidden");
                 root.landed(root.dropInto);
+                root.dragAddress = "";
                 dockRetreat.restart();
                 root.mark("hide");
                 root.say(`${root.nameFor(f[2] ?? "")} hidden`, "minimize", "Show", "reopen", f[1], 3500);
@@ -199,11 +253,15 @@ Singleton {
                          "Undo", "unside", f[1], 6000);
                 break;
             case "restored":
+                root.setHeld(f[1], "");
                 if (IslandController.transientState === "window" && IslandController.payload?.address === f[1])
                     IslandController.dismiss();
                 break;
             case "hover":
                 root.hint();
+                break;
+            case "menuup":
+                root.menuReleased(f[1]);
                 break;
             case "menu":
                 root.menu = { "address": f[1], "monitor": f[2], "x": Number(f[3]), "y": Number(f[4]) };
