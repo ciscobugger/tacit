@@ -26,4 +26,7 @@ if [ "${1:-}" != now ] && [ "$on_mains" = 0 ] && [ -n "$battery" ] && [ "$batter
 fi
 
 # -Syuw: refresh the list and download what the next update needs; nothing is installed or removed
-exec pacman -Syuw --noconfirm --noprogressbar
+pacman -Syuw --noconfirm --noprogressbar || exit
+# when the last look worked, whether or not anything had changed: pacman leaves a list it finds current untouched, and
+# Settings' "Checked at" (the lists' time) went back to when something last came
+install -d /var/lib/tacit && touch /var/lib/tacit/updates-checked

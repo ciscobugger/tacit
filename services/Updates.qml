@@ -128,7 +128,7 @@ Singleton {
         // what is waiting ("name old -> new"), then where each of its files is: file:// once downloaded
         // (only where Tacit installs its updates itself, tacit-session's tacit-update: not on a computer set up by hand,
         // as the owner's Book4 with its held Qt)
-        command: ["bash", "-c", "[ -x /usr/lib/tacit/tacit-update ] || { echo unmanaged; exit 0; }; pacman -Qu 2>/dev/null; echo ---; pacman -Sup --print-format %l 2>/dev/null; echo ---; stat -c %Y /var/lib/pacman/sync/*.db 2>/dev/null | sort -n | tail -1; echo ---; systemctl is-active tacit-update-night.timer"]
+        command: ["bash", "-c", "[ -x /usr/lib/tacit/tacit-update ] || { echo unmanaged; exit 0; }; pacman -Qu 2>/dev/null; echo ---; pacman -Sup --print-format %l 2>/dev/null; echo ---; stat -c %Y /var/lib/pacman/sync/*.db /var/lib/tacit/updates-checked 2>/dev/null | sort -n | tail -1; echo ---; systemctl is-active tacit-update-night.timer"]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.trim() === "unmanaged") {
