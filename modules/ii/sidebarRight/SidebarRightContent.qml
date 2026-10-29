@@ -635,9 +635,7 @@ Item {
                             }
 
                             // The pills fill the grid in seven across — every row of
-                            // height.action cells closes on the same right edge as the square
-                            // — and the pencil takes the tail of the last incomplete row, so
-                            // it is never alone on a line of its own.
+                            // height.action cells closes on the same right edge as the square.
                             Grid {
                                 id: drawerGrid
                                 objectName: "drawerGrid"
@@ -654,46 +652,39 @@ Item {
                                         inDrawer: true
                                     }
                                 }
+                            }
 
-                                RippleButton {
-                                    implicitWidth: Kit.tokens.height.action
-                                    implicitHeight: Kit.tokens.height.action
-                                    buttonRadius: width / 2
-                                    borderWidth: 0
-                                    toggled: root.editMode
-                                    colBackground: root.colPillOff
-                                    colBackgroundHover: root.colPillOffHover
-                                    colBackgroundToggled: root.colPillOn
-                                    onClicked: {
-                                        root.editMode = !root.editMode;
-                                    }
-                                    contentItem: Symbol {
-                                        anchors.centerIn: parent
-                                        text: "edit"
-                                        size: Kit.tokens.icon.nav
-                                        // Measured at the pill's own scale: the glyph's ink
-                                        // is centred in its box, reading a hair high — a
-                                        // single pixel returned. The same TacitSymbols face
-                                        // the kit draws with, so the correction rides on it.
-                                        anchors.verticalCenterOffset: size / 22
-                                        // The wash says edit mode is on; the glyph stays ink.
-                                        color: Tacit.inkSec
-                                    }
-                                    FocusRing {
-                                        shown: parent.keyboardFocus
-                                        corner: width / 2
-                                    }
-                                    StyledToolTip {
-                                        text: Translation.tr("Reshuffle")
-                                    }
-                                    Keys.onPressed: event => {
-                                        Kit.focusVisible = true;
-                                    }
-                                    Accessible.role: Accessible.Button
-                                    Accessible.name: Translation.tr("Reshuffle")
-                                    Accessible.checkable: true
-                                    Accessible.checked: root.editMode
+                            // Rearranging, as a word (Discord 2026-10-29: the pencil at the grid's tail, with a
+                            // tooltip only, was not found): Edit, and Done while the pills can be dragged
+                            RippleButton {
+                                Layout.alignment: Qt.AlignRight
+                                implicitWidth: editWords.implicitWidth + Kit.tokens.space.m * 2
+                                implicitHeight: Kit.tokens.height.railRow
+                                buttonRadius: height / 2
+                                borderWidth: 0
+                                toggled: root.editMode
+                                colBackground: root.colPillOff
+                                colBackgroundHover: root.colPillOffHover
+                                colBackgroundToggled: root.colPillOn
+                                onClicked: {
+                                    root.editMode = !root.editMode;
                                 }
+                                contentItem: StyledText {
+                                    id: editWords
+                                    text: root.editMode ? Translation.tr("Done") : Translation.tr("Edit")
+                                    color: Tacit.inkMain
+                                }
+                                FocusRing {
+                                    shown: parent.keyboardFocus
+                                    corner: height / 2
+                                }
+                                Keys.onPressed: event => {
+                                    Kit.focusVisible = true;
+                                }
+                                Accessible.role: Accessible.Button
+                                Accessible.name: root.editMode ? Translation.tr("Done") : Translation.tr("Edit")
+                                Accessible.checkable: true
+                                Accessible.checked: root.editMode
                             }
                         }
                     }
