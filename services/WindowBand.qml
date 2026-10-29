@@ -31,6 +31,12 @@ Singleton {
     function command(verb, address) {
         Quickshell.execDetached(["hyprctl", "tacitgrip", verb, address]);
     }
+    // several windows back at once, one after another in the order given: the last one ends in front
+    function reopenAll(addresses) {
+        const a = addresses.filter(x => /^0x[0-9a-fA-F]+$/.test(x));
+        if (a.length > 0)
+            Quickshell.execDetached(["sh", "-c", a.map(x => `hyprctl tacitgrip reopen ${x}`).join("; ")]);
+    }
     // the menu's rows and the notch's pill
     function act(verb, address) {
         root.menu = null;
@@ -57,8 +63,11 @@ Singleton {
         const name = root.toplevelAt(address)?.monitor?.name ?? Hyprland.focusedMonitor?.name ?? "";
         return Quickshell.screens.find(s => s.name === name) ?? Quickshell.screens[0];
     }
+    // the button lit for the window that lands in it (PaletteDock), when it lands
+    signal landed(string appId)
+
     // where the held window goes, for the plugin's flight: the dock's button (on the dock's screen, from PaletteDock)
-    // or the notch's line
+    // or the notch as it is (it goes in under their glass)
     function reportHide(x, y, w, h) {
         if (root.dragAddress.length === 0)
             return;
@@ -67,9 +76,18 @@ Singleton {
                                  `${s.x + x}`, `${s.y + y}`, `${w}`, `${h}`]);
     }
     function reportClose() {
+        if (root.dragAddress.length === 0)
+            return;
         const s = root.screenOf(root.dragAddress);
+        const g = IslandController.geometryFor("window");
         Quickshell.execDetached(["hyprctl", "tacitgrip", "target", root.dragAddress, "close",
-                                 `${s.x + s.width / 2 - 110}`, `${s.y + 2}`, "220", "34"]);
+                                 `${s.x + (s.width - g.w) / 2}`, `${s.y + Config.options.island.topMargin}`, `${g.w}`, `${g.h}`]);
+    }
+    // again once the notch has grown to say "Close <app>", so the window goes into the notch as it then is
+    Timer {
+        id: closeReport
+        interval: 300
+        onTriggered: if (root.zone === "close") root.reportClose()
     }
     Timer {
         id: dockRetreat
@@ -140,6 +158,7 @@ Singleton {
                 }
                 if (root.zone === "close") {
                     root.reportClose();
+                    closeReport.restart();
                     const t = root.toplevelAt(f[1]);
                     IslandController.request("window", {
                         "text": `Close ${root.nameFor(t?.wayland?.appId ?? t?.lastIpcObject?.class ?? "")}`,
@@ -169,6 +188,7 @@ Singleton {
                 root.say(`${root.nameFor(f[2] ?? "")} closed`, "close", "Reopen", "reopen", f[1], 7000);
                 break;
             case "hidden":
+                root.landed(root.dropInto);
                 dockRetreat.restart();
                 root.mark("hide");
                 root.say(`${root.nameFor(f[2] ?? "")} hidden`, "minimize", "Show", "reopen", f[1], 3500);
