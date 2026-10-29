@@ -56,6 +56,14 @@ Scope {
         overviewScope.dockShown = true;
         GlobalStates.overviewOpen = true;
     }
+    // the window band holds the dock up while a window is carried down to it (WindowBand.holdDock)
+    Connections {
+        target: WindowBand
+        function onHoldDockChanged() {
+            if (WindowBand.holdDock)
+                overviewScope.showDock();
+        }
+    }
     function showDock() {
         if (GlobalStates.overviewOpen || GlobalStates.screenLocked)
             return;

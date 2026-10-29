@@ -214,8 +214,16 @@ Item {
         interval: root.dockVisited ? 450 : 1500
         onTriggered: {
             // the dock that holds the keyboard stays until Esc or a click elsewhere
-            if (root.dockMode && !root.dockKeys && !dockHover.hovered && dock.draggingId.length === 0)
+            if (root.dockMode && !root.dockKeys && !dockHover.hovered && dock.draggingId.length === 0 && !WindowBand.holdDock)
                 root.dockDone();
+        }
+    }
+    // the window band let the dock go: it leaves as it does when the pointer leaves it
+    Connections {
+        target: WindowBand
+        function onHoldDockChanged() {
+            if (!WindowBand.holdDock && root.dockMode && !dockHover.hovered)
+                dockLeaveTimer.restart();
         }
     }
     onDockModeChanged: {

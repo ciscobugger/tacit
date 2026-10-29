@@ -14,6 +14,14 @@ Singleton {
 
     // the menu while it is open: { address, monitor, x, y } (logical, on that monitor)
     property var menu: null
+    // the window held by the hand, its program, and where it is heading (none, close, hide, left, right)
+    property string dragAddress: ""
+    property string dragApp: ""
+    property string zone: "none"
+    // the dock up for the band: while a window is held over the bottom, and while one lands in its button
+    property bool holdDock: false
+    // the program whose button takes the window (PaletteDock lights it and says where it is)
+    property string dropInto: ""
     // the gestures the person has used (close, hide, side), kept across restarts: the hint stops once all are known
     property var used: ({})
     property real hintedAt: 0
@@ -39,6 +47,37 @@ Singleton {
     function addressOf(toplevel) {
         const a = Hyprland.toplevels.values.find(x => x.wayland === toplevel)?.address ?? "";
         return a.length === 0 || a.startsWith("0x") ? a : `0x${a}`;
+    }
+
+    function toplevelAt(address) {
+        const a = (address ?? "").replace(/^0x/, "");
+        return Hyprland.toplevels.values.find(t => (t.address ?? "").replace(/^0x/, "") === a) ?? null;
+    }
+    function screenOf(address) {
+        const name = root.toplevelAt(address)?.monitor?.name ?? Hyprland.focusedMonitor?.name ?? "";
+        return Quickshell.screens.find(s => s.name === name) ?? Quickshell.screens[0];
+    }
+    // where the held window goes, for the plugin's flight: the dock's button (on the dock's screen, from PaletteDock)
+    // or the notch's line
+    function reportHide(x, y, w, h) {
+        if (root.dragAddress.length === 0)
+            return;
+        const s = root.screenOf(root.dragAddress);
+        Quickshell.execDetached(["hyprctl", "tacitgrip", "target", root.dragAddress, "hide",
+                                 `${s.x + x}`, `${s.y + y}`, `${w}`, `${h}`]);
+    }
+    function reportClose() {
+        const s = root.screenOf(root.dragAddress);
+        Quickshell.execDetached(["hyprctl", "tacitgrip", "target", root.dragAddress, "close",
+                                 `${s.x + s.width / 2 - 110}`, `${s.y + 2}`, "220", "34"]);
+    }
+    Timer {
+        id: dockRetreat
+        interval: 1100
+        onTriggered: {
+            root.holdDock = false;
+            root.dropInto = "";
+        }
     }
 
     function nameFor(cls) {
@@ -84,11 +123,53 @@ Singleton {
                 return;
             const f = event.data.split(",");
             switch (f[0]) {
+            case "lift":
+                dockRetreat.stop();
+                root.dragAddress = f[1];
+                root.dragApp = root.toplevelAt(f[1])?.wayland?.appId ?? "";
+                root.zone = "none";
+                break;
+            case "zone":
+                root.zone = f[2] ?? "none";
+                if (root.zone === "hide") {
+                    root.dropInto = root.dragApp;
+                    root.holdDock = true;
+                } else {
+                    root.dropInto = "";
+                    root.holdDock = false;
+                }
+                if (root.zone === "close") {
+                    root.reportClose();
+                    const t = root.toplevelAt(f[1]);
+                    IslandController.request("window", {
+                        "text": `Close ${root.nameFor(t?.wayland?.appId ?? t?.lastIpcObject?.class ?? "")}`,
+                        "icon": "close",
+                        "hold": 60000,
+                        "prompt": true
+                    }, 65);
+                } else if (IslandController.transientState === "window" && IslandController.payload?.prompt) {
+                    IslandController.dismiss();
+                }
+                break;
+            case "drop":
+                // a window let go over the bottom flies into its button: the dock stays to take it (hidden, below)
+                if (root.zone !== "hide") {
+                    root.holdDock = false;
+                    root.dropInto = "";
+                } else {
+                    dockRetreat.restart();
+                }
+                if (root.zone !== "close" && IslandController.transientState === "window" && IslandController.payload?.prompt)
+                    IslandController.dismiss();
+                root.zone = "none";
+                root.dragAddress = "";
+                break;
             case "closed":
                 root.mark("close");
                 root.say(`${root.nameFor(f[2] ?? "")} closed`, "close", "Reopen", "reopen", f[1], 7000);
                 break;
             case "hidden":
+                dockRetreat.restart();
                 root.mark("hide");
                 root.say(`${root.nameFor(f[2] ?? "")} hidden`, "minimize", "Show", "reopen", f[1], 3500);
                 break;

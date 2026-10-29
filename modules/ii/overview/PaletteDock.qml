@@ -408,7 +408,19 @@ Item {
                 radius: root.tile / 2
                 // the program whose windows the peek shows is lit a step brighter: the pill and the tab read as one
                 readonly property bool peeked: root.peeking && root.shownEntry?.appId === pill.appId
-                readonly property bool hot: pill.dragging || pill.hovered && !pill.open
+                // the window band's window is heading for this button: it opens as the slot that takes it
+                readonly property bool bandTarget: WindowBand.dropInto.length > 0 && WindowBand.dropInto === pill.appId
+                onBandTargetChanged: if (pill.bandTarget) bandReport.restart()
+                Timer {
+                    id: bandReport
+                    // once the dock has risen, so the place is where it will be
+                    interval: 320
+                    onTriggered: {
+                        const p = pill.mapToItem(null, 0, 0);
+                        WindowBand.reportHide(p.x, p.y, pill.width, pill.height);
+                    }
+                }
+                readonly property bool hot: pill.dragging || pill.hovered && !pill.open || pill.bandTarget
                 readonly property bool lit: pill.open && (pill.here || pill.peeked)
                 readonly property color ink: pill.hot ? root.inkHot : pill.lit ? root.inkLit : pill.open ? root.inkOpen : root.inkClosed
                 // closed programs bare, open ones on the wash ("on"), a step brighter where you are or peeked; pointed
