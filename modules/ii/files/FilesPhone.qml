@@ -122,7 +122,7 @@ Item {
                     ink: "sec"
                     text: "Send files from this computer to your phone over Wi-Fi. This computer needs one more part for that. Setting it up asks for your password and brings the whole system up to date, so it can take a few minutes."
                 }
-                K.Slab { text: "Set up your phone"; tone: "default"; onPicked: PhoneLink.setupPhone() }
+                K.Slab { text: "Set up your phone"; tone: "default"; onActivated: PhoneLink.setupPhone() }
             }
             // getting it
             Column {
@@ -139,7 +139,7 @@ Item {
                 failure: PhoneLink.setup !== "cancelled"
                 text: PhoneLink.setupWords
                 action: "Try again"
-                onActed: PhoneLink.setupPhone()
+                onActivated: PhoneLink.setupPhone()
             }
             // the part is here but not running
             K.PageState {
