@@ -6,11 +6,33 @@ hl.monitor({
     scale = 1
 })
 
-hl.gesture({
-    fingers = 3,
-    direction = "swipe",
-    action = "move"
-})
+-- Three fingers do what the window band does, to the window under the pointer (Discord 2026-10-29: the band's line
+-- takes fiddling on a touchpad): up closes it into the notch, down hides it into the dock, left and right take that
+-- half. It acts once the fingers have travelled far enough; a short brush does nothing. (Three fingers moved the window
+-- before; the band's line still does.)
+local function bandSwipe(direction, verb)
+    local travelled = 0
+    hl.gesture({
+        fingers = 3,
+        direction = direction,
+        action = {
+            start = function() travelled = 0 end,
+            update = function(e)
+                local d = e.delta or {}
+                travelled = travelled + math.abs((direction == "up" or direction == "down") and (d.y or 0) or (d.x or 0))
+            end,
+            finish = function(e)
+                if not e.cancelled and travelled >= 120 then
+                    hl.dispatch(hl.dsp.exec_cmd("hyprctl tacitgrip " .. verb .. " active"))
+                end
+            end
+        }
+    })
+end
+bandSwipe("up", "close")
+bandSwipe("down", "hide")
+bandSwipe("left", "left")
+bandSwipe("right", "right")
 hl.gesture({
     fingers = 3,
     direction = "pinch",
