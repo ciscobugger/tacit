@@ -29,6 +29,18 @@ Item {
     // everything else is shown as polkit words it.
     readonly property var request: {
         const m = PolkitService.cleanMessage.match(/^Authentication is needed to run [`'](.+)[`'] as (the super user|user (.+))$/);
+        if (m && !m[3]) {
+            // Tacit's own installs (Apps, a part a feature needs: stored.py's pacman) in words, not the command line
+            // (Discord 2026-10-29: Set up your phone asked under "/usr/bin/env LC_ALL=C /usr/bin/stdbuf ... kdeconnect")
+            // (polkit shortens a long command in the middle: ".../usr/bin/stdbuf  ...  -Syu --noconfirm ...")
+            const pm = m[1].match(/^\/usr\/bin\/env LC_ALL=C \/usr\/bin\/stdbuf\b.*?\s(-[SR]\S*)(\s|$)/);
+            if (pm && /^-S/.test(pm[1]))
+                return { "title": Translation.tr("Install on this computer"), "words": true,
+                         "detail": pm[1].includes("u") ? Translation.tr("Adds what is needed and brings the system up to date")
+                                                       : Translation.tr("Adds what is needed") };
+            if (pm && /^-R/.test(pm[1]))
+                return { "title": Translation.tr("Remove from this computer"), "detail": "", "words": true };
+        }
         if (m)
             return { "title": m[3] ? Translation.tr("Run as %1").arg(m[3]) : Translation.tr("Run as administrator"), "detail": m[1] };
         return { "title": PolkitService.cleanMessage, "detail": "" };
@@ -174,7 +186,7 @@ Item {
                             visible: text.length > 0
                             text: root.request.detail
                             elide: Text.ElideMiddle
-                            font.family: Appearance.font.family.monospace
+                            font.family: root.request.words ? Appearance.font.family.main : Appearance.font.family.monospace
                             font.pixelSize: Appearance.font.pixelSize.smallie
                             color: Appearance.colors.colSubtext
                         }
