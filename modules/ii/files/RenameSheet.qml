@@ -156,12 +156,12 @@ Item {
         Row {
             spacing: 20
             // Rename waits while a name clashes or nothing changes (the kit's Slab has no unavailable look)
-            K.Slab { text: "Rename"; tone: "default"; enabled: sheet.clean; onPicked: sheet.go() }
+            K.Slab { text: "Rename"; tone: "default"; enabled: sheet.clean; onActivated: sheet.go() }
             K.WordAction {
                 anchors.verticalCenter: parent.verticalCenter
                 width: cancelWord.implicitWidth
                 text: "Cancel"
-                onPicked: sheet.close()
+                onActivated: sheet.close()
                 K.TacitText { id: cancelWord; visible: false; text: "Cancel" }
             }
         }

@@ -287,7 +287,7 @@ Item {
             anchors.rightMargin: Tacit.space.l + row.factWidths[0] + row.factWidths[1] + Tacit.space.s
             anchors.verticalCenter: parent.verticalCenter
             text: row.offer?.label ?? ""
-            onPicked: row.offerTaken(row.index)
+            onActivated: row.offerTaken(row.index)
         }
         MouseArea {
             anchors.fill: offerPill

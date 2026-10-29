@@ -270,7 +270,7 @@ Item {
                         text: face.slabAction?.label ?? ""
                         tone: "default"
                         // Open goes through the window, as Enter does: a folder opens here, a pick is a choice
-                        onPicked: face.slabAction.id === "open" ? face.open() : face.slabAction.run()
+                        onActivated: face.slabAction.id === "open" ? face.open() : face.slabAction.run()
                     }
                     Item { width: 1; height: face.slabAction ? 16 : 0 }
                     Repeater {
@@ -279,7 +279,7 @@ Item {
                             required property var modelData
                             width: face.side
                             text: modelData.label
-                            onPicked: modelData.run()
+                            onActivated: modelData.run()
                         }
                     }
                     K.WordAction {
@@ -287,7 +287,7 @@ Item {
                         visible: face.moreThere
                         width: face.side
                         text: "More…"
-                        onPicked: face.more(moreWord)
+                        onActivated: face.more(moreWord)
                     }
                     Item { width: 1; height: face.riskAction && (face.words.length > 0 || face.moreThere) ? 10 : 0 }
                     K.WordAction {
@@ -295,7 +295,7 @@ Item {
                         width: face.side
                         text: face.riskAction?.label ?? ""
                         risk: true
-                        onPicked: face.riskAction.run()
+                        onActivated: face.riskAction.run()
                     }
                 }
             }

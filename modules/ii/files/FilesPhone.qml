@@ -81,7 +81,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: wordsWidth
                     text: "Try again"
-                    onPicked: PhoneLink.retry(sr.s.n)
+                    onActivated: PhoneLink.retry(sr.s.n)
                 }
                 K.Progress {
                     visible: sr.s.state === "sending"
@@ -209,13 +209,13 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: page.waitingFiles.length > 0 ? "Connect and send" : "Connect"
                         tone: "default"
-                        onPicked: PhoneLink.connect()
+                        onActivated: PhoneLink.connect()
                     }
                     K.WordAction {
                         anchors.verticalCenter: parent.verticalCenter
                         width: wordsWidth
                         text: "Not now"
-                        onPicked: PhoneLink.notNow()
+                        onActivated: PhoneLink.notNow()
                     }
                 }
             }
@@ -251,7 +251,7 @@ Item {
                 visible: PhoneLink.usable && PhoneLink.paired
                 width: wordsWidth
                 text: "Forget this phone"
-                onPicked: PhoneLink.forget()
+                onActivated: PhoneLink.forget()
             }
         }
     }

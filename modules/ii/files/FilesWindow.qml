@@ -2805,7 +2805,7 @@ FloatingWindow {
                                 : win.gone.length > 0 ? (pageState.drive.length > 0 ? "Go to Home" : `Go to ${Files.placeName(win.gone)}`)
                                 : win.unreadable ? (win.historyIndex > 0 ? "Go back" : "Go to Home")
                                 : win.query.length > 0 ? "Search the folders inside" : win.filterActive && folderModel.total > 0 && win.shownCount === 0 ? "Clear the filter" : ""
-                            onActed: {
+                            onActivated: {
                                 if (win.gone.length > 0)
                                     win.go(pageState.drive.length > 0 ? win.home : win.gone);
                                 else if (win.unreadable)
@@ -2860,8 +2860,8 @@ FloatingWindow {
                                 elide: Text.ElideRight
                                 ink: "sec"
                             }
-                            K.Slab { anchors.verticalCenter: parent.verticalCenter; visible: win.activeJob !== null; text: "Stop"; onPicked: win.stopJob() }
-                            K.Slab { anchors.verticalCenter: parent.verticalCenter; visible: win.activeJob === null && win.undoJob.length > 0; text: "Undo"; onPicked: win.undo() }
+                            K.Slab { anchors.verticalCenter: parent.verticalCenter; visible: win.activeJob !== null; text: "Stop"; onActivated: win.stopJob() }
+                            K.Slab { anchors.verticalCenter: parent.verticalCenter; visible: win.activeJob === null && win.undoJob.length > 0; text: "Undo"; onActivated: win.undo() }
                         }
                     }
                 }

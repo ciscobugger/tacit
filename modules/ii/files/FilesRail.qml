@@ -229,7 +229,7 @@ Item {
                         symbol: "eject"
                         size: K.Kit.tokens.icon.rail
                         label: drive.modelData.usb ? "Eject, safe to pull" : "Unmount"
-                        onPressed: rail.eject(drive.modelData)
+                        onActivated: rail.eject(drive.modelData)
                         K.Tooltip { text: eject.label; shown: eject.hovered }
                     }
                 }
