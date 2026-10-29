@@ -122,7 +122,10 @@ Scope {
         Item {
             id: door
             width: Appearance.sizes.notificationPopupWidth
-            height: 60
+            // only the screen's very edge: the pointer stops there however far it is flung, and a window that reaches
+            // the top keeps its own buttons (60 px tall, it took the top-right buttons' hovers and clicks of every
+            // window filling the screen, and opened the empty centre over them; Discord 2026-10-29)
+            height: 3
             anchors.top: root.isTop ? parent.top : undefined
             anchors.bottom: root.isBottom ? parent.bottom : undefined
             anchors.right: root.isRight ? parent.right : undefined
