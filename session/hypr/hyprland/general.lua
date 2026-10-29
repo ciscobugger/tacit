@@ -91,7 +91,7 @@ hl.config({
             enabled = true,
             range = 20,
             offset = {0, 2},
-            render_power = 10,
+            render_power = 4,   -- Hyprland 0.57 refuses more than 4 (0.56 took 10 unchecked)
             color = "rgba(00000020)"
 
         },

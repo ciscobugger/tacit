@@ -35,7 +35,7 @@ hl.config({
             enabled = true,
             range = 18,
             offset = {0, 3},
-            render_power = 10
+            render_power = 4   -- Hyprland 0.57 refuses more than 4 (0.56 took 10 unchecked)
         }
     },
     gestures = {
@@ -116,4 +116,22 @@ hl.config({ decoration = { blur = { noise = 0.015 } } })     -- minimal grain, n
 
 -- Pointer: a macOS-style curve (2026-10-02). Slow moves are slower than 1:1 for precise landing, swipes go further;
 -- output speed = v * (0.6 + 1.6 * (v / 6)^1.2), v in 0.5 steps. Not in shellOverrides' generator, so set here.
-hl.config({ input = { accel_profile = "custom 0.5 0 0.341 0.786 1.355 2.056 2.899 3.889 5.033 6.334 7.798 9.428 11.228 13.2" } })
+-- Hyprland 0.57 checks input.accel_profile against adaptive/flat/custom and refuses a curve there (its own parser still
+-- reads one); a device's own setting is not checked, so each mouse and touchpad gets the curve as its own, at the start
+-- and when one is plugged in later. Hyprland before 0.57 (no hl.get_devices) takes it as it always did.
+local POINTER_CURVE = "custom 0.5 0 0.341 0.786 1.355 2.056 2.899 3.889 5.033 6.334 7.798 9.428 11.228 13.2"
+if hl.get_devices then
+    local curved = {}
+    local function curvePointers()
+        for _, d in ipairs(hl.get_devices()) do
+            if d.type == "pointer" and d.name and not curved[d.name] then
+                curved[d.name] = true
+                hl.device({ name = d.name, accel_profile = POINTER_CURVE })
+            end
+        end
+    end
+    hl.on("hyprland.start", curvePointers)
+    hl.timer(curvePointers, { timeout = 3000, type = "repeat" })
+else
+    hl.config({ input = { accel_profile = POINTER_CURVE } })
+end
