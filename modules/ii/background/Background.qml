@@ -157,7 +157,7 @@ Variants {
 
         screen: modelData
         exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Bottom
+        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Background
         WlrLayershell.namespace: "quickshell:background"
         WlrLayershell.keyboardFocus: GlobalStates.desktopWidgetKeyboardFocus
             ? WlrKeyboardFocus.OnDemand
