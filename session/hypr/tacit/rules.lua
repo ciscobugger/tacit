@@ -26,6 +26,8 @@ hl.layer_rule({ match = { namespace = "quickshell:island" },            blur = t
 -- no_anim: these three draw their own edge reveal (caelestia's model, see
 -- shell-fusion-motion-plan.md). Left on layersIn they would get Hyprland's popin on
 -- top of the shell's slide. The island keeps riding layersIn.
+-- The Desktop folder's tags are the notch's pills on the wallpaper: same frost, same threshold.
+hl.layer_rule({ match = { namespace = "quickshell:desktopIcons" },      blur = true, ignore_alpha = 0.64 })
 hl.layer_rule({ match = { namespace = "quickshell:overview" },          blur = true, ignore_alpha = 0.89, no_anim = true })
 hl.layer_rule({ match = { namespace = "quickshell:sidebarRight" },      blur = true, ignore_alpha = 0.64, no_anim = true })
 hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, blur = true, ignore_alpha = 0.64 })

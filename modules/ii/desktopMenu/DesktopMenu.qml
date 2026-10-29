@@ -250,6 +250,15 @@ Scope {
                     }
 
                     MenuRow {
+                        glyph: "desktop_windows"
+                        label: DesktopIcons.hidden ? "Show icons" : "Hide icons"
+                        onClicked: {
+                            GlobalStates.desktopMenuOpen = false
+                            DesktopIcons.setHidden(!DesktopIcons.hidden)
+                        }
+                    }
+
+                    MenuRow {
                         glyph: "stacks"
                         label: "Shelf"
                         hint: DropShelf.items.length > 0 ? String(DropShelf.items.length) : ""

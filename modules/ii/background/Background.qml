@@ -521,6 +521,7 @@ Variants {
                     interval: 1000
                     onTriggered: {
                         wallpaperDropArea.armed = true
+                        DesktopIcons.dropArmed = true
                         Wallpapers.startPreview(wallpaperDropArea.picture)
                     }
                 }
@@ -529,11 +530,14 @@ Variants {
                     if (wallpaperDropArea.armed)
                         Wallpapers.stopPreview()
                     wallpaperDropArea.armed = false
+                    DesktopIcons.dropArmed = false
+                    DesktopIcons.dropCount = 0
                     wallpaperDropArea.picture = ""
                 }
 
                 onEntered: (drag) => {
                     drag.accepted = drag.hasUrls
+                    DesktopIcons.dropCount = drag.hasUrls ? drag.urls.length : 0
                     const one = drag.hasUrls && drag.urls.length === 1
                         ? CF.FileUtils.trimFileProtocol(decodeURIComponent(drag.urls[0].toString())) : ""
                     const oneExt = one.split(".").pop().toLowerCase()
@@ -552,6 +556,9 @@ Variants {
                     }
                     if (wallpaperDropArea.armed) {
                         IslandController.wallpaperSet(wallpaperDropArea.picture)
+                    } else if (!DesktopIcons.hidden) {
+                        // files dropped on the desktop are put in the Desktop folder, where the tags show them
+                        DesktopIcons.put(drop.urls, drop.keyboardModifiers, drop.source !== null)
                     } else {
                         const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y)
                         DropShelf.show(drop.urls, globalPos.x, globalPos.y)
@@ -566,7 +573,9 @@ Variants {
                 Item {
                     id: dropOverlay
                     anchors.fill: parent
-                    visible: wallpaperDropArea.containsDrag
+                    // the tags' ghost says what letting go does; this frame is for a picture about to become the
+                    // wallpaper, and for a desktop with its icons hidden
+                    visible: wallpaperDropArea.containsDrag && (wallpaperDropArea.armed || DesktopIcons.hidden)
                     opacity: visible ? 1 : 0
                     Behavior on opacity {
                         NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
@@ -815,8 +824,12 @@ Variants {
                 id: desktopRightClickArea
                 anchors.fill: parent
                 z: -2
-                acceptedButtons: Qt.RightButton
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 onClicked: (mouse) => {
+                    if (mouse.button === Qt.LeftButton) {
+                        DesktopIcons.clear()
+                        return
+                    }
                     GlobalStates.desktopMenuScreen = bgRoot.screen
                     GlobalStates.desktopMenuX = mouse.x
                     GlobalStates.desktopMenuY = mouse.y
