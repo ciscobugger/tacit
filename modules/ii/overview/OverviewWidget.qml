@@ -9,6 +9,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import "SwitcherCaption.js" as SwitcherCaption
 
 /**
  * The workspace overview (Super+Tab): the notch grown wide, docked into the top edge, holding one
@@ -82,17 +83,15 @@ Item {
     property bool captioned: false
     onSwitchingChanged: if (root.switching) root.captioned = true
     readonly property real captionHeight: root.captioned ? 10 + 18 : 0
-    property string choiceTitle: ""
-    property string choiceApp: ""
+    property string choiceCaption: ""
     property rect ringRect: Qt.rect(0, 0, 0, 0)
     readonly property var choiceData: root.windowByAddress[root.choiceAddress] ?? null
     onChoiceDataChanged: {
         if (!root.choiceData)
             return;
-        root.choiceTitle = root.choiceData.title ?? "";
         const cls = root.choiceData.class ?? "";
         const e = DesktopEntries.byId(cls) ?? DesktopEntries.heuristicLookup(cls);
-        root.choiceApp = e?.name || (cls.length > 0 ? cls.charAt(0).toUpperCase() + cls.slice(1) : "");
+        root.choiceCaption = SwitcherCaption.caption(root.choiceData.title, cls, e?.name ?? "");
     }
 
     property int draggingFromWorkspace: -1
@@ -430,17 +429,12 @@ Item {
                     y: windowSpace.y + root.workspaceImplicitHeight + 10
                     spacing: 0
                     StyledText {
-                        text: root.choiceTitle
+                        text: root.choiceCaption
                         font.pixelSize: Tacit.size.row
                         font.variableAxes: ({ "wght": Tacit.weight.medium, "wdth": 100 })
                         color: Tacit.inkMain
                         elide: Text.ElideRight
                         width: Math.min(implicitWidth, root.fullWidth * 0.6)
-                    }
-                    StyledText {
-                        text: root.choiceApp.length > 0 ? " · " + root.choiceApp : ""
-                        font.pixelSize: Tacit.size.row
-                        color: Tacit.inkMeta
                     }
                 }
             }
