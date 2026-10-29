@@ -966,6 +966,7 @@ Item {
             anchors.bottom: parent.bottom
             x: (frame.width - dock.implicitWidth) / 2
             maxWidth: root.dockMaxWidth
+            restOffset: (root.implicitHeight + 16) * root.offsetScale
             discX: disc.x - dock.x
             visible: root.travel < 1
             enabled: root.dockMode

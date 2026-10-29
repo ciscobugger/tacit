@@ -33,6 +33,9 @@ Item {
     id: root
 
     property real maxWidth: 880
+    // how far the dock still is from where it rests while it slides in (SearchWidget's slide), so the window band can
+    // name a button's place before the dock has arrived
+    property real restOffset: 0
     // where the disc stands, in this item's x: programs fade where it has passed over them
     property real discX: width
     // the peek, above the row (SearchWidget draws it)
@@ -411,7 +414,14 @@ Item {
                 readonly property bool peeked: root.peeking && root.shownEntry?.appId === pill.appId
                 // the window band's window is heading for this button: it opens as the slot that takes it
                 readonly property bool bandTarget: WindowBand.dropInto.length > 0 && WindowBand.dropInto === pill.appId
-                onBandTargetChanged: if (pill.bandTarget) bandReport.restart()
+                onBandTargetChanged: if (pill.bandTarget) pill.reportBand()
+                Component.onCompleted: if (pill.bandTarget) pill.reportBand()
+                // where it will rest, at once, and again once the dock has arrived
+                function reportBand() {
+                    const p = pill.mapToItem(null, 0, 0);
+                    WindowBand.reportHide(p.x, p.y - root.restOffset, pill.width, pill.height);
+                    bandReport.restart();
+                }
                 // the window has landed in it: the button takes it with a small swell, and settles
                 property bool taking: false
                 Connections {
