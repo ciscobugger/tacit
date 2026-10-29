@@ -113,10 +113,11 @@ Item {
     }
 
     function activate(app) {
-        // a window the window band hid comes back first (the last one hidden); held windows are never cycled through
+        // the windows the window band hid come back, all of them, each to its own place (the last one in front); held
+        // windows are never cycled through
         const hidden = app.toplevels.filter(t => WindowBand.heldAs(t) === "hidden");
         if (hidden.length > 0) {
-            WindowBand.command("reopen", WindowBand.addressOf(hidden[hidden.length - 1]));
+            WindowBand.reopenAll(hidden.map(t => WindowBand.addressOf(t)));
             root.opened();
             return;
         }
@@ -377,6 +378,22 @@ Item {
                 // the window band's window is heading for this button: it opens as the slot that takes it
                 readonly property bool bandTarget: WindowBand.dropInto.length > 0 && WindowBand.dropInto === pill.appId
                 onBandTargetChanged: if (pill.bandTarget) bandReport.restart()
+                // the window has landed in it: the button takes it with a small swell, and settles
+                property bool taking: false
+                Connections {
+                    target: WindowBand
+                    function onLanded(appId) {
+                        if (appId.length > 0 && appId === pill.appId) {
+                            pill.taking = true;
+                            takeEnd.restart();
+                        }
+                    }
+                }
+                Timer {
+                    id: takeEnd
+                    interval: 110
+                    onTriggered: pill.taking = false
+                }
                 Timer {
                     id: bandReport
                     // once the dock has risen, so the place is where it will be
@@ -394,7 +411,7 @@ Item {
                 color: pill.hot ? root.colSandWash : pill.lit ? root.colWashLit : pill.open ? root.colWash : "transparent"
                 opacity: pill.swept
                 // sunk a little while pressed
-                scale: (0.92 + 0.08 * pill.swept) * (pillArea.pressed ? 0.95 : 1)
+                scale: (0.92 + 0.08 * pill.swept) * (pillArea.pressed ? 0.95 : 1) * (pill.taking ? 1.08 : 1)
                 Behavior on scale { Anim { type: Anim.FastSpatial } }
                 z: pill.dragging ? 2 : 0
                 transform: Translate {
