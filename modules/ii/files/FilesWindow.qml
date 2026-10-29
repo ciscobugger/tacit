@@ -2749,6 +2749,10 @@ FloatingWindow {
                             property bool banding: false
                             readonly property var bar: win.searching ? hitBar : win.pictures ? pics.bar : win.view === "grid" ? gridBar : listBar
                             function onGround(x, y) {
+                                // the phone's page is not a folder: its buttons take their own presses (this area took
+                                // them, and Set up your phone never answered; Discord 2026-10-29)
+                                if (win.phoneShown)
+                                    return false;
                                 if (x >= ground.width - (ground.bar?.width ?? 0))
                                     return false;
                                 if (win.searching)
