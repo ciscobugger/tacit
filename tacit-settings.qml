@@ -4250,6 +4250,8 @@ ApplicationWindow {
         ColumnLayout {
             id: inputCol
             spacing: 0
+            // "shortcuts" opens the Shortcuts page in place of the groups, as the Notch page opens its sections
+            property string viewing: ""
             // The pointer runs on a custom curve (slow moves under 1:1, swipes faster), and libinput ignores the speed
             // setting under a custom curve, so a speed scales the curve itself: -1 halves it, +1 doubles it.
             function curve(speed) {
@@ -4286,6 +4288,7 @@ ApplicationWindow {
                 HyprlandConfig.setMany(entries);
             }
             Group {
+                visible: inputCol.viewing === ""
                 title: "Keyboard"
                 ChoiceRow {
                     id: layoutRow
@@ -4329,8 +4332,16 @@ ApplicationWindow {
                         HyprlandConfig.setMany({ "input:repeat_delay": o.delay, "input:repeat_rate": o.rate });
                     }
                 }
+                OpenRow {
+                    glyph: "keyboard"
+                    label: "Shortcuts"
+                    value: Object.keys(Shortcuts.changed).length + Shortcuts.apps.length > 0 ? "Some are yours" : ""
+                    description: "What each key combination does, and your own"
+                    onActivated: inputCol.viewing = "shortcuts"
+                }
             }
             Group {
+                visible: inputCol.viewing === ""
                 title: "Touchpad"
                 ChoiceRow {
                     label: "Scrolling"
@@ -4414,6 +4425,7 @@ ApplicationWindow {
                 }
             }
             Group {
+                visible: inputCol.viewing === ""
                 title: "Pointer"
                 // Hyprland's follow_mouse 0-3, each said by what it does (3 was "Only on click", the
                 // opposite of what it is: a click does not move the typing)
@@ -4463,6 +4475,7 @@ ApplicationWindow {
 
             // Flow reads words.txt at the start of every dictation, so an edit counts from the next.
             Group {
+                visible: inputCol.viewing === ""
                 title: "Dictation"
                 note: "Words Flow always spells exactly as written here: names, products, places."
                 ChoiceRow {
@@ -4533,6 +4546,16 @@ ApplicationWindow {
                         HyprlandConfig.set("input:repeat_rate", value);
                     }
                 }
+            }
+            BackLine {
+                visible: inputCol.viewing !== ""
+                text: "Keyboard & touchpad"
+                onClicked: inputCol.viewing = ""
+            }
+            Loader {
+                Layout.fillWidth: true
+                active: inputCol.viewing === "shortcuts"
+                sourceComponent: ShortcutsPage {}
             }
         }
     }
