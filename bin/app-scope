@@ -7,6 +7,10 @@
 # favour the app in front. Without a user manager the app starts plainly.
 id=$(printf '%s' "${1##*/}" | tr -c 'A-Za-z0-9_.' '_' | cut -c1-48)
 shift
-[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus" ] || exec "$@"
+# The app's output goes to the journal, never to whatever started the shell: an app that inherited a terminal kept
+# writing to it after the terminal closed, and Discord quit on the error ("write EIO", Discord 2026-10-29)
+out() { command -v systemd-cat >/dev/null && exec systemd-cat --identifier="${id:-app}" -- "$@" </dev/null; exec "$@" </dev/null >/dev/null 2>&1; }
+[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus" ] || out "$@"
+command -v systemd-cat >/dev/null && set -- systemd-cat --identifier="${id:-app}" -- "$@"
 exec systemd-run --user --scope --collect --quiet --slice=app-graphical.slice \
-    --unit="app-${id:-app}-$$" -- "$@"
+    --unit="app-${id:-app}-$$" -- "$@" </dev/null
