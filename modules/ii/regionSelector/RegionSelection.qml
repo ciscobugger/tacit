@@ -331,8 +331,11 @@ PanelWindow {
             id: imageDimensionCollector
             onStreamFinished: {
                 // The script measures the grim capture, so its boxes are in device pixels while
-                // everything drawn here is logical.
-                const detected = JSON.parse(imageDimensionCollector.text).map(region => {
+                // everything drawn here is logical. A finder that failed (OpenCV without its contrib part, as
+                // installs had until 2026-10-29) prints no list: no picture regions then, the rest works.
+                let found = [];
+                try { found = JSON.parse(imageDimensionCollector.text); } catch (e) { return; }
+                const detected = found.map(region => {
                     return {
                         at: [region.at[0] / root.monitorScale, region.at[1] / root.monitorScale],
                         size: [region.size[0] / root.monitorScale, region.size[1] / root.monitorScale],
