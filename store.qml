@@ -138,7 +138,9 @@ ApplicationWindow {
     }
     function act(a) { const st = stateOf(a); if (st === "installed") launch(a); else if (st === "get") get(a.pkg); }
     function loadHome() { homeFailed = false; homeProc.running = true; }
-    function refresh() { homeProc.running = true; if (page === "app" && appInfo) { appProc.pkg = appInfo.pkg; appProc.running = true; } }
+    // the search's answers too: they said Get after the app was in (the backend reads the installed list again)
+    function refresh() { homeProc.running = true; if (page === "app" && appInfo) { appProc.pkg = appInfo.pkg; appProc.running = true; }
+        if (found?.query && searchProc.running) searchProc.write(JSON.stringify({ op: "search", q: found.query }) + "\n"); }
     function runSearch(q) {
         query = q;
         const s = q.trim().toLowerCase();
