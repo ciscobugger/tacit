@@ -48,11 +48,16 @@ Singleton {
             if (root.link === object) root.link = null;
         }
     }
+    // every 2 s for the first 30 s unanswered, then every 10 s: a computer without Bluetooth has no
+    // agent, and each failed connect is a line in the shell's log, which is kept in memory
     Timer {
-        interval: 2000
+        id: knock
+        property int tries: 0
+        interval: knock.tries < 15 ? 2000 : 10000
         repeat: true
         running: !root.connected
-        onTriggered: root.gen++
+        onRunningChanged: if (!knock.running) knock.tries = 0
+        onTriggered: { knock.tries++; root.gen++; }
     }
 
     function receive(line: string): void {

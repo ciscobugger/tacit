@@ -209,10 +209,11 @@ Singleton {
     }
 
     // ---- the official roster: `claude agents --json` (about 150ms) every 5s. It carries the
-    // session's own name and status; hooks stay for instant transitions and the window.
+    // session's own name and status; hooks stay for instant transitions and the window. Without
+    // Claude Code installed nothing is started: a missing binary logged a failed start every poll.
     Process {
         id: rosterProc
-        command: ["claude", "agents", "--json"]
+        command: ["sh", "-c", "command -v claude >/dev/null && exec claude agents --json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let rows;

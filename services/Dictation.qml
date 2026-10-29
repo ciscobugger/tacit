@@ -81,10 +81,13 @@ Singleton {
     // failed; the start is what Host.qml does for agent-host. The knock stays at 2 s so a flowd
     // restarted by hand is picked up at once, and only the start is thinned out - it is a
     // subprocess, and `systemctl --user start` on a running unit does nothing anyway.
+    // After 30 s unanswered the knock is every 30 s: a computer without flowd (every install but the
+    // owner's) logged a failed connect every 2 s for good, into the shell's log in memory. A press
+    // of the key knocks fast again.
     Timer {
         id: retry
         property int tries: 0
-        interval: 2000
+        interval: retry.tries < 15 ? 2000 : 30000
         repeat: true
         running: !root.connected
         onTriggered: {
@@ -183,6 +186,7 @@ Singleton {
         if (GlobalStates.screenLocked) return;
         if (!root.connected) {
             IslandController.request("flowNote", { icon: "hearing_disabled", text: Voice.cant("Flow isn't running"), tone: "error" }, 90);
+            retry.tries = 0;
             return;
         }
         root.pressAt = Date.now();
