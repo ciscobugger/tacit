@@ -39,7 +39,6 @@ Item {
     property string wantPath: ""
     property var entries: []                  // [{ path, name, kind, size, at }]
     property int cur: 0                       // the framed file
-    property string asked: ""                 // the file the last open named, kept in the list even when the filters miss it
     property int landed: -1                   // the file the player and reader belong to
     property real pos: 0                      // the roll's place in files; = cur at rest
     property real settle: 0
@@ -174,12 +173,9 @@ Item {
             const p = entriesFor.get(i, "filePath") + "";
             list.push({ path: p, name: p.split("/").pop(), kind: Info.kindOf(p), size: entriesFor.get(i, "fileSize"), at: entriesFor.get(i, "fileModified") });
         }
-        // a file the filters miss is added in its place, and kept while it is the framed one (the folder reports
-        // its count again a moment later, and the list rebuilt without it showed the neighbour instead);
+        // a file the filters miss is added in its place, but only for the open that asked for it:
         // a framed file that has since been deleted or renamed is not kept as a ghost
-        let ghost = false;
-        if ((wantPath.length || keep === asked) && !list.some(e => e.path === keep) && keep.startsWith(folder + "/")) {
-            ghost = true;
+        if (wantPath.length && !list.some(e => e.path === keep) && keep.startsWith(folder + "/")) {
             const e = { path: keep, name: keep.split("/").pop(), kind: Info.kindOf(keep), size: -1, at: new Date() };
             let at = list.findIndex(x => x.name.toLowerCase() > e.name.toLowerCase());
             list.splice(at < 0 ? list.length : at, 0, e);
@@ -187,7 +183,6 @@ Item {
         const wasFirst = landed < 0;
         const found = list.findIndex(e => e.path === keep);
         const gone = found < 0 && !wasFirst && !wantPath.length && landed >= 0;   // the framed file went away
-        asked = ghost ? keep : "";   // kept only while the list lacks it; once the folder lists it, it is an ordinary file
         entries = list;
         const i = found >= 0 ? found : Math.max(0, Math.min(list.length - 1, cur));   // else its nearest neighbour
         const moved = wasFirst || i !== cur || gone;
@@ -486,12 +481,7 @@ Item {
         id: probe
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    const r = JSON.parse(text); const n = Object.assign({}, vw.probed); n[r.path] = r; vw.probed = n;
-                    // a video's shape comes only from the probe (turned by its rotation there); without this every
-                    // video was framed 16:9 and a vertical one sat in a landscape box over its own cropped poster
-                    if (r.w > 0 && r.h > 0 && vw.aspects[r.path] === undefined) vw.setAspectOf(r.path, r.w / r.h);
-                } catch (e) {}
+                try { const r = JSON.parse(text); const n = Object.assign({}, vw.probed); n[r.path] = r; vw.probed = n; } catch (e) {}
             }
         }
         onExited: vw.pump()
@@ -570,7 +560,6 @@ Item {
     function key(e) {
         const shift = (e.modifiers & Qt.ShiftModifier) !== 0, ctrl = (e.modifiers & Qt.ControlModifier) !== 0;
         showChrome();
-        if (openMenu.shown && openMenu.keys(e)) { e.accepted = true; return; }
         switch (e.key) {
         case Qt.Key_Left:
             if (shift && mediaOn) seekBy(-5000); else if (shift && kind === "pdf") { if (reader) reader.goTo(pdfPage - 1, true); } else step(-1);
@@ -598,9 +587,7 @@ Item {
         case Qt.Key_Slash: openSearch(); break;
         case Qt.Key_F: if (ctrl) openSearch(); break;
         case Qt.Key_N: if (reader && query.length) reader.next(shift ? -1 : 1); break;
-        case Qt.Key_C: if (ctrl && kind === "pdf" && reader && reader.hasSelection) reader.copy(); else if (ctrl) copyFile(); else cycleSubtitles(); break;
-        case Qt.Key_R: turn(); break;
-        case Qt.Key_O: if (entry) openWith(width - 14, 60); break;
+        case Qt.Key_C: if (ctrl && reader) reader.copy(); else if (!ctrl) cycleSubtitles(); break;
         case Qt.Key_A: cycleAudioTrack(); break;
         case Qt.Key_M: toggleMute(); break;
         case Qt.Key_BracketLeft: rate = Math.max(0.5, rate - 0.25); toast(rate + "×"); break;
@@ -1080,19 +1067,8 @@ Item {
         property bool shown: false
         property real menuX: 0
         property real menuY: 0
-        property int sel: -1                  // the row the keys are on
-        function open() { sel = apps.length > 0 && apps[0].file.length > 0 ? 0 : -1; shown = true; }
+        function open() { shown = true; }
         function close() { shown = false; }
-        function launch(a) { close(); Quickshell.execDetached(["gio", "launch", a.file, path]); }
-        // Up and Down move, Enter opens, Escape (handled with the other keys) closes
-        function keys(e) {
-            const n = apps.filter(a => a.file.length > 0).length;
-            if (e.key === Qt.Key_Down && n > 0) sel = (sel + 1) % n;
-            else if (e.key === Qt.Key_Up && n > 0) sel = (sel - 1 + n) % n;
-            else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && sel >= 0 && sel < n) launch(apps[sel]);
-            else return e.key !== Qt.Key_Escape;
-            return true;
-        }
         anchors.fill: parent
         z: 60
         opacity: shown ? 1 : 0
@@ -1116,14 +1092,13 @@ Item {
                     model: openMenu.apps
                     delegate: Item {
                         required property var modelData
-                        required property int index
                         width: 236
                         height: 34
                         Rectangle {
                             anchors.fill: parent
                             radius: Appearance.rounding.verysmall
                             color: pick.pressed ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.78)
-                                 : (pick.containsMouse || index === openMenu.sel) && modelData.file.length ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.90) : "transparent"
+                                 : pick.containsMouse && modelData.file.length ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.90) : "transparent"
                         }
                         readonly property string iconFile: modelData.icon.length > 0 ? Quickshell.iconPath(modelData.icon, true) : ""
                         IconImage {
@@ -1153,7 +1128,7 @@ Item {
                             hoverEnabled: true
                             enabled: modelData.file.length > 0
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: openMenu.launch(modelData)
+                            onClicked: { openMenu.close(); Quickshell.execDetached(["gio", "launch", modelData.file, openMenu.path]); }
                         }
                     }
                 }
@@ -1180,16 +1155,11 @@ Item {
             font.family: Appearance.font.family.main
             font.pixelSize: 18
             cursorDelegate: Rectangle { width: 1.5; color: vw.main }
-            onAccepted: { if (vw.lockedDoc && text.length) { lock.tried = true; vw.lockedDoc.password = text; } text = ""; }
+            onAccepted: { if (vw.lockedDoc) vw.lockedDoc.password = text; text = ""; }
             Keys.onEscapePressed: vw.forceActiveFocus()
         }
         Rectangle { y: 66; width: parent.width; height: 1; color: vw.hair }
-        // asked again after a try: that password was wrong
-        property bool tried: false
-        Connections { target: vw.lockedDoc; function onPasswordRequired() { if (lock.tried) lock.wrong = true; } }
-        property bool wrong: false
-        VT { y: 74; ink: lock.wrong ? 1 : 2; font.pixelSize: 13; text: lock.wrong ? "That password didn't open it. Try again." : "Type the password and press Enter." }
-        onShownChanged: { if (shown) pass.forceActiveFocus(); else { tried = false; wrong = false; } }
+        onShownChanged: if (shown) pass.forceActiveFocus()
     }
     VT {
         visible: vw.entries.length === 0

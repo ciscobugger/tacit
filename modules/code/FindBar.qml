@@ -33,14 +33,7 @@ Item {
     function close() { bar.visible = false; bar.replacing = false; bar.closed(); }
     function step(back) {
         if (!bar.doc) return;
-        if (bar.mode === "line") {
-            // a line that is not a number leaves the bar open with its range showing, rather than jumping to the top
-            const n = parseInt(needle.text);
-            if (isNaN(n) || n < 1) return;
-            bar.doc.goToLine(Math.min(n, bar.doc.lineTotal()));
-            bar.close();
-            return;
-        }
+        if (bar.mode === "line") { bar.doc.goToLine(parseInt(needle.text) || 0); bar.close(); return; }
         bar.doc.findNext(needle.text, back, bar.caseSensitive);
     }
 
@@ -85,12 +78,11 @@ Item {
         StyledText {
             id: count
             anchors { right: sensitive.left; rightMargin: 10; verticalCenter: parent.verticalCenter }
-            visible: bar.mode === "line" ? !!bar.doc : needle.text.length > 0
-            text: bar.mode === "line" ? `1 to ${bar.doc ? bar.doc.lineTotal() : 1}`
-                : bar.matches === 0 ? "No matches" : bar.matches === 1 ? "1 match" : `${bar.matches} matches`
+            visible: bar.mode === "find" && needle.text.length > 0
+            text: bar.matches === 0 ? "No matches" : bar.matches === 1 ? "1 match" : `${bar.matches} matches`
             font.pixelSize: 13
             font.family: Appearance.font.family.numbers
-            color: bar.mode === "find" && bar.matches === 0 ? Tacit.risk : Tacit.inkMeta
+            color: bar.matches === 0 ? Tacit.risk : Tacit.inkMeta
         }
         BarButton {
             id: sensitive
@@ -154,12 +146,6 @@ Item {
             clip: true
             onAccepted: if (bar.doc) bar.doc.replaceCurrent(needle.text, replacement.text, bar.caseSensitive)
             Keys.onEscapePressed: bar.close()
-            Keys.onPressed: event => {
-                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
-                    if (bar.doc && bar.matches > 0) bar.doc.replaceAll(needle.text, replacement.text, bar.caseSensitive);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Backtab) { needle.forceActiveFocus(); event.accepted = true; }
-            }
         }
         StyledText {
             anchors { left: swapGlyph.right; leftMargin: 8; verticalCenter: parent.verticalCenter }
@@ -222,6 +208,7 @@ Item {
         width: tbText.implicitWidth + 20
         height: 24
         radius: Appearance.rounding.full
+        opacity: tb.enabled ? 1 : 0.4
         color: tbArea.containsMouse && tb.enabled ? Appearance.colors.colLayer2Hover : Appearance.colors.colLayer1
         Behavior on color { ColorAnimation { duration: 80 } }
         StyledText {
@@ -229,7 +216,7 @@ Item {
             anchors.centerIn: parent
             text: tb.label
             font.pixelSize: 13
-            color: tb.enabled ? Tacit.inkMain : Tacit.inkFaint
+            color: Tacit.inkMain
         }
         MouseArea {
             id: tbArea

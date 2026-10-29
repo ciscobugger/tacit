@@ -691,11 +691,11 @@ PanelWindow {
                 anchors.right: parent.right
                 spacing: 6
                 RecordPill {
-                    label: Translation.tr("Cancel")
+                    label: "Cancel"
                     onPicked: root.dismiss()
                 }
                 RecordPill {
-                    label: Translation.tr("Record")
+                    label: "Record"
                     glyph: "fiber_manual_record"
                     strong: true
                     onPicked: root.record()
@@ -719,7 +719,7 @@ PanelWindow {
                     const w = root.windowRegions.find(r => r.at[0] === root.targetedRegionX && r.at[1] === root.targetedRegionY);
                     const cls = w?.class ?? "";
                     const e = DesktopEntries.byId(cls) ?? DesktopEntries.heuristicLookup(cls);
-                    return Translation.tr("Record %1").arg(e?.name || cls || Translation.tr("this window"));
+                    return `Record ${e?.name || cls || "this window"}`;
                 }
                 onPicked: root.recordTargeted()
             }

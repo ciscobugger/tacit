@@ -176,7 +176,7 @@ Scope {
                             anchors.horizontalCenter: parent.horizontalCenter
                             implicitHeight: protectionMessageBackground.implicitHeight
                             implicitWidth: protectionMessageBackground.implicitWidth
-                            visible: root.protectionMessage !== ""
+                            opacity: root.protectionMessage !== "" ? 1 : 0
 
                             StyledRectangularShadow {
                                 target: protectionMessageBackground

@@ -199,9 +199,7 @@ Singleton {
                 root.entries = readProc.buffer
             } else {
                 root.entries = []
-                // a fresh or just-wiped history has no database yet and `list` exits 1 on it: empty, not broken
-                if (exitCode !== 1 || readProc.buffer.length > 0)
-                    console.error("[Cliphist] Failed to refresh with code", exitCode, "and status", exitStatus)
+                console.error("[Cliphist] Failed to refresh with code", exitCode, "and status", exitStatus)
             }
             if (root.refreshPending) {
                 root.refreshPending = false;

@@ -24,7 +24,7 @@ set_state() {
     # recording indicator keeps whatever it had - so it says "recording" when nothing is.
     if [[ ! -f "$STATE_FILE" ]] || ! jq "$@" "$filter" "$STATE_FILE" > "$tmp"; then
         rm -f "$tmp"
-        say "The notch may show the wrong thing for this recording: its note could not be updated."
+        say "Could not update $STATE_FILE, so the notch may be wrong about the recording."
         return 1
     fi
     mv "$tmp" "$STATE_FILE"
@@ -70,7 +70,7 @@ while (( $# > 0 )); do
     shift
 done
 
-mkdir -p "$RECORDING_DIR" || { say "The folder $RECORDING_DIR could not be made, so nothing was recorded."; exit 1; }
+mkdir -p "$RECORDING_DIR" || { say "Could not make $RECORDING_DIR."; exit 1; }
 
 WHERE=()
 if (( FULLSCREEN )); then
@@ -86,7 +86,7 @@ fi
 SOUND=()
 if [[ -n "$AUDIO" ]]; then
     if ! command -v pactl > /dev/null 2>&1; then
-        say "This recording has no sound: the sound system could not be reached."
+        say "pactl is not installed, so this recording has no sound."
     elif [[ "$AUDIO" == system ]]; then
         SOUND=(--audio="$(pactl get-default-sink).monitor")
     else
@@ -112,8 +112,7 @@ STOPPED=$(date +%s%3N)
 if [[ ! -s "$FILE" ]]; then
     rm -f "$FILE"
     set_state '.record.enable = false | .record.file = ""'
-    echo "wf-recorder exited with $code" >&2
-    say "The recording could not start. Try again, or pick another screen."
+    say "The recording could not start (wf-recorder exited with $code)."
     exit 1
 fi
 # the notch's card shows a still from the start; the old stills go

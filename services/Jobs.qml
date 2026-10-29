@@ -74,14 +74,11 @@ Singleton {
     // never seen running - and everything the window does afterwards (the status line, Undo, the
     // name field on a new folder) hangs off jobFinished.
     readonly property var startedHere: ({})
-    readonly property var startedOp: ({})
     // start("copy", ["keep", "/dest", "/a", "/b"]) -> id
     function start(op, args) {
         const id = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-        // through bash, so a runner that lost its executable bit still runs
-        Quickshell.execDetached(["setsid", "-f", "bash", root.runner, id, op].concat(args));
+        Quickshell.execDetached(["setsid", "-f", root.runner, id, op].concat(args));
         root.startedHere[id] = true;
-        root.startedOp[id] = op;
         root.watch(id);
         return id;
     }
@@ -121,17 +118,7 @@ Singleton {
             return;
         root.watchers[id] = watcherComp.createObject(root, { "id": id });
     }
-    // A job that never wrote its report: it did not start, or died first. Said as a failure, or the
-    // window shows nothing at all and the click looks dead.
-    function lost(id) {
-        const op = root.startedOp[id];
-        if (op && root.startedHere[id] === true)
-            root.absorb(id, JSON.stringify({ "id": id, "op": op, "dest": "", "state": "failed", "total": 1, "done": 0, "bytes": 0, "bytesDone": 0,
-                "current": "", "error": "Files lost track of it. Look in the folder to see if it went through", "started": Date.now(), "ended": Date.now(), "results": [], "undo": null }));
-        root.forget(id);
-    }
     function forget(id) {
-        delete root.startedOp[id];
         delete root.startedHere[id];
         const w = root.watchers[id];
         if (!w)
@@ -160,7 +147,7 @@ Singleton {
                     w.tries += 1;
                     if (w.tries > 40) {
                         console.warn(`[Jobs] no report from job ${w.id} after 6 s; stopped watching`);
-                        root.lost(w.id);
+                        root.forget(w.id);
                     } else {
                         retry.restart();
                     }

@@ -85,20 +85,6 @@ Scope {
         }
     }
 
-    // "Send to your phone…" with no phone connected yet: the newest window shows the phone's page (one is opened if none is)
-    Connections {
-        target: PhoneLink
-        function onPageRequested() {
-            let w = root.newestOpen();
-            if (!w) {
-                root.create(Files.home, "", "");
-                w = root.newest();
-            }
-            w.showPhone();
-            root.focus(w);
-        }
-    }
-
     function forget(w) {
         root.windows = root.windows.filter(x => x !== w);
     }

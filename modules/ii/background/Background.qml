@@ -157,7 +157,7 @@ Variants {
 
         screen: modelData
         exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Background
+        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:background"
         WlrLayershell.keyboardFocus: GlobalStates.desktopWidgetKeyboardFocus
             ? WlrKeyboardFocus.OnDemand
@@ -178,8 +178,8 @@ Variants {
         }
 
         Component.onCompleted: {
-            previousWallpaper.target = ""
-            wallpaper.target = bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
+            previousWallpaper.source = ""
+            wallpaper.source = bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
             bgRoot.currentWallpaperSource = bgRoot.wallpaperPath
             bgRoot.previousWallpaperSource = ""
             bgRoot.transitionProgress = 1.0
@@ -194,21 +194,21 @@ Variants {
         onWallpaperPathChanged: {
             bgRoot.videoRevealed = false
             if (wallpaperSafetyTriggered) {
-                previousWallpaper.target = ""
-                wallpaper.target = ""
+                previousWallpaper.source = ""
+                wallpaper.source = ""
                 bgRoot.transitionProgress = 1.0
                 return
             }
             if (bgRoot.wallpaperAnimation === "") {
-                wallpaper.target = wallpaperPath
+                wallpaper.source = wallpaperPath
                 bgRoot.currentWallpaperSource = wallpaperPath
                 if (!bgRoot.wallpaperIsVideo) return
                 bgRoot.videoRevealed = true
                 return
             }
 
-            previousWallpaper.target = bgRoot.currentWallpaperSource
-            wallpaper.target = wallpaperPath
+            previousWallpaper.source = bgRoot.currentWallpaperSource
+            wallpaper.source = wallpaperPath
             bgRoot.currentWallpaperSource = wallpaperPath
             if (bgRoot.wallpaperAnimation === "random") {
                 bgRoot.currentShader = bgRoot.shaderList[Math.floor(Math.random() * bgRoot.shaderList.length)]
@@ -220,7 +220,7 @@ Variants {
             // ago, or it was the wallpaper before): then no status change follows, the crossfade
             // never starts, and the OLD picture stays on screen for good while everything else
             // reports the new one. Start the transition here when the image is already loaded.
-            if (wallpaper.loaded)
+            if (wallpaper.status === Image.Ready)
                 transitionAnim.restart()
         }
 
@@ -228,14 +228,14 @@ Variants {
         // allocation limit) never reaches Image.Ready, so the crossfade would sit at 0 forever
         // with a full-screen shader on top of it. Keep what is on screen and say what failed.
         function abortWallpaperTransition(failedSource) {
-            const keep = String(previousWallpaper.target);
+            const keep = String(previousWallpaper.source);
             transitionAnim.stop();
             bgRoot.transitionProgress = 1.0;
             if (keep.length > 0) {
-                wallpaper.target = keep;
+                wallpaper.source = keep;
                 bgRoot.currentWallpaperSource = keep;
             }
-            previousWallpaper.target = "";
+            previousWallpaper.source = "";
             bgRoot.previousWallpaperSource = "";
             Wallpapers.reportUnloadable(CF.FileUtils.trimFileProtocol(String(failedSource)));
         }
@@ -247,7 +247,7 @@ Variants {
             interval: 5000
             running: bgRoot.wallpaperAnimation !== "" && bgRoot.transitionProgress < 1.0 && !transitionAnim.running
             onTriggered: {
-                previousWallpaper.target = "";
+                previousWallpaper.source = "";
                 bgRoot.transitionProgress = 1.0;
             }
         }
@@ -261,7 +261,7 @@ Variants {
             duration: 1200
             easing.type: Easing.InOutCubic
             onFinished: {
-                previousWallpaper.target = ""
+                previousWallpaper.source = ""
                 bgRoot.previousWallpaperSource = ""
                 bgRoot.transitionProgress = 1.0
                 bgRoot.videoRevealed = bgRoot.wallpaperIsVideo
@@ -296,24 +296,27 @@ Variants {
                 NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
             }
 
-            // The picture is decoded at the size that covers the panel's own pixels and cut to them
-            // (WallpaperImage): a high-megapixel picture never decodes at native size, and during a
-            // crossfade both copies are resident at once.
-            WallpaperImage {
+            Image {
                 id: previousWallpaper
                 anchors.fill: parent
+                fillMode: Image.PreserveAspectCrop
                 cache: true
                 mipmap: true
                 smooth: true
+                asynchronous: true
                 layer.enabled: true
-                opacity: 1
                 visible: false
-                view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
+                // PreserveAspectCrop can never show more than the panel's own pixels. Without
+                // this a high-megapixel picture decodes at native size, and during a crossfade
+                // both copies are resident at once.
+                sourceSize.width: bgRoot.screen.width * bgRoot.screen.devicePixelRatio
+                sourceSize.height: bgRoot.screen.height * bgRoot.screen.devicePixelRatio
             }
 
-            WallpaperImage {
+            StyledImage {
                 id: wallpaper
                 anchors.fill: parent
+                fillMode: Image.PreserveAspectCrop
                 cache: true
                 smooth: true
                 mipmap: true
@@ -321,12 +324,13 @@ Variants {
                 layer.enabled: blurLoader.active
                 visible: !blurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
-                view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
+                sourceSize.width: bgRoot.screen.width * bgRoot.screen.devicePixelRatio
+                sourceSize.height: bgRoot.screen.height * bgRoot.screen.devicePixelRatio
                 onStatusChanged: {
                     if (status === Image.Ready && bgRoot.transitionProgress === 0.0) {
                         transitionAnim.restart()
                     } else if (status === Image.Error) {
-                        bgRoot.abortWallpaperTransition(wallpaper.target)
+                        bgRoot.abortWallpaperTransition(wallpaper.source)
                     }
                 }
             }
@@ -521,7 +525,6 @@ Variants {
                     interval: 1000
                     onTriggered: {
                         wallpaperDropArea.armed = true
-                        DesktopIcons.dropArmed = true
                         Wallpapers.startPreview(wallpaperDropArea.picture)
                     }
                 }
@@ -530,14 +533,11 @@ Variants {
                     if (wallpaperDropArea.armed)
                         Wallpapers.stopPreview()
                     wallpaperDropArea.armed = false
-                    DesktopIcons.dropArmed = false
-                    DesktopIcons.dropCount = 0
                     wallpaperDropArea.picture = ""
                 }
 
                 onEntered: (drag) => {
                     drag.accepted = drag.hasUrls
-                    DesktopIcons.dropCount = drag.hasUrls ? drag.urls.length : 0
                     const one = drag.hasUrls && drag.urls.length === 1
                         ? CF.FileUtils.trimFileProtocol(decodeURIComponent(drag.urls[0].toString())) : ""
                     const oneExt = one.split(".").pop().toLowerCase()
@@ -556,9 +556,6 @@ Variants {
                     }
                     if (wallpaperDropArea.armed) {
                         IslandController.wallpaperSet(wallpaperDropArea.picture)
-                    } else if (!DesktopIcons.hidden) {
-                        // files dropped on the desktop are put in the Desktop folder, where the tags show them
-                        DesktopIcons.put(drop.urls, drop.keyboardModifiers, drop.source !== null)
                     } else {
                         const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y)
                         DropShelf.show(drop.urls, globalPos.x, globalPos.y)
@@ -573,9 +570,7 @@ Variants {
                 Item {
                     id: dropOverlay
                     anchors.fill: parent
-                    // the tags' ghost says what letting go does; this frame is for a picture about to become the
-                    // wallpaper, and for a desktop with its icons hidden
-                    visible: wallpaperDropArea.containsDrag && (wallpaperDropArea.armed || DesktopIcons.hidden)
+                    visible: wallpaperDropArea.containsDrag
                     opacity: visible ? 1 : 0
                     Behavior on opacity {
                         NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
@@ -824,12 +819,8 @@ Variants {
                 id: desktopRightClickArea
                 anchors.fill: parent
                 z: -2
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                acceptedButtons: Qt.RightButton
                 onClicked: (mouse) => {
-                    if (mouse.button === Qt.LeftButton) {
-                        DesktopIcons.clear()
-                        return
-                    }
                     GlobalStates.desktopMenuScreen = bgRoot.screen
                     GlobalStates.desktopMenuX = mouse.x
                     GlobalStates.desktopMenuY = mouse.y

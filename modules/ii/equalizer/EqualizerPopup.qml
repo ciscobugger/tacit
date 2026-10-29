@@ -108,9 +108,6 @@ Scope {
             implicitHeight: root.popupHeight
             color: "transparent"
             WlrLayershell.namespace: "quickshell:equalizer"
-            // Without this the layer takes no keys, so the sliders and Escape did nothing; same
-            // setting as the desktop menu and the overview.
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
             anchors {
                 top: true

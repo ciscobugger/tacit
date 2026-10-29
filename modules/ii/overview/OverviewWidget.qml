@@ -9,7 +9,6 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
-import "SwitcherCaption.js" as SwitcherCaption
 
 /**
  * The workspace overview (Super+Tab): the notch grown wide, docked into the top edge, holding one
@@ -75,25 +74,6 @@ Item {
     property real scale: root.workspaceImplicitWidth * monitor.scale / root.workWidth
     property real workspaceImplicitHeight: root.workHeight * root.scale / monitor.scale
 
-    // Alt+Tab: the same sheet, a choice ring on one window and its title under the cards. Set by Overview.qml.
-    property bool switching: false
-    property string choiceAddress: ""
-    // The caption's room stays once it has been shown, so the sheet does not change height while it shrinks back
-    // (switching is already off by then); reopen() and a new switching run set it again.
-    property bool captioned: false
-    onSwitchingChanged: if (root.switching) root.captioned = true
-    readonly property real captionHeight: root.captioned ? 10 + 18 : 0
-    property string choiceCaption: ""
-    property rect ringRect: Qt.rect(0, 0, 0, 0)
-    readonly property var choiceData: root.windowByAddress[root.choiceAddress] ?? null
-    onChoiceDataChanged: {
-        if (!root.choiceData)
-            return;
-        const cls = root.choiceData.class ?? "";
-        const e = DesktopEntries.byId(cls) ?? DesktopEntries.heuristicLookup(cls);
-        root.choiceCaption = SwitcherCaption.caption(root.choiceData.title, cls, e?.name ?? "");
-    }
-
     property int draggingFromWorkspace: -1
     property int draggingTargetWorkspace: -1
     property int windowZ: 1
@@ -102,7 +82,7 @@ Item {
     readonly property real cardsWidth: root.count * root.workspaceImplicitWidth + (root.count - 1) * root.cardGap
     readonly property real cardsTop: root.stripHeight + 10 + root.numeralHeight + root.numeralGap
     readonly property real fullWidth: root.cardsWidth + 2 * root.sidePadding
-    readonly property real fullHeight: root.cardsTop + root.workspaceImplicitHeight + root.captionHeight + root.bottomPadding
+    readonly property real fullHeight: root.cardsTop + root.workspaceImplicitHeight + root.bottomPadding
 
     // 0 is the closed notch, 1 the open sheet. The notch's open spring (IslandContent.qml
     // geometryCurve), so the sheet grows out of the notch and settles the way its own sheets do.
@@ -118,7 +98,6 @@ Item {
         root.openness = 0;
     }
     function reopen() {
-        root.captioned = root.switching;
         root.closing = false;
         root.openness = 1;
     }
@@ -131,10 +110,7 @@ Item {
             onRunningChanged: if (!running && root.closing && root.openness === 0) root.closed()
         }
     }
-    Component.onCompleted: {
-        root.captioned = root.switching;
-        root.openness = 1;
-    }
+    Component.onCompleted: root.openness = 1
 
     readonly property var closedGeometry: IslandController.geometryFor("idle")
 
@@ -321,14 +297,6 @@ Item {
                             property real xWithinWorkspaceWidget: Math.max((windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale, 0)
                             property real yWithinWorkspaceWidget: Math.max((windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale, 0)
 
-                            readonly property bool chosen: root.switching && window.address === root.choiceAddress
-                            Binding {
-                                target: root
-                                property: "ringRect"
-                                value: Qt.rect(window.x, window.y, window.width, window.height)
-                                when: window.chosen
-                            }
-
                             readonly property real tileRadius: Math.min(Appearance.rounding.verysmall, Math.min(targetWindowWidth, targetWindowHeight) / 4)
                             topLeftRadius: tileRadius
                             topRightRadius: tileRadius
@@ -399,42 +367,10 @@ Item {
                                 StyledToolTip {
                                     extraVisibleCondition: false
                                     alternativeVisibleCondition: dragArea.containsMouse && !window.Drag.active
-                                    text: windowData?.title ?? ""
+                                    text: `${windowData?.title}\n[${windowData?.class}] ${windowData?.xwayland ? "[XWayland] " : ""}`
                                 }
                             }
                         }
-                    }
-
-                    Rectangle { // The choice ring (Alt+Tab): the kit's focus ring, off the tile by its gap
-                        visible: root.switching && root.choiceData !== null
-                        x: root.ringRect.x - Tacit.state.focusGap
-                        y: root.ringRect.y - Tacit.state.focusGap
-                        width: root.ringRect.width + 2 * Tacit.state.focusGap
-                        height: root.ringRect.height + 2 * Tacit.state.focusGap
-                        radius: Math.min(Tacit.radius.row, Math.min(root.ringRect.width, root.ringRect.height) / 4) + Tacit.state.focusGap
-                        color: "transparent"
-                        border.width: Tacit.state.focusRing
-                        border.color: Tacit.accent
-                        z: root.windowDraggingZ + 1
-                        Behavior on x { animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this) }
-                        Behavior on y { animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this) }
-                        Behavior on width { animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this) }
-                        Behavior on height { animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this) }
-                    }
-                }
-
-                Row { // The chosen window in full, under the cards: the tiles carry no titles
-                    visible: root.captioned
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: windowSpace.y + root.workspaceImplicitHeight + 10
-                    spacing: 0
-                    StyledText {
-                        text: root.choiceCaption
-                        font.pixelSize: Tacit.size.row
-                        font.variableAxes: ({ "wght": Tacit.weight.medium, "wdth": 100 })
-                        color: Tacit.inkMain
-                        elide: Text.ElideRight
-                        width: Math.min(implicitWidth, root.fullWidth * 0.6)
                     }
                 }
             }

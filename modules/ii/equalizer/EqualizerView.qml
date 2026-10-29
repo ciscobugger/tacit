@@ -21,9 +21,6 @@ Item {
     property QtObject blendedColors: Appearance.colors
     signal closeRequested()
 
-    focus: true
-    Keys.onEscapePressed: root.closeRequested()
-
     // b1..b10 gains in dB, mirrors eq_state.json written by equalizer.sh
     property var bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     property string presetName: "Flat"
@@ -185,7 +182,7 @@ Item {
                     font.pixelSize: Appearance.font.pixelSize.small
                     color: root.blendedColors.colSubtext
                     elide: Text.ElideRight
-                    text: `${Translation.tr("Preset")}: ${Translation.tr(root.presetName)}`
+                    text: `${Translation.tr("Preset")}: ${root.presetName}`
                 }
             }
 

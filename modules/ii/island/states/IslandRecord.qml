@@ -52,13 +52,6 @@ Item {
     }
     // IslandContent hands its keys here while this sheet is up
     function keyPressed(event) {
-        if (root.mode === "saved" && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-            root.acted();
-            Files.reveal(root.file);
-            root.close();
-            event.accepted = true;
-            return;
-        }
         if (root.mode !== "choose")
             return;
         const at = root.choices.findIndex(c => c.what === root.pick);
@@ -68,8 +61,6 @@ Item {
             root.pick = root.choices[(at + 2) % 3].what;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             root.choose(root.pick);
-        } else if (event.key === Qt.Key_S) {
-            root.nextSound();
         } else {
             return;
         }
@@ -153,7 +144,7 @@ Item {
         visible: root.mode === "choose"
         anchors.horizontalCenter: parent.horizontalCenter
         y: 58
-        text: `Enter records ${root.pick === "screen" ? "the whole screen" : root.pick === "window" ? "a window" : "an area"} again · S changes the sound · Esc closes`
+        text: `Enter records ${root.pick === "screen" ? "the whole screen" : root.pick === "window" ? "a window" : "an area"} again · Esc closes`
         font.pixelSize: 13
         color: Tacit.inkFaint
     }

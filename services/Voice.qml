@@ -33,49 +33,6 @@ Singleton {
         return dt.getFullYear() === new Date(t).getFullYear() ? `${month} ${dt.getDate()}` : `${month} ${dt.getFullYear()}`;
     }
 
-    // whole days between at and now, by the calendar: 0 today, 1 yesterday
-    function daysAgo(at, now) {
-        const a = new Date(at), b = new Date(now ?? Date.now());
-        a.setHours(0, 0, 0, 0);
-        b.setHours(0, 0, 0, 0);
-        return Math.round((b.getTime() - a.getTime()) / 86400000);
-    }
-    readonly property var weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    readonly property var months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-
-    // "18:02"
-    function clock(at) {
-        return Qt.formatTime(new Date(at), "HH:mm");
-    }
-    // A time in a list of files: today the time, this week the day, before that the date.
-    // "18:02", "Yesterday", "Tuesday", "3 Oct", "3 Oct 2025"
-    function when(at, now) {
-        const d = new Date(at);
-        const days = root.daysAgo(at, now);
-        if (days <= 0)
-            return root.clock(at);
-        if (days === 1)
-            return "Yesterday";
-        if (days < 7)
-            return root.weekdays[d.getDay()];
-        const year = d.getFullYear() === new Date(now ?? Date.now()).getFullYear() ? "" : ` ${d.getFullYear()}`;
-        return `${d.getDate()} ${root.months[d.getMonth()].slice(0, 3)}${year}`;
-    }
-    // The heading over a day's files: "Today", "Yesterday", "Tuesday", then "Sunday 20 October" (with the year when
-    // it is not this one)
-    function day(at, now) {
-        const d = new Date(at);
-        const days = root.daysAgo(at, now);
-        if (days <= 0)
-            return "Today";
-        if (days === 1)
-            return "Yesterday";
-        if (days < 7)
-            return root.weekdays[d.getDay()];
-        const year = d.getFullYear() === new Date(now ?? Date.now()).getFullYear() ? "" : ` ${d.getFullYear()}`;
-        return `${root.weekdays[d.getDay()]} ${d.getDate()} ${root.months[d.getMonth()]}${year}`;
-    }
-
     // "188 kB", "2.1 MB", "1.2 GB"
     function size(bytes) {
         const b = Number(bytes) || 0;

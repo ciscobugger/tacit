@@ -1,6 +1,5 @@
 import qs.modules.common
 import qs.modules.common.functions
-import qs.modules.common.widgets
 import qs.services
 import QtQuick
 import Quickshell.Services.Notifications
@@ -11,8 +10,6 @@ RippleButton {
     id: button
     property string buttonText
     property string urgency
-    // What an icon-only button does, in words, on hover.
-    property string tip: ""
     readonly property real tone: urgency == NotificationUrgency.Critical ? 0.86 : 0.93
     implicitHeight: 30
     leftPadding: 12
@@ -20,10 +17,6 @@ RippleButton {
     buttonRadius: Appearance.rounding.full
     colBackground: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, tone)
     colBackgroundHover: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, tone - 0.05)
-    StyledToolTip {
-        text: button.tip
-        extraVisibleCondition: button.tip.length > 0
-    }
     contentItem: StyledText {
         horizontalAlignment: Text.AlignHCenter
         text: buttonText

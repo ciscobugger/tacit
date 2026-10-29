@@ -225,7 +225,6 @@ ApplicationWindow {
         Headline { text: parent.headline; alarm: parent.alarm }
         Gap { h: 10 }
         Sentence { visible: text !== ""; cause: parent.cause; rest: parent.rest }
-        Sentence { visible: facts.problem !== ""; rest: facts.problem; color: Ink.sand; topPadding: 8 }
         Gap { h: 22 }
         Gauge {
             visible: !!parent.gauge && parent.verbs.length === 0
@@ -330,7 +329,6 @@ ApplicationWindow {
                                     height: 24
                                     activeFocusOnTab: true
                                     Keys.onReturnPressed: facts.byProcessor = modelData.cpu
-                                    Keys.onSpacePressed: facts.byProcessor = modelData.cpu
                                     T {
                                         id: ut
                                         text: unit.modelData.t
@@ -543,7 +541,7 @@ ApplicationWindow {
                     readonly property var p: visible ? facts.batteryPage() : null
                     Head {
                         headline: batteryPage.p?.headline ?? "No battery."
-                        rest: batteryPage.p?.rest ?? "This computer has no battery to show."
+                        rest: batteryPage.p?.rest ?? ""
                         gauge: batteryPage.p ? { value: batteryPage.p.pct / 100, word: "", warn: batteryPage.p.pct <= 15 } : null
                     }
                     Gap { h: 26 }

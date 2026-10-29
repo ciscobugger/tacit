@@ -482,11 +482,11 @@ Singleton {
                 rawValue: entry,
                 name: entry.replace(/^\s*\S+\s+/, ""),
                 type: root.sectionTitles.emoji,
-                verb: Translation.tr("Insert"),
+                verb: Translation.tr("Copy"),
                 iconName: glyph,
                 iconType: LauncherSearchResult.IconType.Text,
                 execute: () => {
-                    Emojis.insert(glyph);
+                    Quickshell.clipboardText = glyph;
                 }
             });
         });

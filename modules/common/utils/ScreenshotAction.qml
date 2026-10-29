@@ -75,15 +75,9 @@ Singleton {
             case ScreenshotAction.Action.Search:
                 return ["bash", "-c", `${cropInPlace} && xdg-open "${root.imageSearchEngineBaseUrl}$(${uploadAndGetUrl(screenshotPath)})" && ${cleanup}`]
                 break;
-            case ScreenshotAction.Action.CharRecognition: {
-                // wl-copy with nothing to read empties the clipboard, so a region without text must not reach it
-                const shot = StringUtils.shellSingleQuoteEscape(screenshotPath);
-                const copied = Translation.tr("Text copied"), copiedBody = Translation.tr("Copied to the clipboard");
-                const none = Translation.tr("No text found"), noneBody = Translation.tr("Nothing was copied");
-                return ["bash", "-c", `${cropInPlace} && text=$(tesseract '${shot}' stdout -l $(tesseract --list-langs | awk 'NR>1{print $1}' | tr '\\n' '+' | sed 's/\\+$/\\n/') 2>/dev/null); `
-                    + `if [ -n "$(printf %s "$text" | tr -d '[:space:]')" ]; then printf %s "$text" | wl-copy && notify-send "${copied}" "${copiedBody}" -a "Screen Snip" -i "image-x-generic"; `
-                    + `else notify-send "${none}" "${noneBody}" -a "Screen Snip" -i "image-x-generic"; fi; ${cleanup}`]
-            }
+            case ScreenshotAction.Action.CharRecognition:
+                return ["bash", "-c", `${cropInPlace} && tesseract '${StringUtils.shellSingleQuoteEscape(screenshotPath)}' stdout -l $(tesseract --list-langs | awk 'NR>1{print $1}' | tr '\\n' '+' | sed 's/\\+$/\\n/') | wl-copy && ${cleanup}`]
+                break;
             case ScreenshotAction.Action.Record:
                 return ["bash", "-c", `${Directories.recordScriptPath} --region '${slurpRegion}'`]
                 break;

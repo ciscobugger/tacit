@@ -174,8 +174,7 @@ then `hyprctl reload`.
 | `Super` (tap) | command palette |
 | `Super + Space` | open the notch |
 | `Super + Shift + Space` | ask Claude in the notch |
-| `Super + I` | settings |
-| `Super + Escape` | session menu (lock, log out, restart, shut down) |
+| `Super + I` or `Super + Escape` | settings |
 | `Super + N` | control panel |
 | `Super + /` | every keybind |
 | `Super + E` | files |

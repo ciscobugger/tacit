@@ -595,10 +595,8 @@ ApplicationWindow {
     }
 
     // ── keys every editor has ───────────────────────────────────────────────
-    Shortcut { sequence: "Ctrl+S"; enabled: !root.covered; onActivated: if (root.cur) root.cur.save() }
-    // what draws over the editor: keys that act on the open file wait until it is gone
-    readonly property bool covered: root.picking || finder.visible || menu.visible
-    Shortcut { sequence: "Ctrl+W"; enabled: root.ask === null && !root.covered; onActivated: if (root.current >= 0) root.closeDoc(root.current) }
+    Shortcut { sequence: "Ctrl+S"; onActivated: if (root.cur) root.cur.save() }
+    Shortcut { sequence: "Ctrl+W"; enabled: root.ask === null; onActivated: if (root.current >= 0) root.closeDoc(root.current) }
     Shortcut { sequence: "Ctrl+B"; onActivated: { root.treeShown = !root.treeShown; root.refocus(); } }
     // Ctrl+Shift+T is "a terminal here" in Files and "reopen the closed tab" in most editors,
     // so the typing switch sits on a chord of its own.
@@ -611,9 +609,9 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+N"; enabled: project.root.length > 0 && root.ask === null; onActivated: root.startNew(root.here(), "folder") }
     Shortcut { sequence: "Ctrl+P"; enabled: project.root.length > 0; onActivated: finder.open("files") }
     Shortcut { sequence: "Ctrl+Shift+F"; enabled: project.root.length > 0; onActivated: finder.open("search") }
-    Shortcut { sequence: "Ctrl+F"; enabled: root.cur !== null && !root.covered; onActivated: find.open("find", root.cur.selection) }
-    Shortcut { sequence: "Ctrl+G"; enabled: root.cur !== null && !root.covered; onActivated: find.open("line", "") }
-    Shortcut { sequence: "F3"; enabled: root.cur !== null && !root.covered; onActivated: find.visible ? find.step(false) : find.open("find", root.cur.selection) }
+    Shortcut { sequence: "Ctrl+F"; enabled: root.cur !== null; onActivated: find.open("find", root.cur.selection) }
+    Shortcut { sequence: "Ctrl+G"; enabled: root.cur !== null; onActivated: find.open("line", "") }
+    Shortcut { sequence: "F3"; enabled: root.cur !== null; onActivated: find.visible ? find.step(false) : find.open("find", root.cur.selection) }
     Shortcut { sequence: "Shift+F3"; enabled: root.cur !== null; onActivated: if (find.visible) find.step(true) }
     // straight to a tab, however far the strip has scrolled
     function showTab(n) { if (n >= 0 && n < root.docs.length) root.show(n); }
@@ -846,7 +844,7 @@ ApplicationWindow {
                     StyledText {
                         anchors.centerIn: parent
                         visible: root.docs.length === 0
-                        text: project.loaded && project.files.length === 0 ? "This folder is empty. New file starts one (Ctrl+N)." : "Pick a file on the left."
+                        text: "Pick a file on the left."
                         font.pixelSize: 16
                         color: Tacit.inkMeta
                     }
@@ -949,8 +947,8 @@ ApplicationWindow {
                     StyledText {
                         id: position
                         anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter }
-                        text: root.cur && !root.cur.problem.length ? `Ln ${root.cur.line}, Col ${root.cur.column}`
-                            + (statusLine.narrow ? "" : `   ${root.cur.indentName}${root.cur.languageName ? "   " + root.cur.languageName : ""}`) : ""
+                        text: root.cur ? `Ln ${root.cur.line}, Col ${root.cur.column}`
+                            + (statusLine.narrow ? "" : `   ${root.cur.indentName}${root.cur.language ? "   " + root.cur.language : ""}`) : ""
                         font.pixelSize: 13
                         font.family: Appearance.font.family.numbers
                         color: Tacit.inkMeta

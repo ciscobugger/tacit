@@ -229,13 +229,10 @@ switch() {
             fi
             if [ ${#missing_deps[@]} -gt 0 ]; then
                 echo "Missing deps: ${missing_deps[*]}"
-                # said once: every try (and the timer that changes the picture) used to repeat it
-                told="$STATE_DIR/user/video-wallpaper-told"
-                if [ ! -e "$told" ]; then
-                    mkdir -p "$(dirname "$told")" && : > "$told"
-                    notify-send -a "Wallpaper" "Video wallpapers can't play yet" \
-                        "A part they need is missing on this computer, so the wallpaper stays as it was."
-                fi
+                echo "Arch: sudo pacman -S ${missing_deps[*]}"
+                # nothing is installed from here (kitty is not installed either)
+                notify-send -a "Wallpaper" "Needs ${missing_deps[*]}" \
+                    "A video wallpaper needs ${missing_deps[*]}: sudo pacman -S ${missing_deps[*]}"
                 exit 0
             fi
 

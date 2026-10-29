@@ -8,7 +8,6 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 import qs.modules.tacit
 import "Markdown.js" as Md
-import "Titles.js" as Titles
 
 /**
  * A session's conversation, laid out after OpenChamber's chat column in the shell's colours.
@@ -285,7 +284,7 @@ Item {
     signal restartHost()
     // ── the agent: Claude Code, Codex, pi or opencode ─────────────────────────
     readonly property string agent: conv.session?.tool || "claude"
-    readonly property var agentNames: ({ claude: "Claude Code", codex: "Codex", pi: "Pi", opencode: "OpenCode" })
+    readonly property var agentNames: ({ claude: "Claude Code", codex: "Codex", pi: "pi", opencode: "opencode" })
     readonly property string agentName: conv.agentNames[conv.agent] ?? conv.agent
     // what the host can do with this agent's sessions; a host older than protocol 5 reports none
     readonly property var caps: conv.live?.caps ?? conv.host.agents[conv.agent]?.caps
@@ -1461,7 +1460,7 @@ Item {
         StyledText {
             id: title
             anchors { left: parent.left; leftMargin: 24; right: conv.finding ? findBox.left : tools.left; rightMargin: 12; top: parent.top; topMargin: 12 }
-            text: conv.shownSession ? (conv.shownSession.fresh ? "New session" : Titles.of(conv.shownSession)) : ""
+            text: conv.shownSession ? (conv.shownSession.fresh ? "New session" : (conv.shownSession.title || conv.shownSession.lastPrompt || conv.shownSession.prompt || "Untitled").replace(/\s*<desktop-context>[\s\S]*$/, "")) : ""
             elide: Text.ElideRight
             font.pixelSize: 16
             font.weight: Font.DemiBold
@@ -2371,14 +2370,12 @@ Item {
             delegate: Loader {
                 id: ask
                 required property var modelData
-                required property int index
                 width: bottomArea.width
                 sourceComponent: ask.modelData.tool === "AskUserQuestion" ? questionCard : permissionCard
                 Component {
                     id: questionCard
                     QuestionCard {
                         pending: ask.modelData
-                        keys: ask.index === 0
                         // the conversation keeps the rest of the window
                         maxHeight: (conv.height - header.height) * 0.6
                         onAnswered: input => conv.answer({ op: "answer", id: conv.session.id, request: ask.modelData.request, allow: true, input: input })
@@ -2389,7 +2386,6 @@ Item {
                     id: permissionCard
                     PermissionCard {
                         pending: ask.modelData
-                        keys: ask.index === 0
                         onAnswered: (allow, permissions) => {
                             const req = { op: "answer", id: conv.session.id, request: ask.modelData.request, allow: allow };
                             if (permissions) req.permissions = permissions;

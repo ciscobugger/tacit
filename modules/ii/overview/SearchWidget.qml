@@ -541,19 +541,13 @@ Item {
     readonly property string emptyTitle: {
         const section = PaletteSearch.activeSection;
         if (section === "files" && !PaletteFiles.available)
-            return Translation.tr("File search is not available on this computer.");
+            return Translation.tr("File search needs fd installed.");
         if (section === "files" && PaletteFiles.failed)
             return Translation.tr("File search failed.");
         if (section === "calculator" && PaletteSearch.mathError)
             return Translation.tr("Not a valid expression.");
         if (PaletteSearch.busy)
             return Translation.tr("Still looking.");
-        // a kind chosen with nothing typed yet: say what to do, not what was not found for ""
-        if (section.length > 0 && root.emptyQuery.trim().length === 0 && section !== "clipboard") {
-            if (section === "windows")
-                return Translation.tr("No windows open.");
-            return Translation.tr("Type to search %1.").arg(PaletteSearch.activeSectionTitle);
-        }
         if (section === "clipboard" && Cliphist.entries.length === 0)
             return Translation.tr("Clipboard is empty.");
         if (section === "emoji")
@@ -966,7 +960,6 @@ Item {
             anchors.bottom: parent.bottom
             x: (frame.width - dock.implicitWidth) / 2
             maxWidth: root.dockMaxWidth
-            restOffset: (root.implicitHeight + 16) * root.offsetScale
             discX: disc.x - dock.x
             visible: root.travel < 1
             enabled: root.dockMode
@@ -1148,20 +1141,15 @@ Item {
                 Keys.onPressed: event => {
                     const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
                     const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
-                    const alt = (event.modifiers & Qt.AltModifier) !== 0;
                     if (root.dockKeys) {
                         if (event.key === Qt.Key_Escape)
                             GlobalStates.overviewOpen = false;
-                        else if (alt && (event.key === Qt.Key_Left || event.key === Qt.Key_Right))
-                            dock.moveFocusedBy(event.key === Qt.Key_Left ? -1 : 1);
-                        else if (ctrl && event.key === Qt.Key_P)
-                            dock.togglePinFocused();
                         else if (event.key === Qt.Key_Left || event.key === Qt.Key_Backtab)
                             dock.moveFocus(-1);
                         else if (event.key === Qt.Key_Right || event.key === Qt.Key_Tab)
                             dock.moveFocus(1);
                         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                            shift ? dock.launchFocused() : dock.openFocused();
+                            dock.openFocused();
                         else
                             return; // a letter: typed into the field, which starts the search
                         event.accepted = true;

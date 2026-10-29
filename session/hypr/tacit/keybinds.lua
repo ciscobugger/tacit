@@ -5,12 +5,12 @@ hl.bind("CTRL+SUPER+ALT+Slash", hl.dsp.exec_cmd("xdg-open ~/.config/hypr/custom/
 -- Appended to ~/.config/hypr/custom/keybinds.lua, loaded after hyprland/keybinds.lua.
 -- Shortcut names are the fork's CompositorGlobalShortcut names:
 --   quickshell:searchToggleRelease -> claimed by modules/ii/commandPalette/CommandPalette.qml
---   quickshell:sessionToggle       -> modules/ii/sessionScreen/SessionScreen.qml
+--   quickshell:settingsToggle      -> modules/ii/settings/Settings.qml
 
--- Super + Escape -> the session menu (lock, log out, restart, shut down). Nothing binds this
--- combination upstream (only CTRL + SHIFT + Escape, the task manager). Settings keeps Super + I.
-hl.bind("SUPER + Escape", hl.dsp.global("quickshell:sessionToggle"),
-    { description = "Shell: Session (lock, log out, power)" })
+-- Super + Escape -> shell settings. Nothing binds this combination upstream
+-- (only CTRL + SHIFT + Escape, the task manager), so there is nothing to displace.
+hl.bind("SUPER + Escape", hl.dsp.global("quickshell:settingsToggle"),
+    { description = "Shell: Settings" })
 
 -- Super (release) -> palette.
 --
@@ -66,13 +66,3 @@ hl.define_submap("flow", function()
     end, { description = "Flow: cancel" })
     hl.bind("SUPER + SHIFT + F23", hl.dsp.global("quickshell:flowHold"), { description = "Flow: hold to dictate" }) -- # [hidden] (the same key inside the flow submap)
 end)
-
--- Alt + Tab -> the window switcher: the workspace overview with a ring on the window you were in before; Tab and
--- Shift + Tab move it, letting go of Alt focuses it (modules/ii/overview/Overview.qml). Hyprland sees the keys before
--- any window, so the open overview does not need to hold them; the Alt release binds are the same kind as Super's above
--- (release, any modifier state, passed on) and do nothing in the shell unless a switch is going.
-hl.bind("ALT + Tab", hl.dsp.global("quickshell:altTabNext"), { description = "Shell: Switch windows" })
-hl.bind("ALT + SHIFT + Tab", hl.dsp.global("quickshell:altTabPrev"), { description = "Shell: Switch windows, back" })
-hl.bind("ALT + Escape", hl.dsp.global("quickshell:altTabCancel"), { description = "Shell: Leave the window switcher" })
-hl.bind("ALT_L", hl.dsp.global("quickshell:altTabRelease"), { ignore_mods = true, transparent = true, release = true })
-hl.bind("ALT_R", hl.dsp.global("quickshell:altTabRelease"), { ignore_mods = true, transparent = true, release = true })

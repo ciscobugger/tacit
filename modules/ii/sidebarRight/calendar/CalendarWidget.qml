@@ -6,15 +6,9 @@ import QtQuick
 import QtQuick.Layouts
 
 Item {
-    id: calendar
     // Layout.topMargin: 10
     anchors.topMargin: 10
     property int monthShift: 0
-    // The week strip: an optional one-row calendar (the current week alone) with an
-    // expand button in the header that unfolds the full month. Off by default, so the
-    // users that want the month straight away (Background) see it unchanged.
-    property bool expandable: false
-    property bool expanded: false
     // A new Date() inside the layout helpers is not a QML dependency, so the grid has to be
     // bound to the clock to survive midnight. Midnight of the clock's day, not the clock
     // itself: the grid depends on the day, not on every tick.
@@ -24,45 +18,23 @@ Item {
     }
     property var viewingDate: CalendarLayout.getDateInXMonthsTime(monthShift, today)
     property var calendarLayout: CalendarLayout.getCalendarLayout(viewingDate, monthShift === 0)
-    // The row of the grid that carries today: the week strip is that one row.
-    readonly property int todayRow: {
-        for (let r = 0; r < 6; r++)
-            for (let c = 0; c < 7; c++)
-                if (calendarLayout[r][c].today === 1)
-                    return r;
-        return 0;
-    }
     width: calendarColumn.width
     implicitHeight: calendarColumn.height + 10 * 2
-    // The fold: the week strip unfolds to the month and folds back with the
-    // emphasized curve; while it moves the surplus rows are clipped, so the same
-    // motion reads as unfolding, not as a jump.
-    clip: expandable
-    Behavior on implicitHeight {
-        enabled: calendar.expandable
-        Anim {
-            type: Anim.Emphasized
-        }
-    }
 
     MouseArea {
         anchors.fill: parent
         onWheel: (event) => {
-            if (!expandable || expanded) {
-                if (event.angleDelta.y > 0) {
-                    monthShift--;
-                } else if (event.angleDelta.y < 0) {
-                    monthShift++;
-                }
+            if (event.angleDelta.y > 0) {
+                monthShift--;
+            } else if (event.angleDelta.y < 0) {
+                monthShift++;
             }
         }
     }
 
     ColumnLayout {
         id: calendarColumn
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.topMargin: 10
+        anchors.centerIn: parent
         spacing: 5
 
         // Calendar header
@@ -82,7 +54,6 @@ Item {
                 Layout.fillHeight: false
             }
             CalendarHeaderButton {
-                visible: expanded || !expandable
                 forceCircle: true
                 downAction: () => {
                     monthShift--;
@@ -95,28 +66,12 @@ Item {
                 }
             }
             CalendarHeaderButton {
-                visible: expanded || !expandable
                 forceCircle: true
                 downAction: () => {
                     monthShift++;
                 }
                 contentItem: MaterialSymbol {
                     text: "chevron_right"
-                    iconSize: Appearance.font.pixelSize.larger
-                    horizontalAlignment: Text.AlignHCenter
-                    color: Appearance.colors.colOnLayer1
-                }
-            }
-            // The week strip's toggle: fold the month out, fold it back in.
-            CalendarHeaderButton {
-                visible: expandable
-                forceCircle: true
-                downAction: () => {
-                    monthShift = 0;
-                    expanded = !expanded;
-                }
-                contentItem: MaterialSymbol {
-                    text: expanded ? "expand_more" : "expand_less"
                     iconSize: Appearance.font.pixelSize.larger
                     horizontalAlignment: Text.AlignHCenter
                     color: Appearance.colors.colOnLayer1
@@ -141,23 +96,20 @@ Item {
             }
         }
 
-        // Real week rows: the whole month, or the strip's one row (the week carrying
-        // today). In the strip the week is the user's place, so a day that falls in
-        // another month keeps the ordinary ink — the week, not the month, is the unit.
+        // Real week rows
         Repeater {
             id: calendarRows
-            model: expanded || !expandable ? 6 : 1
+            // model: calendarLayout
+            model: 6
             delegate: RowLayout {
-                readonly property int row: expanded || !expandable ? modelData : calendar.todayRow
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillHeight: false
                 spacing: 5
                 Repeater {
-                    model: Array(7).fill(row)
+                    model: Array(7).fill(modelData)
                     delegate: CalendarDayButton {
                         day: calendarLayout[modelData][index].day
-                        isToday: expanded || !expandable ? calendarLayout[modelData][index].today
-                            : (calendarLayout[modelData][index].today === 1 ? 1 : 0)
+                        isToday: calendarLayout[modelData][index].today
                     }
                 }
             }

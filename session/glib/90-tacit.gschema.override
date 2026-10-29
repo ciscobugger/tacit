@@ -12,7 +12,3 @@ color-scheme='prefer-dark'
 font-antialiasing='grayscale'
 font-hinting='slight'
 font-rgba-order='rgb'
-
-# the same for apps that ask GSettings or the settings portal (GTK 4, libadwaita)
-[org.gnome.desktop.wm.preferences]
-button-layout=':'

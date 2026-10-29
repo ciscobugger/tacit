@@ -334,9 +334,3 @@ end
 if is_file_exists("/usr/lib/tacit/hyprland/tacit-share.so") then
     hl.plugin.load("/usr/lib/tacit/hyprland/tacit-share.so")
 end
-
--- The window band (tacit-boot's tacit-frame.so): the line above every window; up to the notch closes, down to the dock
--- hides, to a side takes that half, a right click opens the window's menu (the shell's WindowBand and WindowMenu)
-if is_file_exists("/usr/lib/tacit/hyprland/tacit-frame.so") then
-    hl.plugin.load("/usr/lib/tacit/hyprland/tacit-frame.so")
-end

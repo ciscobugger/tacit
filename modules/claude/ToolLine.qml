@@ -111,7 +111,7 @@ Item {
             weight: Font.Medium
             active: line.running
             rests: true
-            color: line.running ? Appearance.colors.colInkMain : Appearance.colors.colInkSecondary
+            opacity: line.running ? 1 : 0.85
         }
         StyledText {
             anchors { left: name.right; leftMargin: 8; right: trailing.left; rightMargin: 8; verticalCenter: parent.verticalCenter }

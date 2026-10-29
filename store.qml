@@ -53,7 +53,6 @@ ApplicationWindow {
     property string page: "discover"
     property var history: []
     property var home: null
-    property bool homeFailed: false
     property var job: null
     property var found: null
     property var appInfo: null
@@ -133,11 +132,9 @@ ApplicationWindow {
     function removeApp(pkg) {
         if (work) return;
         work = { pkg: pkg, kind: "remove", progress: 0.5, phase: "Removing" };
-        const o = Object.assign({}, outcome); delete o[pkg]; outcome = o;
         workProc.command = ["python3", "-I", backend, "remove", pkg]; workProc.running = true;
     }
     function act(a) { const st = stateOf(a); if (st === "installed") launch(a); else if (st === "get") get(a.pkg); }
-    function loadHome() { homeFailed = false; homeProc.running = true; }
     function refresh() { homeProc.running = true; if (page === "app" && appInfo) { appProc.pkg = appInfo.pkg; appProc.running = true; } }
     function runSearch(q) {
         query = q;
@@ -166,22 +163,18 @@ ApplicationWindow {
     }
     readonly property var outcomeWords: ({
         "cancelled": ["Not installed", "The password was not given, so nothing changed."],
-        "denied": ["Not installed", "The password was not accepted, so nothing changed."],
         "busy": ["Another update is running", "Try again when it has finished."],
         "offline": ["No internet connection", "Connect to the internet, then try again."],
         "space": ["Not enough space", "Free up some space, then try again."],
         "update": ["Needs a system update first", "This computer's list of apps is out of date, so this version is no longer on the server. Update everything, and it is got in the same step."],
         "failed": ["Couldn't install it", "Nothing was changed. Try again, or look again later."],
         "needed": ["Other apps use it", "It can't be removed while they need it."],
-        "r-cancelled": ["Not removed", "The password was not given, so nothing changed."],
-        "r-busy": ["Another update is running", "Try again when it has finished."],
-        "r-failed": ["Couldn't remove it", "Nothing was changed. Try again, or look again later."],
         "unavailable": ["Not made for this computer", "There is no version of it for this computer's processor."]
     })
 
     // ---- the backend
     Process { id: homeProc; running: true; command: ["python3", "-I", root.backend, "home"]
-        stdout: StdioCollector { onStreamFinished: { try { root.home = JSON.parse(text); root.homeFailed = false; } catch (e) { root.homeFailed = true; console.warn("store: home", e); } } } }
+        stdout: StdioCollector { onStreamFinished: { try { root.home = JSON.parse(text); } catch (e) { console.warn("store: home", e); } } } }
     Process { id: appProc; property string pkg: ""; command: ["python3", "-I", root.backend, "app", pkg]
         stdout: StdioCollector { onStreamFinished: { try { const j = JSON.parse(text); if (root.appInfo && j.pkg === root.appInfo.pkg) root.appInfo = j; } catch (e) { console.warn("store: app", e); } } } }
     Process { id: heroProc; property string pkg: ""; command: ["python3", "-I", root.backend, "app", pkg]
@@ -198,8 +191,7 @@ ApplicationWindow {
         stdout: SplitParser { onRead: line => { try {
             const r = JSON.parse(line);
             if (root.found && r.query === root.found.query) root.found = Object.assign({}, root.found, { apps: r.apps, done: true });
-        } catch (e) {} } }
-        onExited: if (root.found && !root.found.done) root.found = Object.assign({}, root.found, { done: true }) }
+        } catch (e) {} } } }
     Process { id: workProc
         stdout: SplitParser { onRead: line => {
             let msg = null; try { msg = JSON.parse(line); } catch (e) { return; }
@@ -209,23 +201,13 @@ ApplicationWindow {
                     // nothing went wrong: the app needs the waiting updates with it, so ask, here, where Get was pressed
                     root.askUpdate = Object.assign({ pkg: root.work.pkg, name: root.appOf(root.work.pkg)?.name ?? root.appInfo?.name ?? "" }, msg.plan);
                 } else {
-                    const o = Object.assign({}, root.outcome);
-                    o[root.work.pkg] = root.work.kind === "remove" && !["ok", "needed"].includes(msg.result) ? (["cancelled", "busy"].includes(msg.result) ? "r-" + msg.result : "r-failed") : msg.result;
-                    root.outcome = o;
+                    const o = Object.assign({}, root.outcome); o[root.work.pkg] = msg.result; root.outcome = o;
                     if (msg.result !== "ok" && root.work.kind === "install" && !(root.page === "app" && root.appInfo?.pkg === root.work.pkg)) root.openApp(root.work.pkg);
                 }
                 if (msg.result === "ok" && root.work.kind === "install") { root.justGot = root.work.pkg; tickTimer.restart(); }
             }
         } }
-        onExited: {
-            // the backend ended without saying how it went (it crashed): say so, rather than let the button quietly come back
-            const w = root.work;
-            if (w && root.outcome[w.pkg] === undefined && !(w.kind === "install" && root.justGot === w.pkg) && !root.askUpdate) {
-                const o = Object.assign({}, root.outcome); o[w.pkg] = w.kind === "remove" ? "r-failed" : "failed"; root.outcome = o;
-                if (w.kind === "install" && !(root.page === "app" && root.appInfo?.pkg === w.pkg)) root.openApp(w.pkg);
-            }
-            root.work = null; root.refresh();
-        } }
+        onExited: { root.work = null; root.refresh(); } }
     Timer { id: tickTimer; interval: 2600; onTriggered: root.justGot = "" }
 
     // ---- colour: the ground, the inks measured on it (APCA, as Appearance.inkFor), the raised tones, the page's own colour
@@ -892,16 +874,7 @@ ApplicationWindow {
                 Word { anchors.verticalCenter: parent.verticalCenter; text: "Not now"; ink: root.inkMain; onPicked: root.askUpdate = null }
             }
         }
-    }
-
-    // the front page is not here yet (first start), or could not be made
-    Column {
-        parent: canvas; z: 1; visible: !root.home && root.page === "discover"
-        anchors.horizontalCenter: parent.horizontalCenter; y: root.height * 0.42; spacing: 14
-        Body { anchors.horizontalCenter: parent.horizontalCenter; font.weight: Font.DemiBold
-            text: root.homeFailed ? "Couldn't load the apps" : "Getting the apps…" }
-        Small { visible: root.homeFailed; anchors.horizontalCenter: parent.horizontalCenter; text: "Nothing was changed. Try again in a moment." }
-        Word { visible: root.homeFailed; anchors.horizontalCenter: parent.horizontalCenter; text: "Try again"; glyph: "refresh"; ink: root.inkMain; onPicked: root.loadHome() }
+        Keys.onEscapePressed: root.askUpdate = null
     }
 
     // ---- what you can do: when the search opens with nothing typed, the page steps back and these stand in its light
@@ -936,9 +909,7 @@ ApplicationWindow {
         }
     }
     Shortcut { sequences: ["Ctrl+F", "Ctrl+K"]; onActivated: field.forceActiveFocus() }
-    Shortcut { sequence: "Escape"; enabled: !field.activeFocus; onActivated: { if (root.askUpdate) root.askUpdate = null; else root.back(); } }
-    Shortcut { sequences: ["Return", "Enter"]; enabled: !!root.askUpdate && !field.activeFocus
-        onActivated: { const pk = root.askUpdate.pkg; root.askUpdate = null; root.getEverything(pk); } }
+    Shortcut { sequence: "Escape"; enabled: !field.activeFocus; onActivated: root.back() }
 
     Component { id: coverC; CoverSpread {} }
     Component { id: splitC; SplitSpread {} }
@@ -1178,7 +1149,7 @@ ApplicationWindow {
                     Body { text: (root.outcomeWords[appPage.w] ?? ["", ""])[0]; font.weight: Font.DemiBold }
                     Small { text: (root.outcomeWords[appPage.w] ?? ["", ""])[1]; font.pixelSize: 16 }
                     Item { width: 1; height: 8 }
-                    Word { visible: ["cancelled", "denied", "busy", "offline", "failed"].includes(appPage.w); text: "Try again"; glyph: "refresh"; ink: root.inkMain; onPicked: root.get(appPage.a.pkg) }
+                    Word { visible: ["cancelled", "busy", "offline", "failed"].includes(appPage.w); text: "Try again"; glyph: "refresh"; ink: root.inkMain; onPicked: root.get(appPage.a.pkg) }
                 }
                 Item { width: 1; height: 44 }
                 Rectangle { width: root.cw; height: 1; color: root.inkMain; opacity: 0.1 }
@@ -1233,7 +1204,7 @@ ApplicationWindow {
                 x: root.m; width: root.cw
                 readonly property var list: (root.home?.installed ?? []).map(p => root.appOf(p)).filter(x => x)
                 PageHead { kicker: "On this computer"; title: "Your apps"
-                    line: !root.home ? "" : yoursPage.list.length ? "Apps from here that are on this computer. They update with Tacit's system updates." : "None yet. Apps you get here are listed here." }
+                    line: yoursPage.list.length ? "Apps from here that are on this computer. They update with Tacit's system updates." : "None yet. Apps you get here are listed here." }
                 Item { width: 1; height: 56 }
                 Repeater {
                     model: yoursPage.list

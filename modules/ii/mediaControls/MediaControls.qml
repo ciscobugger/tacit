@@ -208,7 +208,7 @@ Scope {
                             }
                             StyledText {
                                 color: Appearance.colors.colSubtext
-                                text: Translation.tr("Start music or a video in an app\nand it will show up here")
+                                text: Translation.tr("Make sure your player has MPRIS support\nor try turning off duplicate player filtering")
                                 font.pixelSize: Appearance.font.pixelSize.small
                             }
                         }

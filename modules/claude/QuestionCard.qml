@@ -1,5 +1,4 @@
 import QtQuick
-import QtQml
 import QtQuick.Controls
 import qs.modules.common
 import qs.modules.common.widgets
@@ -47,22 +46,6 @@ Rectangle {
     // still here well after the answer (it did not reach the host): it can be answered again
     Timer { running: card.sent; interval: 5000; onTriggered: card.sent = false }
     enabled: !card.sent
-
-    // keys for the card on top: the choices, Next and Skip were mouse-only (Alt+digit, as the composer
-    // is a text field and keeps the plain digits)
-    property bool keys: true
-    readonly property bool keyed: card.keys && card.visible && !card.sent
-    Instantiator {
-        model: 9
-        delegate: Shortcut {
-            required property int index
-            sequence: `Alt+${index + 1}`
-            enabled: card.keyed && index < (card.current.options ?? []).length
-            onActivated: card.toggle(card.current.question, card.current.options[index].label, card.multi)
-        }
-    }
-    Shortcut { sequences: ["Ctrl+Return", "Ctrl+Enter"]; enabled: card.keyed; onActivated: card.next() }
-    Shortcut { sequence: "Ctrl+Shift+Backspace"; enabled: card.keyed; onActivated: { card.sent = true; card.skipped(); } }
 
     function toggle(q, label, multi) {
         const p = Object.assign({}, card.picked);

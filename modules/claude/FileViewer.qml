@@ -184,7 +184,8 @@ Item {
                     text: index + 1
                     font.family: Appearance.font.family.monospace
                     font.pixelSize: 13
-                    color: Appearance.colors.colInkFaint
+                    color: Appearance.colors.colInkSecondary
+                    opacity: 0.5
                     Rectangle {
                         readonly property string kind: viewer.marks[index + 1] ?? ""
                         visible: kind.length > 0

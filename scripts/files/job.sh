@@ -58,20 +58,6 @@ write() {
 finish() { state=$1; ended=$(date +%s%3N); current=""; write; rm -f "$cancel"; exit 0; }
 cancelled() { [ -e "$cancel" ]; }
 
-# What went wrong, in words: "Could not delete a.txt" + the tool's complaint -> the reason when it is
-# one a person can act on. $1 is the sentence, $2 what the tool said.
-because() {
-    local r=""
-    case "$2" in
-    *"Permission denied"*|*"Operation not permitted"*) r="you are not allowed to change it here" ;;
-    *"Read-only file system"*) r="the disk is read-only" ;;
-    *"No space left"*) r="the disk is full" ;;
-    *"busy"*) r="it is in use" ;;
-    *"No such file"*) r="it is not there any more" ;;
-    esac
-    error="$1${r:+: $r}"
-}
-
 # "name", "name 2", "name 3" ... beside a file that is already there
 keep_name() {   # dir base -> free path
     local d=$1 b=$2 stem ext n=2
@@ -97,27 +83,17 @@ copy|move)
             case "$policy" in
             skip)    done_=$((done_+1)); continue ;;
             keep)    target=$(keep_name "$dest" "$name") ;;
-            replace)
-                # pasted onto itself: nothing to replace
-                if [ "$s" -ef "$target" ]; then done_=$((done_+1)); continue; fi
-                # A folder, or a file over a folder, replaces the old one whole: cp and mv would put the
-                # new one inside it ("dir/dir"). The old one goes to the trash first, so it can come back.
-                if [ -d "$target" ] || [ -d "$s" ]; then
-                    case "$target/" in "$s"/*) error="Could not replace $name: it holds the one being put there"; finish failed ;; esac
-                    case "$s/" in "$target"/*) error="Could not replace $name: it holds the one being put there"; finish failed ;; esac
-                    if ! out=$(gio trash -- "$target" 2>&1); then because "Could not replace $name" "$out"; finish failed; fi
-                fi ;;
+            replace) [ "$op" = move ] && [ -d "$target" ] && [ ! -d "$s" ] && rm -rf -- "$target" ;;
             esac
         fi
         # progress: the target growing, sampled while the copy runs
-        if [ "$op" = copy ]; then cp -a -- "$s" "$target" 2>"$report.err" & else mv -f -- "$s" "$target" 2>"$report.err" & fi
+        if [ "$op" = copy ]; then cp -a -- "$s" "$target" & else mv -f -- "$s" "$target" & fi
         pid=$!; before=$bytesDone
         while kill -0 "$pid" 2>/dev/null; do
             if cancelled; then kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; [ "$op" = copy ] && rm -rf -- "$target"; finish cancelled; fi
             cur=$(du -sb -- "$target" 2>/dev/null | cut -f1); bytesDone=$((before + ${cur:-0})); write; sleep 0.3
         done
-        if ! wait "$pid"; then because "Could not ${op} $name" "$(cat "$report.err" 2>/dev/null)"; rm -f "$report.err"; finish failed; fi
-        rm -f "$report.err"
+        if ! wait "$pid"; then error="Could not ${op} $name"; finish failed; fi
         cur=$(du -sb -- "$target" 2>/dev/null | cut -f1); bytesDone=$((before + ${cur:-0}))
         results+=("$target"); made+=("$target"); [ "$op" = move ] && moved_from+=("$s")
         done_=$((done_+1)); write
@@ -134,7 +110,7 @@ trash)
         current=$(basename -- "$s"); write
         if ! out=$(gio trash -- "$s" 2>&1); then
             # no trash on this filesystem (a stick, /tmp): the UI asks about deleting for good
-            case "$out" in *"not supported"*|*"trash"*"directory"*|*"Unable to find or create"*) error="no trash on this disk" ;; *) because "Could not move $(basename -- "$s") to the trash" "$out" ;; esac
+            case "$out" in *"not supported"*|*"trash"*"directory"*|*"Unable to find or create"*) error="no trash on this disk" ;; *) error="Could not move $(basename -- "$s") to the trash" ;; esac
             finish failed
         fi
         results+=("$s"); done_=$((done_+1)); write
@@ -165,7 +141,7 @@ restore)
 rename)
     src=$1; new=$2; total=1; dir_=$(dirname -- "$src"); target="$dir_/$new"; current=$new; write
     if [ -e "$target" ]; then error="$new is already here"; finish failed; fi
-    if ! out=$(mv -- "$src" "$target" 2>&1); then because "Could not rename" "$out"; finish failed; fi
+    if ! mv -- "$src" "$target"; then error="Could not rename"; finish failed; fi
     results+=("$target"); done_=1
     undo=$(jq -nc --arg from "$target" --arg to "$src" '{op:"move-back", from:[$from], to:[$to]}')
     finish done ;;
@@ -247,7 +223,7 @@ delete)
     tdir="${XDG_DATA_HOME:-$HOME/.local/share}/Trash"
     for s in "$@"; do
         current=$(basename -- "$s"); write
-        if ! out=$(rm -rf -- "$s" 2>&1); then because "Could not delete $(basename -- "$s")" "$out"; finish failed; fi
+        if ! rm -rf -- "$s"; then error="Could not delete $(basename -- "$s")"; finish failed; fi
         # "Delete for good" inside the trash: the record goes with the file, or a later "put back"
         # of a same-named file matches a record whose file is gone. Only the trash's own top level
         # has records; a file inside a trashed folder is covered by that folder's one.

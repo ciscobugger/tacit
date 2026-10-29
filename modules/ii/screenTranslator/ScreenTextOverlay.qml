@@ -21,6 +21,7 @@ Item {
     property color textColor: "white"
     required property string screenshotPath
 
+    readonly property string wikiLink: "https://ii.clsty.link/en/ii-qs/02usage/#setting-it-up" // TODO: write a page for this
     readonly property string textColorDetectionScriptPath: Quickshell.shellPath("scripts/images/text-color-venv.sh")
 
     property bool loading: true
@@ -34,21 +35,19 @@ Item {
 
     property bool error: false
     property string errorMessage: ""
-    // the key button is only the way forward when the key is what is wrong
-    property bool keyProblem: false
     function showError() {
         error = true;
     }
 
     Component.onCompleted: {
         if (GoogleCloud.tokenReady && GoogleCloud.tokenError) {
-            root.handleError("");
+            root.showError();
         }
         cloudVision.annotateImage(screenshotPath);
     }
 
     function reattemptAsNeeded() {
-        if (root.visionParagraphs.length === 0 && GoogleCloud.tokenReady && !GoogleCloud.tokenError) {
+        if (root.visionParagraphs == [] && GoogleCloud.tokenReady && !GoogleCloud.tokenError) {
             root.error = false;
             cloudVision.annotateImage(root.screenshotPath);
         }
@@ -121,9 +120,15 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 textFormat: Text.MarkdownText
                 wrapMode: Text.Wrap
-                text: `**${Translation.tr("Screen Translator")}**\n\n${root.errorMessage}\n\n${root.keyProblem ? Translation.tr("Paste your Google Cloud key with the key button below, or press Escape to close.") : Translation.tr("Press Escape to close.")}`
+                text: `**${Translation.tr("Screen Translator")}**\n\n${root.errorMessage}\n\n__[${Translation.tr("See setup instructions on the wiki")}](${root.wikiLink})__`
                 font.pixelSize: Appearance.font.pixelSize.small * root.scaleFactor
                 color: root.textColor
+                onLinkActivated: (link) => {
+                    Qt.openUrlExternally(link)
+                    GlobalStates.screenTranslatorOpen = false
+                }
+
+                PointingHandLinkHover {}
             }
         }
     }
@@ -133,7 +138,6 @@ Item {
     }
 
     function handleError(msg) {
-        root.keyProblem = !(msg?.length > 0);
         if (msg?.length > 0) root.errorMessage = msg;
         else root.errorMessage = Translation.tr("Set your Google Cloud service account key");
         root.showError();
@@ -147,13 +151,6 @@ Item {
         onFinished: {
             gcr.initializeWithData(outputData);
             root.visionParagraphs = gcr.coherentParagraphs;
-            if (root.visionParagraphs.length === 0) {
-                // translating nothing is an API error; say what is true instead
-                root.keyProblem = false;
-                root.errorMessage = Translation.tr("No text was found on this screen.");
-                root.showError();
-                return;
-            }
             // print(gcr.coherentParagraphs)
             root.translationKeys = gcr.coherentParagraphs.map(p => p.text);
             // print("TRANSLATION KEYS:", JSON.stringify(root.translationKeys));

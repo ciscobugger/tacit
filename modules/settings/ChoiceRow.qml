@@ -29,10 +29,8 @@ SettingRow {
     readonly property real inlineWidth: root.options.reduce((w, o) => w + optionMetrics.advanceWidth(String(o.label)) + 24 + ((o.glyph ?? "").length > 0 ? 21 : 0), 0)
     readonly property bool inline: !root.asList && root.options.length > 0 && root.options.length <= 4
         && root.inlineWidth <= root.width - 72
-    // the words under the question, the first on the labels' edge; a list too wide a neighbour for its label goes
-    // under it as well, the label keeps the row
-    readonly property bool crowded: !root.inline && root.width - root.edge - 20 - 16 - dropButton.implicitWidth < 160
-    stacked: root.inline || root.crowded
+    // the words under the question, the first on the labels' edge
+    stacked: root.inline
     readonly property var currentOption: root.options.find(o => o.value === root.current) ?? null
 
     // the whole row opens the list when it is a list, the way the button alone would
@@ -48,7 +46,7 @@ SettingRow {
     Keys.onRightPressed: if (root.inline) root.step(1)
 
     control: Item {
-        x: root.inline ? -12 : root.stacked ? -10 : 0
+        x: root.inline ? -12 : 0
         implicitWidth: root.inline ? inlineRow.implicitWidth : dropButton.implicitWidth
         implicitHeight: root.inline ? inlineRow.implicitHeight : dropButton.implicitHeight
 
@@ -148,7 +146,7 @@ SettingRow {
             Popup {
                 id: menu
                 y: dropButton.height + 4
-                x: root.stacked ? 0 : dropButton.width - width
+                x: dropButton.width - width
                 width: Math.max(dropButton.width, 240)
                 padding: 6
                 modal: false

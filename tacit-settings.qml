@@ -50,19 +50,7 @@ ApplicationWindow {
     property int current: 0
     // A page switch: the new page is built and laid out unseen (its rows settled over the first
     // frames, a flicker), then comes in from the top of the scroll, rising 6 px as it fades in.
-    onCurrentChanged: { root.revealPage(); Qt.callLater(root.revealInRail); }
-    // The open place stays in view in the rail: a page opened from outside (a link to About, Down
-    // from the search) used to light a row that was scrolled out of sight.
-    function revealInRail() {
-        const row = railRepeater.itemAt(root.current);
-        if (!row || !row.visible)
-            return;
-        const max = Math.max(0, railScroll.contentHeight - railScroll.height);
-        if (row.y < railScroll.contentY)
-            railScroll.contentY = Math.max(0, row.y);
-        else if (row.y + row.height > railScroll.contentY + railScroll.height)
-            railScroll.contentY = Math.min(max, row.y + row.height - railScroll.height + 4);
-    }
+    onCurrentChanged: root.revealPage()
     function revealPage() {
         pageScroll.contentY = 0;
         pageIn.stop();
@@ -278,21 +266,6 @@ ApplicationWindow {
             }
         }
 
-        // a search that finds no place says so, and how to get the places back
-        StyledText {
-            visible: root.query.trim().length > 0 && !root.categories.some(c => root.matches(c))
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: searchBox.bottom
-            anchors.leftMargin: 20
-            anchors.rightMargin: 20
-            anchors.topMargin: 20
-            text: `No setting is named "${root.query.trim()}". Clear the search to see them all.`
-            font.pixelSize: 15
-            color: Tacit.inkSec
-            wrapMode: Text.Wrap
-        }
-
         Flickable {
             id: railScroll
             anchors.left: parent.left
@@ -313,7 +286,6 @@ ApplicationWindow {
                 spacing: 2
 
                 Repeater {
-                    id: railRepeater
                     model: root.categories
                     Column {
                         id: catRow
@@ -390,9 +362,6 @@ ApplicationWindow {
         ColumnLayout {
             id: pageColumn
             transform: Translate { id: pageRise }
-            // Escape from anywhere in the page closes Settings, as it does from the search; a row
-            // that uses Escape itself (a field, a menu) takes it first
-            Keys.onEscapePressed: root.close()
             // up to 1000 wide (Windows Settings' content width), in the middle of the room beside the
             // rail (left-aligned read as lopsided full screen)
             x: Math.max(16, Math.floor((pageScroll.width - width) / 2))
@@ -1510,7 +1479,7 @@ ApplicationWindow {
                 EyeRow {
                     glyph: "smart_toy"
                     label: "Agents and long jobs"
-                    description: "An agent session or a build at work, waiting for you, or done"
+                    description: "A Claude session or a build at work, waiting for you, or done"
                     checked: Config.options.island.states.activity
                     onToggled: value => Config.options.island.states.activity = value
                 }
@@ -1521,7 +1490,7 @@ ApplicationWindow {
             Group {
                 visible: nt.viewing === "reminders"
                 title: "Reminders"
-                note: "The folders your agent works in are always watched. Pull request reminders only work when GitHub is signed in on this computer."
+                note: "Claude sessions' folders are always watched. Pull request reminders only work when GitHub is signed in on this computer."
                 Repeater {
                     model: Config.options.island.unsavedRepos
                     SettingRow {
@@ -2008,7 +1977,6 @@ ApplicationWindow {
 
             Group {
                 title: "Sound comes out of"
-                note: Audio.outputDevices.length > 0 ? "" : "No speakers or headphones were found. Plug some in, or connect them on the Bluetooth page."
                 Repeater {
                     model: Audio.outputDevices
                     SettingRow {
@@ -2032,7 +2000,6 @@ ApplicationWindow {
             }
             Group {
                 title: "Sound goes in through"
-                note: Audio.inputDevices.length > 0 ? "" : "No microphone was found. Plug one in, or connect one on the Bluetooth page."
                 Repeater {
                     model: Audio.inputDevices
                     SettingRow {
@@ -2565,8 +2532,8 @@ ApplicationWindow {
                         { key: "settings", label: "Settings", glyph: "settings" },
                         { key: "keybinds", label: "Keyboard shortcuts", glyph: "keyboard" },
                         { key: "flow", label: "Past dictations", glyph: "mic" },
-                        { key: "claude", label: "Your agent", glyph: "chat" },
-                        { key: "command", label: "Run a command", glyph: "terminal" },
+                        { key: "claude", label: "Claude", glyph: "chat" },
+                        { key: "command", label: "Shell commands", glyph: "terminal" },
                         { key: "web", label: "Web search", glyph: "public" }
                     ]
                     EyeRow {
@@ -2623,7 +2590,7 @@ ApplicationWindow {
                 FieldRow { label: "Search the clipboard with"; compact: true; text: Config.options.search.prefix.clipboard; onCommitted: value => Config.options.search.prefix.clipboard = value }
                 FieldRow { label: "Search emoji with"; compact: true; text: Config.options.search.prefix.emojis; onCommitted: value => Config.options.search.prefix.emojis = value }
                 FieldRow { label: "Search keyboard shortcuts with"; compact: true; text: Config.options.search.prefix.keybinds; onCommitted: value => Config.options.search.prefix.keybinds = value }
-                FieldRow { label: "Run a command with"; compact: true; text: Config.options.search.prefix.shellCommand; onCommitted: value => Config.options.search.prefix.shellCommand = value }
+                FieldRow { label: "Run a shell command with"; compact: true; text: Config.options.search.prefix.shellCommand; onCommitted: value => Config.options.search.prefix.shellCommand = value }
                 FieldRow { label: "Search the web with"; compact: true; text: Config.options.search.prefix.webSearch; onCommitted: value => Config.options.search.prefix.webSearch = value }
             }
         }
@@ -3962,7 +3929,6 @@ ApplicationWindow {
             }
             Group {
                 title: "Screen"
-                note: dp.screens.length === 0 && dp.brightness < 0 ? "Tacit could not read your screens. Reopen Settings to try again." : ""
                 SettingRow {
                     visible: dp.brightness >= 0
                     clickable: false
@@ -4213,7 +4179,7 @@ ApplicationWindow {
             }
             Group {
                 title: "When you step away"
-                note: Object.keys(root.idleTimes).length > 0 ? "" : "No time is set for locking or sleeping, so nothing happens when you step away."
+                note: Object.keys(root.idleTimes).length > 0 ? "" : "Nothing is set to happen: hypridle has no timers."
                 ChoiceRow {
                     visible: root.idleTimes.lock !== undefined
                     glyph: "lock_clock"
@@ -4250,8 +4216,6 @@ ApplicationWindow {
         ColumnLayout {
             id: inputCol
             spacing: 0
-            // "shortcuts" opens the Shortcuts page in place of the groups, as the Notch page opens its sections
-            property string viewing: ""
             // The pointer runs on a custom curve (slow moves under 1:1, swipes faster), and libinput ignores the speed
             // setting under a custom curve, so a speed scales the curve itself: -1 halves it, +1 doubles it.
             function curve(speed) {
@@ -4288,7 +4252,6 @@ ApplicationWindow {
                 HyprlandConfig.setMany(entries);
             }
             Group {
-                visible: inputCol.viewing === ""
                 title: "Keyboard"
                 ChoiceRow {
                     id: layoutRow
@@ -4332,16 +4295,8 @@ ApplicationWindow {
                         HyprlandConfig.setMany({ "input:repeat_delay": o.delay, "input:repeat_rate": o.rate });
                     }
                 }
-                OpenRow {
-                    glyph: "keyboard"
-                    label: "Shortcuts"
-                    value: Object.keys(Shortcuts.changed).length + Shortcuts.apps.length > 0 ? "Some are yours" : ""
-                    description: "What each key combination does, and your own"
-                    onActivated: inputCol.viewing = "shortcuts"
-                }
             }
             Group {
-                visible: inputCol.viewing === ""
                 title: "Touchpad"
                 ChoiceRow {
                     label: "Scrolling"
@@ -4425,7 +4380,6 @@ ApplicationWindow {
                 }
             }
             Group {
-                visible: inputCol.viewing === ""
                 title: "Pointer"
                 // Hyprland's follow_mouse 0-3, each said by what it does (3 was "Only on click", the
                 // opposite of what it is: a click does not move the typing)
@@ -4475,7 +4429,6 @@ ApplicationWindow {
 
             // Flow reads words.txt at the start of every dictation, so an edit counts from the next.
             Group {
-                visible: inputCol.viewing === ""
                 title: "Dictation"
                 note: "Words Flow always spells exactly as written here: names, products, places."
                 ChoiceRow {
@@ -4546,16 +4499,6 @@ ApplicationWindow {
                         HyprlandConfig.set("input:repeat_rate", value);
                     }
                 }
-            }
-            BackLine {
-                visible: inputCol.viewing !== ""
-                text: "Keyboard & touchpad"
-                onClicked: inputCol.viewing = ""
-            }
-            Loader {
-                Layout.fillWidth: true
-                active: inputCol.viewing === "shortcuts"
-                sourceComponent: ShortcutsPage {}
             }
         }
     }
@@ -4752,7 +4695,7 @@ ApplicationWindow {
                 SettingRow { visible: about.model.length > 0; clickable: false; glyph: "computer"; label: "Model"; control: StyledText { text: about.model; color: Tacit.inkMeta; font.pixelSize: 15 } }
                 SettingRow { visible: SystemInfo.cpu.length > 0; clickable: false; glyph: "memory"; label: "Processor"; control: StyledText { text: about.cores > 0 ? `${SystemInfo.cpu} · ${about.cores} cores` : SystemInfo.cpu; color: Tacit.inkMeta; font.pixelSize: 15 } }
                 SettingRow { visible: SystemInfo.gpu.length > 0; clickable: false; glyph: "developer_board"; label: "Graphics"; control: StyledText { text: SystemInfo.gpu; color: Tacit.inkMeta; font.pixelSize: 15 } }
-                SettingRow { visible: about.memoryKb > 0; clickable: false; glyph: "memory_alt"; label: "Memory"; control: StyledText { text: `${Math.ceil(about.memoryKb / 1048576)} GB`; color: Tacit.inkMeta; font.pixelSize: 15 } }
+                SettingRow { visible: about.memoryKb > 0; clickable: false; glyph: "memory_alt"; label: "Memory"; control: StyledText { text: `${Math.ceil(about.memoryKb / 1048576)} GB`; color: Tacit.inkMeta; font.pixelSize: 13 } }
                 SettingRow { visible: about.diskSize > 0; clickable: false; glyph: "hard_drive"; label: "Storage"; control: StyledText { text: `${about.gb(about.diskFree)} free of ${about.gb(about.diskSize)}`; color: Tacit.inkMeta; font.pixelSize: 15 } }
             }
             Group {
@@ -4771,10 +4714,14 @@ ApplicationWindow {
                 title: "Updates"
                 aside: Updates.currentVersion.length > 0 ? `Tacit ${Updates.currentVersion}` : ""
                 property var state: ({})
-                // Restart downloads what is missing first, which can take a while; when that fails nothing restarts, and
-                // the row says so (the shell's Updates.qml runs it, so the notch's Restart shows here too)
-                readonly property bool tonight: Updates.tonightSet
-                readonly property bool restartFailed: Updates.restartFailed
+                property bool tonight: false
+                // Restart downloads what is missing first; when that fails nothing restarts, and the row says so
+                property bool restartFailed: false
+                Process {
+                    id: restartProc
+                    command: ["bash", "-c", "systemctl start tacit-update@now.service && systemctl reboot"]
+                    onExited: (code, status) => updatesGroup.restartFailed = code !== 0
+                }
                 readonly property bool busy: Updates.phase !== ""
                 readonly property bool ready: !busy && updatesGroup.state.ready === true
                 readonly property int waiting: updatesGroup.state.count ?? 0
@@ -4826,22 +4773,27 @@ ApplicationWindow {
                     description: Updates.phase === "looking" ? "Asking for the newest list"
                         : Updates.phase === "downloading" ? (Updates.totalMB > 0 ? `${Updates.doneMB} of ${Updates.totalMB} MB` : "Starting")
                         : Updates.lastCheckFailed ? "Check that this computer is online, then try again"
-                        : Updates.restarting ? "Getting ready to restart"
                         : updatesGroup.restartFailed ? "Couldn't finish the download · check that this computer is online, then try again"
                         : updatesGroup.tonight ? "Tonight, on the charger"
                         : updatesGroup.ready ? `${updatesGroup.waiting} ${updatesGroup.waiting === 1 ? "update" : "updates"} · they install while the computer restarts`
                         : updatesGroup.waiting > 0 ? "Check for updates gets them now"
                         : updatesGroup.checkedText
                     control: Row {
-                        visible: updatesGroup.ready && !updatesGroup.tonight && !Updates.restarting
+                        visible: updatesGroup.ready && !updatesGroup.tonight
                         spacing: 4
                         TextButton {
                             label: "Tonight"
-                            onPressed: Updates.tonight()
+                            onPressed: {
+                                Quickshell.execDetached(["systemctl", "start", "tacit-update@tonight.service"]);
+                                updatesGroup.tonight = true;
+                            }
                         }
                         TextButton {
                             label: "Restart"
-                            onPressed: Updates.restartNow()
+                            onPressed: {
+                                updatesGroup.restartFailed = false;
+                                restartProc.running = true;
+                            }
                         }
                     }
                 }

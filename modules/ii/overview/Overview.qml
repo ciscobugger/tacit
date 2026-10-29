@@ -146,87 +146,6 @@ Scope {
         overviewScope.gridRequested = false;
     }
 
-    // Alt+Tab: the workspace sheet as a window switcher. The windows in the order they were last in use
-    // (Hyprland's focusHistoryID, 0 = the one you are in), the first Tab on the one before. Releasing Alt
-    // focuses the choice, which switches workspace when it is on another; Escape puts everything back.
-    property bool switching: false
-    property var switchOrder: []
-    property int switchIndex: 0
-    property bool switchShown: false
-    readonly property string switchChoice: overviewScope.switchOrder[overviewScope.switchIndex] ?? ""
-
-    function recentWindows() {
-        return HyprlandData.windowList
-            .filter(w => w.mapped !== false && !w.hidden && (w.workspace?.id ?? -1) >= 1 && (w.workspace?.id ?? 101) <= 100)
-            .sort((a, b) => a.focusHistoryID - b.focusHistoryID)
-            .map(w => w.address);
-    }
-
-    function switcherStep(dir) {
-        if (GlobalStates.screenLocked)
-            return;
-        if (!overviewScope.switching) {
-            const order = overviewScope.recentWindows();
-            if (order.length < 2)
-                return;
-            overviewScope.switchOrder = order;
-            overviewScope.switchIndex = 1;
-            overviewScope.switching = true;
-            overviewScope.switchShown = false;
-            // a tap is a quick switch and draws nothing; the sheet comes up once Alt is held
-            if (GlobalStates.overviewOpen)
-                overviewScope.showSwitcher();
-            else
-                switchHold.restart();
-            return;
-        }
-        const n = overviewScope.switchOrder.length;
-        overviewScope.switchIndex = (overviewScope.switchIndex + dir + n) % n;
-        if (!overviewScope.switchShown)
-            overviewScope.showSwitcher();
-    }
-
-    function showSwitcher() {
-        switchHold.stop();
-        // with the overview switched off in Settings there is no sheet: Alt+Tab still switches, without drawing
-        if (!(Config?.options.overview.enable ?? true))
-            return;
-        overviewScope.switchShown = true;
-        overviewScope.paletteMode = false;
-        overviewScope.paletteAlive = false;
-        overviewScope.dockShown = false;
-        overviewScope.prefixMode = "";
-        searchWidget.cancelSearch();
-        overviewScope.moveToFocusedScreen();
-        overviewScope.gridRequested = true;
-        GlobalStates.overviewOpen = true;
-        overviewScope.gridRequested = false;
-    }
-
-    // Alt let go (or Enter): focus the choice
-    function switcherCommit() {
-        if (!overviewScope.switching)
-            return;
-        const address = overviewScope.switchChoice;
-        overviewScope.switcherEnd();
-        if (address.length > 0)
-            Hyprland.dispatch(`hl.dsp.focus({ window = "address:${address}" })`);
-    }
-
-    function switcherEnd() {
-        switchHold.stop();
-        overviewScope.switching = false;
-        overviewScope.switchShown = false;
-        if (GlobalStates.overviewOpen)
-            GlobalStates.overviewOpen = false;
-    }
-
-    Timer {
-        id: switchHold
-        interval: 150
-        onTriggered: overviewScope.showSwitcher()
-    }
-
     // Only SUPER+Tab opens the grid. The corners and the dock set overviewOpen directly, and
     // after one SUPER+Tab they opened the grid instead of the palette: paletteMode stayed false.
     property bool gridRequested: false
@@ -235,9 +154,6 @@ Scope {
         function onOverviewOpenChanged() {
             if (GlobalStates.overviewOpen && !overviewScope.gridRequested)
                 overviewScope.paletteMode = true;
-            // closed by a click, the focus grab or Super+Tab while switching: nothing is chosen any more
-            if (!GlobalStates.overviewOpen && overviewScope.switching)
-                overviewScope.switcherEnd();
         }
     }
 
@@ -385,20 +301,7 @@ Scope {
             focus: GlobalStates.overviewOpen && !overviewScope.paletteMode
 
             Keys.onPressed: event => {
-                // Left and Right already move to the workspace; Enter stays on the one shown
-                if (overviewScope.switching) {
-                    if (event.key === Qt.Key_Escape)
-                        overviewScope.switcherEnd();
-                    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                        overviewScope.switcherCommit();
-                    else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Right)
-                        overviewScope.switcherStep(1);
-                    else if (event.key === Qt.Key_Backtab || event.key === Qt.Key_Left)
-                        overviewScope.switcherStep(-1);
-                    event.accepted = true;
-                    return;
-                }
-                if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if (event.key === Qt.Key_Escape) {
                     GlobalStates.overviewOpen = false;
                 } else if (event.key === Qt.Key_Left) {
                     if (!panelWindow.searchingText)
@@ -460,8 +363,6 @@ Scope {
                     id: defaultComponent
                     OverviewWidget {
                         screen: panelWindow.screen
-                        switching: overviewScope.switching
-                        choiceAddress: overviewScope.switchChoice
                         visible: !overviewScope.paletteMode
                     }
                 }
@@ -587,39 +488,6 @@ Scope {
 
         onPressed: {
             overviewScope.openDock();
-        }
-    }
-    CompositorGlobalShortcut {
-        name: "altTabNext"
-        description: "Alt+Tab: the window you were in before, then further back"
-
-        onPressed: {
-            overviewScope.switcherStep(1);
-        }
-    }
-    CompositorGlobalShortcut {
-        name: "altTabPrev"
-        description: "Alt+Shift+Tab: one window forward again"
-
-        onPressed: {
-            overviewScope.switcherStep(-1);
-        }
-    }
-    CompositorGlobalShortcut {
-        name: "altTabCancel"
-        description: "Alt+Escape: leave the window switcher, nothing chosen"
-
-        onPressed: {
-            if (overviewScope.switching)
-                overviewScope.switcherEnd();
-        }
-    }
-    CompositorGlobalShortcut {
-        name: "altTabRelease"
-        description: "Alt let go: focus the chosen window"
-
-        onReleased: {
-            overviewScope.switcherCommit();
         }
     }
     CompositorGlobalShortcut {

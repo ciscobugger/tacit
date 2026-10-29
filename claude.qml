@@ -20,7 +20,6 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 import "modules/claude"
-import "modules/claude/Titles.js" as Titles
 
 ApplicationWindow {
     id: root
@@ -245,7 +244,7 @@ ApplicationWindow {
             }
         });
     }
-    function titleOf(s) { return Titles.of(s); }
+    function titleOf(s) { return (s.title || s.lastPrompt || s.prompt || "Untitled").replace(/\s*<desktop-context>[\s\S]*$/, ""); }
     function projectOf(cwd) {
         if (!cwd) return "";
         if (cwd === root.home) return "~";
@@ -759,13 +758,11 @@ ApplicationWindow {
         // the window as a PNG, for checks that must not put it on screen
         function shot(path: string): void { surface.grabToImage(r => r.saveToFile(path)); }
         function newSession(): string { root.newSession(""); return state(); }
-        // the desktop's way in (claude-hand): a new session somewhere with the prompt in the box. It is not sent: any
-        // program of the user's can call this socket, so starting an agent stays the person's Enter in Praxis.
+        // the desktop's way in (claude-hand): start a session somewhere, or show one
         function handoff(cwd: string, prompt: string): void {
             root.visible = true;
             root.selected = { fresh: true, id: "", cwd: cwd.length ? cwd : root.home, tool: "claude", title: "New session" };
-            conv.prefill(prompt);
-            conv.focusComposer();
+            conv.send(prompt);
         }
         // a file for the open session (the region selector's "Ask Claude"): a session in a
         // terminal cannot take it, so that case starts a new one in the same folder
@@ -795,8 +792,13 @@ ApplicationWindow {
             conv.take(paths);
         }
         function folder(path: string): void { if (root.selected) root.selected = Object.assign({}, root.selected, { cwd: path }); }
-        // No mode, answer or send here: the permission mode, an ask's answer and a message are the person's, in Praxis
-        // or the notch (any program running as the user could otherwise approve an agent's asks over this socket).
+        function mode(m: string): void { conv.chosenMode = m; }
+        function answer(allow: bool): string {
+            const p = conv.pending[0];
+            if (p) conv.answer({ op: "answer", id: root.selected.id, request: p.request, allow: allow });
+            return p ? p.tool : "nothing pending";
+        }
+        function send(text: string): string { conv.send(text); return state(); }
         function live(): string { return JSON.stringify({ working: conv.working, running: conv.running, locked: conv.locked, pending: conv.pending.length,
             partial: conv.partialText.length, thinking: conv.partialThinking.length, offset: conv.offset, rows: conv.items.length, changes: conv.changes.files.length }); }
         function pin(): string { if (root.selected) fm.togglePin(root.selected.id); return state(); }
@@ -815,8 +817,7 @@ ApplicationWindow {
                 if (verb === "move" && r) rail.startTargets("move", { label: r.title }, { id: r.id }, true);
                 else if (verb === "reorder" && r) rail.startTargets("reorder", { label: r.name, path: r.path, isFolder: true }, {}, true);
                 else if (verb === "new") rail.startTargets("new", {}, {}, true);
-            } else if (r && verb === "delete" && Quickshell.env("PRAXIS_TEST") !== "1") return "refused";   // deletes a session
-            else if (r) root.act(verb, r.type === "folder" ? r.fkey : r.id, r);
+            } else if (r) root.act(verb, r.type === "folder" ? r.fkey : r.id, r);
             return JSON.stringify({ cove: cove.mode, coveKey: cove.row?.key ?? "", targets: rail.targetPurpose, row: r ? r.key : "" });
         }
     }

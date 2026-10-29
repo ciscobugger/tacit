@@ -33,9 +33,6 @@ Item {
     id: root
 
     property real maxWidth: 880
-    // how far the dock still is from where it rests while it slides in (SearchWidget's slide), so the window band can
-    // name a button's place before the dock has arrived
-    property real restOffset: 0
     // where the disc stands, in this item's x: programs fade where it has passed over them
     property real discX: width
     // the peek, above the row (SearchWidget draws it)
@@ -116,11 +113,10 @@ Item {
     }
 
     function activate(app) {
-        // the windows the window band hid come back, all of them, each to its own place (the last one in front); held
-        // windows are never cycled through
+        // a window the window band hid comes back first (the last one hidden); held windows are never cycled through
         const hidden = app.toplevels.filter(t => WindowBand.heldAs(t) === "hidden");
         if (hidden.length > 0) {
-            WindowBand.reopenAll(hidden.map(t => WindowBand.addressOf(t)));
+            WindowBand.command("reopen", WindowBand.addressOf(hidden[hidden.length - 1]));
             root.opened();
             return;
         }
@@ -167,40 +163,6 @@ Item {
         const app = root.programs[root.focusIndex];
         if (app)
             root.activate(app);
-    }
-    // The keys for what the pointer does with a pill: Shift+Enter is the middle click (a new window), Ctrl+P the
-    // right click (pin or unpin), Alt+Left/Right the drag. The wash stays on the program when the row re-forms.
-    function keepFocusOn(appId) {
-        const was = root.focusIndex;
-        Qt.callLater(() => {
-            const at = root.programs.findIndex(app => app.appId === appId);
-            root.focusIndex = at >= 0 ? at : Math.min(was, root.programs.length - 1);
-        });
-    }
-    function launchFocused() {
-        const app = root.programs[root.focusIndex];
-        if (app)
-            root.launch(app.appId);
-    }
-    function togglePinFocused() {
-        const app = root.programs[root.focusIndex];
-        if (!app)
-            return;
-        TaskbarApps.togglePin(app.appId);
-        root.keepFocusOn(app.appId);
-    }
-    function moveFocusedBy(delta) {
-        const app = root.programs[root.focusIndex];
-        if (!app || !app.pinned)
-            return;
-        const pins = (Config.options.dock.pinnedApps ?? []).slice();
-        const from = pins.findIndex(id => id.toLowerCase() === app.appId);
-        const to = from + delta;
-        if (from < 0 || to < 0 || to >= pins.length)
-            return;
-        pins.splice(to, 0, pins.splice(from, 1)[0]);
-        Config.options.dock.pinnedApps = pins;
-        root.keepFocusOn(app.appId);
     }
 
     // ------------------------------------------------------------- reordering
@@ -414,30 +376,7 @@ Item {
                 readonly property bool peeked: root.peeking && root.shownEntry?.appId === pill.appId
                 // the window band's window is heading for this button: it opens as the slot that takes it
                 readonly property bool bandTarget: WindowBand.dropInto.length > 0 && WindowBand.dropInto === pill.appId
-                onBandTargetChanged: if (pill.bandTarget) pill.reportBand()
-                Component.onCompleted: if (pill.bandTarget) pill.reportBand()
-                // where it will rest, at once, and again once the dock has arrived
-                function reportBand() {
-                    const p = pill.mapToItem(null, 0, 0);
-                    WindowBand.reportHide(p.x, p.y - root.restOffset, pill.width, pill.height);
-                    bandReport.restart();
-                }
-                // the window has landed in it: the button takes it with a small swell, and settles
-                property bool taking: false
-                Connections {
-                    target: WindowBand
-                    function onLanded(appId) {
-                        if (appId.length > 0 && appId === pill.appId) {
-                            pill.taking = true;
-                            takeEnd.restart();
-                        }
-                    }
-                }
-                Timer {
-                    id: takeEnd
-                    interval: 110
-                    onTriggered: pill.taking = false
-                }
+                onBandTargetChanged: if (pill.bandTarget) bandReport.restart()
                 Timer {
                     id: bandReport
                     // once the dock has risen, so the place is where it will be
@@ -455,7 +394,7 @@ Item {
                 color: pill.hot ? root.colSandWash : pill.lit ? root.colWashLit : pill.open ? root.colWash : "transparent"
                 opacity: pill.swept
                 // sunk a little while pressed
-                scale: (0.92 + 0.08 * pill.swept) * (pillArea.pressed ? 0.95 : 1) * (pill.taking ? 1.08 : 1)
+                scale: (0.92 + 0.08 * pill.swept) * (pillArea.pressed ? 0.95 : 1)
                 Behavior on scale { Anim { type: Anim.FastSpatial } }
                 z: pill.dragging ? 2 : 0
                 transform: Translate {
@@ -533,7 +472,7 @@ Item {
                             anchors.centerIn: parent
                             visible: pill.symbol.length === 0 && mark.iconPath.length === 0
                             text: root.nameFor(pill.appId).charAt(0).toUpperCase()
-                            font.pixelSize: Tacit.size.row
+                            font.pixelSize: 15
                             font.weight: Font.DemiBold
                             color: pill.ink
                         }
@@ -557,13 +496,13 @@ Item {
                 // a closed program's name, above it while pointed at (an open one shows its windows instead)
                 Rectangle {
                     id: nameTag
-                    readonly property bool wanted: (pill.hovered || root.focusIndex === pill.index) && !pill.open && !pill.named && !pill.dragging
+                    readonly property bool wanted: pill.hovered && !pill.open && !pill.named && !pill.dragging
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.top
                     anchors.bottomMargin: 12
                     width: tagText.implicitWidth + 22
                     height: 28
-                    radius: Tacit.radius.panel
+                    radius: 14
                     color: Appearance.m3colors.m3surfaceContainerHigh
                     border.width: 1
                     border.color: Tacit.hairline
@@ -580,7 +519,7 @@ Item {
                         id: tagText
                         anchors.centerIn: parent
                         text: root.nameFor(pill.appId)
-                        font.pixelSize: Tacit.size.fileText
+                        font.pixelSize: 14
                         color: Tacit.inkMain
                     }
                 }

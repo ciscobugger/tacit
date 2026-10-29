@@ -12,7 +12,6 @@ import qs.modules.common.functions
  * The wallpaper selector (CTRL+SUPER+T): a strip docked into the bottom edge, and behind it the
  * whole screen showing the picture pointed at. Enter or a click keeps it (switchwall.sh recolours
  * the desktop from it); Esc, or a click outside the strip, puts back what you had.
- * Dragging the picture on the screen moves the part of it that is shown (kept with the wallpaper, Wallpapers.setFocus).
  * Sources: Yours (pictures used as the wallpaper before, Wallpapers.used), Pictures and Downloads
  * (newest first), Online (OnlineWallpapers; the full picture is downloaded when kept).
  * The palette's edge and shape (SearchWidget.qml) on a near-opaque ground, as WindowDialog.qml's
@@ -60,17 +59,6 @@ Item {
             return `${c.online.provider} · ${c.online.id}`;
         const parts = c.path.split("/");
         return `${parts.pop()} · ${parts.pop() ?? ""}`;
-    }
-    // the part of the pointed picture the screen shows, 0..1 (0.5 = the middle); a picture online has none to choose
-    readonly property string currentPath: root.current?.path ?? ""
-    property real panX: 0.5
-    property real panY: 0.5
-    function storedFocus() {
-        return root.currentPath.length > 0 ? Wallpapers.focusFor(root.currentPath) : Qt.point(0.5, 0.5);
-    }
-    onCurrentPathChanged: {
-        root.panX = root.storedFocus().x;
-        root.panY = root.storedFocus().y;
     }
     readonly property string wallpaperNow: Config.options.background.wallpaperPath ?? ""
 
@@ -145,9 +133,6 @@ Item {
             Wallpapers.select(c.path, root.darkMode, finalPath => Config.options.background.lockWall = finalPath);
             GlobalStates.wallpaperSelectorTarget = "wallpaper";
         } else {
-            const was = root.storedFocus();
-            if (Math.abs(root.panX - was.x) > 0.001 || Math.abs(root.panY - was.y) > 0.001)
-                Wallpapers.setFocus(c.path, root.panX, root.panY);
             Wallpapers.select(c.path, root.darkMode);
         }
         root.closeRequested();
@@ -171,105 +156,45 @@ Item {
         }
         // two pictures, the new one fading in over the last, so moving along never flashes empty
         property bool useA: true
-        // a picture covering the screen, moved inside it to show the chosen part (WallpaperImage.qml does the same
-        // for the desktop); the shape is read from a tiny copy first so the real one is decoded at the covering size
-        component PanPic: Item {
-            id: pane
-            property string src: ""
-            property real fx: 0.5
-            property real fy: 0.5
-            readonly property alias status: img.status
-            readonly property real coverW: img.width
-            readonly property real coverH: img.height
-            anchors.fill: parent
-            clip: true
-            Image {
-                id: probe
-                visible: false
-                asynchronous: true
-                source: pane.src
-                sourceSize: Qt.size(64, 64)
-            }
-            Image {
-                id: img
-                readonly property real aspect: probe.status === Image.Ready && probe.implicitHeight > 0 ? probe.implicitWidth / probe.implicitHeight : 0
-                readonly property bool wide: img.aspect > root.width / root.height
-                asynchronous: true
-                source: img.aspect > 0 ? pane.src : ""
-                sourceSize: Qt.size(Math.ceil(width), Math.ceil(height))
-                width: img.wide ? root.height * img.aspect : root.width
-                height: img.aspect <= 0 ? root.height : img.wide ? root.height : root.width / img.aspect
-                x: -(width - root.width) * pane.fx
-                y: -(height - root.height) * pane.fy
-            }
-        }
-        PanPic {
+        Image {
             id: picA
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            sourceSize: Qt.size(root.width, root.height)
             opacity: curtain.useA ? 1 : 0
             Behavior on opacity {
                 animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
             }
-            onStatusChanged: if (status === Image.Ready && !curtain.useA && src === root.previewSource) curtain.useA = true
+            onStatusChanged: if (status === Image.Ready && !curtain.useA && source.toString() === root.previewSource) curtain.useA = true
         }
-        PanPic {
+        Image {
             id: picB
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            sourceSize: Qt.size(root.width, root.height)
             opacity: curtain.useA ? 0 : 1
             Behavior on opacity {
                 animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
             }
-            onStatusChanged: if (status === Image.Ready && curtain.useA && src === root.previewSource) curtain.useA = false
+            onStatusChanged: if (status === Image.Ready && curtain.useA && source.toString() === root.previewSource) curtain.useA = false
         }
         Connections {
             target: root
             function onPreviewSourceChanged() {
                 if (root.previewSource.length === 0)
                     return;
-                const into = curtain.useA ? picB : picA;
-                into.fx = root.storedFocus().x;
-                into.fy = root.storedFocus().y;
-                into.src = root.previewSource;
+                if (curtain.useA)
+                    picB.source = root.previewSource;
+                else
+                    picA.source = root.previewSource;
             }
         }
-        Component.onCompleted: {
-            picA.fx = root.storedFocus().x;
-            picA.fy = root.storedFocus().y;
-            picA.src = root.previewSource;
-        }
-        // a click outside the strip puts back what you had; a drag moves the picture instead
+        Component.onCompleted: picA.source = root.previewSource
         MouseArea {
-            id: dragArea
-            property real downX: 0
-            property real downY: 0
-            property real fx0: 0.5
-            property real fy0: 0.5
-            property bool moved: false
             anchors.fill: parent
-            cursorShape: dragArea.pressed && dragArea.moved ? Qt.ClosedHandCursor : Qt.ArrowCursor
-            onPressed: mouse => {
-                dragArea.downX = mouse.x;
-                dragArea.downY = mouse.y;
-                dragArea.fx0 = root.panX;
-                dragArea.fy0 = root.panY;
-                dragArea.moved = false;
-            }
-            onPositionChanged: mouse => {
-                if (!dragArea.pressed || root.currentPath.length === 0)
-                    return;
-                if (!dragArea.moved && Math.hypot(mouse.x - dragArea.downX, mouse.y - dragArea.downY) < 6)
-                    return;
-                dragArea.moved = true;
-                const pane = curtain.useA ? picA : picB;
-                const spanX = pane.coverW - root.width;
-                const spanY = pane.coverH - root.height;
-                // the picture follows the pointer, so the part shown moves the other way
-                if (spanX > 1)
-                    root.panX = Math.max(0, Math.min(1, dragArea.fx0 - (mouse.x - dragArea.downX) / spanX));
-                if (spanY > 1)
-                    root.panY = Math.max(0, Math.min(1, dragArea.fy0 - (mouse.y - dragArea.downY) / spanY));
-                pane.fx = root.panX;
-                pane.fy = root.panY;
-            }
-            onClicked: if (!dragArea.moved) root.closeRequested()
+            onClicked: root.closeRequested()
         }
     }
 
@@ -582,7 +507,7 @@ Item {
         StyledText {
             x: 24
             y: 186
-            text: "Enter keeps it · Esc goes back · ← → to look through · Tab for the next source" + (root.currentPath.length > 0 ? " · Drag the picture to choose the part" : "")
+            text: "Enter keeps it · Esc goes back · ← → to look through · Tab for the next source"
             font.pixelSize: Appearance.font.pixelSize.smallie
             color: Appearance.colors.colSubtext
         }

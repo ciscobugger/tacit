@@ -27,7 +27,6 @@ import qs.modules.ii.overlay
 import qs.modules.ii.verticalBar
 import qs.modules.ii.wallpaperSelector
 import qs.modules.ii.desktopMenu
-import qs.modules.ii.desktopIcons
 import qs.modules.ii.windowMenu
 import qs.modules.ii.files
 import qs.modules.ii.dropover
@@ -124,8 +123,6 @@ Scope {
     PanelLoader { component: WallpaperSelector {} }
     PanelLoader { component: Settings {} }
     PanelLoader { component: DesktopMenu {} }
-    // the Desktop folder's files as tags on the wallpaper
-    PanelLoader { component: DesktopTags {} }
     // the window band's menu (a right click on a window's top edge); loading it also starts WindowBand, which
     // listens for the band's events from the moment the shell starts
     PanelLoader { component: WindowMenu {} }

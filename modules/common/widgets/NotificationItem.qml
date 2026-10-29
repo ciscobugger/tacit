@@ -303,7 +303,6 @@ Item { // Notification item area
                                     Layout.fillWidth: false
                                     visible: root.toolsShown
                                     buttonText: Translation.tr("Close")
-                                    tip: Translation.tr("Dismiss")
                                     urgency: notificationObject?.urgency ?? ""
 
                                     onClicked: {
@@ -347,7 +346,6 @@ Item { // Notification item area
                                     readonly property string glyph: file !== "" ? "file_open" : link !== "" ? "link" : root.message ? "reply" : "open_in_new"
                                     visible: file !== "" || link !== "" || Notifications.windowFor(notificationObject) !== null
                                     urgency: notificationObject?.urgency ?? ""
-                                    tip: file !== "" ? Translation.tr("Open file") : link !== "" ? Translation.tr("Open link") : root.message ? Translation.tr("Reply") : Translation.tr("Open app")
                                     onClicked: {
                                         Notifications.open(notificationObject);
                                         GlobalStates.notificationCenterOpen = false;
@@ -368,7 +366,6 @@ Item { // Notification item area
                                 NotificationActionButton {
                                     Layout.fillWidth: false
                                     visible: openButton.file !== ""
-                                    tip: Translation.tr("Show in folder")
                                     urgency: notificationObject?.urgency ?? ""
                                     onClicked: {
                                         Notifications.revealFile(openButton.file);
@@ -392,7 +389,6 @@ Item { // Notification item area
                                     Layout.fillWidth: false
                                     visible: root.toolsShown && !(notificationObject?.actions ?? []).some(a => /^mute$/i.test((a.text ?? "").trim()))
                                     urgency: notificationObject?.urgency ?? ""
-                                    tip: Notifications.isMuted(notificationObject?.appName) ? Translation.tr("Show pop-ups from this app") : Translation.tr("Mute this app")
                                     onClicked: Notifications.toggleMute(notificationObject?.appName)
                                     implicitHeight: 26
                                     leftPadding: 8
@@ -409,10 +405,9 @@ Item { // Notification item area
                                     Layout.fillWidth: false
                                     visible: root.toolsShown
                                     urgency: notificationObject?.urgency ?? ""
-                                    tip: copyIcon.text === "inventory" ? Translation.tr("Copied") : Translation.tr("Copy text")
 
                                     onClicked: {
-                                        Quickshell.clipboardText = notificationObject?.body ?? ""
+                                        Quickshell.clipboardText = notificationObject?.body
                                         copyIcon.text = "inventory"
                                         copyIconTimer.restart()
                                     }
