@@ -1686,7 +1686,17 @@ ApplicationWindow {
             property string viewing: ""
             onViewingChanged: root.revealPage()
             Component.onCompleted: if (["corners", "overview", "widgets"].includes(root.pageAnchor)) dk.viewing = root.pageAnchor   // desktop:<section>
-            readonly property var widgetKeys: ["clock", "weather", "worldClock", "resources", "timers", "images", "customImage", "userCard"]
+            readonly property var widgetList: [
+                { key: "clock", label: "Clock", glyph: "schedule" },
+                { key: "weather", label: "Weather", glyph: "partly_cloudy_day" },
+                { key: "worldClock", label: "World clock", glyph: "public" },
+                { key: "resources", label: "System resources", glyph: "monitor_heart" },
+                { key: "timers", label: "Timers", glyph: "timer" },
+                { key: "images", label: "Image converter", glyph: "photo_library" },
+                { key: "customImage", label: "Custom image", glyph: "image" },
+                { key: "userCard", label: "Your name and picture", glyph: "person" }
+            ]
+            readonly property var widgetKeys: dk.widgetList.map(w => w.key)
             readonly property int widgetsShown: dk.widgetKeys.filter(k => Config.options.background.widgets[k]?.enable).length
             function cornerName(v) { return CornerActions.list.find(o => o.value === v)?.displayName ?? ""; }
             Group {
@@ -1862,24 +1872,41 @@ ApplicationWindow {
             Group {
                 visible: dk.viewing === "widgets"
                 title: "Desktop widgets"
-                note: "Drag a widget to move it, unless they are kept in place."
+                note: "Drag a widget to move it, or pick its placement from ⋯. Lock them to keep them in place."
                 Repeater {
-                    model: [
-                        { key: "clock", label: "Clock", glyph: "schedule" },
-                        { key: "weather", label: "Weather", glyph: "partly_cloudy_day" },
-                        { key: "worldClock", label: "World clock", glyph: "public" },
-                        { key: "resources", label: "System resources", glyph: "monitor_heart" },
-                        { key: "timers", label: "Timers", glyph: "timer" },
-                        { key: "images", label: "Image converter", glyph: "photo_library" },
-                        { key: "customImage", label: "Custom image", glyph: "image" },
-                        { key: "userCard", label: "Your name and picture", glyph: "person" }
-                    ]
-                    EyeRow {
+                    model: dk.widgetList
+                    SettingRow {
+                        id: wRow
                         required property var modelData
+                        readonly property var cfg: Config.options.background.widgets[modelData.key]
+                        readonly property bool isShown: cfg?.enable ?? false
+                        readonly property string strategy: cfg?.placementStrategy ?? "free"
                         glyph: modelData.glyph
                         label: modelData.label
-                        checked: Config.options.background.widgets[modelData.key].enable
-                        onToggled: value => Config.options.background.widgets[modelData.key].enable = value
+                        description: strategy === "leastBusy" ? "Least busy area"
+                            : strategy === "mostBusy" ? "Most busy area" : "Free to drag"
+                        muted: !isShown
+                        onActivated: if (cfg) cfg.enable = !isShown
+                        control: Row {
+                            spacing: 4
+                            RowMenu {
+                                items: [
+                                    { label: "Free (draggable)", checked: wRow.strategy === "free", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "free"; } },
+                                    { label: "Least busy area", checked: wRow.strategy === "leastBusy", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "leastBusy"; } },
+                                    { label: "Most busy area", checked: wRow.strategy === "mostBusy", run: () => { if (wRow.cfg) wRow.cfg.placementStrategy = "mostBusy"; } }
+                                ]
+                            }
+                            Item {
+                                width: 32
+                                height: 32
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: wRow.isShown ? "visibility" : "visibility_off"
+                                    iconSize: 18
+                                    color: wRow.isShown ? Appearance.colors.colInkMain : Appearance.colors.colInkFaint
+                                }
+                            }
+                        }
                     }
                 }
                 SwitchRow {

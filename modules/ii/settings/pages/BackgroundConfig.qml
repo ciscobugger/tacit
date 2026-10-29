@@ -446,6 +446,110 @@ ContentPage {
                     ]
                 }
                 ConfigSelectionArray {
+                    text: Translation.tr("Weather placement strategy")
+                    icon: "cloud"
+                    Layout.fillWidth: false
+                    currentValue: Config.options.background.widgets.weather.placementStrategy
+                    onSelected: newValue => {
+                        Config.options.background.widgets.weather.placementStrategy = newValue;
+                    }
+                    options: [
+                        {
+                            displayName: Translation.tr("Draggable"),
+                            icon: "drag_pan",
+                            value: "free"
+                        },
+                        {
+                            displayName: Translation.tr("Least busy"),
+                            icon: "category",
+                            value: "leastBusy"
+                        },
+                        {
+                            displayName: Translation.tr("Most busy"),
+                            icon: "shapes",
+                            value: "mostBusy"
+                        },
+                    ]
+                }
+                ConfigSelectionArray {
+                    text: Translation.tr("Calendar placement strategy")
+                    icon: "calendar"
+                    Layout.fillWidth: false
+                    currentValue: Config.options.background.widgets.calendar.placementStrategy
+                    onSelected: newValue => {
+                        Config.options.background.widgets.calendar.placementStrategy = newValue;
+                    }
+                    options: [
+                        {
+                            displayName: Translation.tr("Draggable"),
+                            icon: "drag_pan",
+                            value: "free"
+                        },
+                        {
+                            displayName: Translation.tr("Least busy"),
+                            icon: "category",
+                            value: "leastBusy"
+                        },
+                        {
+                            displayName: Translation.tr("Most busy"),
+                            icon: "shapes",
+                            value: "mostBusy"
+                        },
+                    ]
+                }
+                ConfigSelectionArray {
+                    text: Translation.tr("World clock placement strategy")
+                    icon: "globe"
+                    Layout.fillWidth: false
+                    currentValue: Config.options.background.widgets.worldClock.placementStrategy
+                    onSelected: newValue => {
+                        Config.options.background.widgets.worldClock.placementStrategy = newValue;
+                    }
+                    options: [
+                        {
+                            displayName: Translation.tr("Draggable"),
+                            icon: "drag_pan",
+                            value: "free"
+                        },
+                        {
+                            displayName: Translation.tr("Least busy"),
+                            icon: "category",
+                            value: "leastBusy"
+                        },
+                        {
+                            displayName: Translation.tr("Most busy"),
+                            icon: "shapes",
+                            value: "mostBusy"
+                        },
+                    ]
+                }
+                ConfigSelectionArray {
+                    text: Translation.tr("Notes placement strategy")
+                    icon: "note"
+                    Layout.fillWidth: false
+                    currentValue: Config.options.background.widgets.notes.placementStrategy
+                    onSelected: newValue => {
+                        Config.options.background.widgets.notes.placementStrategy = newValue;
+                    }
+                    options: [
+                        {
+                            displayName: Translation.tr("Draggable"),
+                            icon: "drag_pan",
+                            value: "free"
+                        },
+                        {
+                            displayName: Translation.tr("Least busy"),
+                            icon: "category",
+                            value: "leastBusy"
+                        },
+                        {
+                            displayName: Translation.tr("Most busy"),
+                            icon: "shapes",
+                            value: "mostBusy"
+                        },
+                    ]
+                }
+                ConfigSelectionArray {
                     text: Translation.tr("Clock style")
                     icon: "nest_clock_farsight_analog"
                     currentValue: Config.options.background.widgets.clock.style
