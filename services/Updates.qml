@@ -80,11 +80,11 @@ Singleton {
     // the download for the install is made first; when it fails nothing restarts, and the notch says so
     Process {
         id: restartProc
-        command: ["bash", "-c", "systemctl start tacit-update@now.service && systemctl reboot"]
+        command: ["bash", "-c", "systemctl start tacit-update@now.service || exit 1; systemctl reboot || { rm -f /system-update; exit 3; }"]
         onExited: (code, status) => {
             if (code !== 0) {
                 root.restartFailed = true;
-                IslandController.request("copied", { "icon": "error", "text": "Couldn't download the update · check the connection" }, 65);
+                IslandController.request("copied", { "icon": "error", "text": code === 3 ? "Couldn't restart" : "Couldn't download the update · check the connection" }, 65);
             }
         }
     }
