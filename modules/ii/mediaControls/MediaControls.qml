@@ -78,12 +78,13 @@ Scope {
         // Exactly one cava may be alive: these terms are the complement of
         // IslandController.othersRunCava, which owns the waveform in every other case - the
         // equalizer included. (mediaLyricsVisible never existed, so its term only read true.)
+        // Paused, cava only streamed zeros; the island's own copy is also off then.
         running: (GlobalStates.mediaControlsOpen ||
             Config.options.bar.layouts.leftLayout.includes("visualizer") ||
             Config.options.bar.layouts.middleLayout.includes("visualizer") ||
             Config.options.bar.layouts.rightLayout.includes("visualizer") ||
             Config.options.background.widgets.visualizer.enable)
-            && MprisController.activePlayer !== null
+            && MprisController.activePlayer !== null && MprisController.isPlaying
         onRunningChanged: {
             if (!cavaProc.running) {
                 GlobalStates.visualizerPoints = [];
