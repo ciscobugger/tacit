@@ -476,8 +476,17 @@ Item {
     }
     function pump() {
         if (probe.running || probeQueue.length === 0) return;
-        probe.command = ["nice", "-n", "10", "python3", probeScript, "facts", probeQueue[0]];
-        probeQueue = probeQueue.slice(1);
+        // the file landed on goes first; files the person has flicked past are dropped (and forgotten, so they probe again if revisited)
+        const near = {};
+        for (let k = Math.max(0, cur - 2); k <= Math.min(entries.length - 1, cur + 2); k++) near[entries[k].path] = true;
+        const stale = probeQueue.filter(p => !near[p]);
+        if (stale.length > 0) { const n = Object.assign({}, probed); for (const p of stale) delete n[p]; probed = n; }
+        const q = probeQueue.filter(p => near[p]);
+        if (q.length === 0) { probeQueue = []; return; }
+        const here = entries[cur]?.path;
+        const first = q.indexOf(here) >= 0 ? here : q[0];
+        probe.command = ["nice", "-n", "10", "python3", probeScript, "facts", first];
+        probeQueue = q.filter(p => p !== first);
         probe.running = true;
     }
     Process {
