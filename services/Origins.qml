@@ -65,6 +65,8 @@ Singleton {
             return "zen";
         if (a.includes("firefox"))
             return "firefox";
+        if (a === "browser" || a === "browser-cef")
+            return "thyris";
         if (a.includes("chrom") || a.includes("thorium"))
             return a.includes("thorium") ? "thorium" : "chromium";
         return a.split(".").pop();
