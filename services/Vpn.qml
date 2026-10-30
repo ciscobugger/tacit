@@ -126,7 +126,7 @@ Singleton {
             onStreamFinished: {
                 const list = [];
                 for (const line of text.split("\n")) {
-                    const parts = line.split(":");
+                    const parts = Network.splitTerse(line);
                     if (parts.length < 3)
                         continue;
                     const type = parts[parts.length - 2], active = parts[parts.length - 1];
