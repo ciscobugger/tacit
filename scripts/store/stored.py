@@ -263,6 +263,9 @@ def icon_png(src):
     return dst if os.path.exists(dst) else ""
 
 
+OFFLINE = False  # set by the first shot that cannot reach the network, so one run does not wait on every picture
+
+
 def shot(url, wide=1600):
     """a screenshot from the developer's own site, kept at most `wide` px wide as JPEG; "" when it cannot be had.
     Pictures shown across the whole window (the issue, an app's cover) are kept at up to 2560 px"""
@@ -270,6 +273,9 @@ def shot(url, wide=1600):
     dst = os.path.join(CACHE, "shots", name + ".jpg")
     if os.path.exists(dst):
         return dst
+    global OFFLINE
+    if OFFLINE:
+        return ""
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     # per process: the home and app backends can fetch the same picture at once
     raw = f"{dst}.{os.getpid()}.download"
@@ -281,6 +287,10 @@ def shot(url, wide=1600):
         subprocess.run(["magick", raw + "[0]", "-resize", f"{wide}x>", "-quality", "88", tmp], capture_output=True, timeout=60)
         if os.path.exists(tmp):
             os.replace(tmp, dst)
+    except urllib.error.HTTPError:
+        pass
+    except OSError as e:
+        OFFLINE = isinstance(e, urllib.error.URLError)
     except Exception:
         pass
     finally:
@@ -451,7 +461,10 @@ def home():
     windows = None
     for path in (os.environ.get("STORE_WINDOWS_APPS", ""), os.path.expanduser("~/.local/state/tacit-setup/windows-apps.json")):
         if path and os.path.exists(path):
-            windows = json.load(open(path))
+            try:
+                windows = json.load(open(path))
+            except (OSError, ValueError):
+                continue
             break
     page = {"arch": os.uname().machine, "feature": feature, "picks": picks, "issue": issue(ed, cat), "jobs": ed["jobs"], "apps": apps, "windows": windows,
          "installed": sorted(p for p in apps if apps[p]["installed"])}
