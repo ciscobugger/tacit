@@ -205,7 +205,8 @@ Singleton {
             // Three notifications arriving together are three things to read: each one waits
             // its turn instead of overwriting the text of the one on screen. Every other
             // state is a value that has moved on, so re-firing it just refreshes the pill.
-            if (name === "notification") {
+            // Likewise two agents asking: the second ask waits behind the first (the same request re-fires).
+            if (name === "notification" || (name === "claudeAsk" && data?.request !== root.payload?.request)) {
                 root.enqueue(name, data, priority);
                 return;
             }
@@ -214,11 +215,11 @@ Singleton {
                 holdTimer.restart();
             return;
         }
-        // an agent's ask waits for its answer; a volume or brightness key still shows over it, and the ask comes back
-        // first when that has gone
-        if (root.transientShowing && root.transientState === "claudeAsk" && (name === "volume" || name === "brightness")) {
+        // an agent's ask waits for its answer; a volume or brightness key, or a state of higher priority (Flow), still
+        // shows over it, and the ask comes back first when that has gone
+        if (root.transientShowing && root.transientState === "claudeAsk" && (name === "volume" || name === "brightness" || priority >= root.transientPriority)) {
             root.queue = [{ "name": "claudeAsk", "data": root.payload, "priority": root.transientPriority }]
-                .concat(root.queue.filter(q => q.name !== "claudeAsk"));
+                .concat(root.queue.filter(q => q.name !== "claudeAsk" || q.data?.request !== root.payload?.request));
             root.activate(name, data, priority);
             return;
         }
@@ -233,7 +234,7 @@ Singleton {
 
     function enqueue(name, data, priority) {
         const depth = Config.options.island.notificationQueueDepth;
-        let queued = root.queue.slice().filter(q => q.name !== name || name === "notification");
+        let queued = root.queue.slice().filter(q => q.name !== name || name === "notification" || (name === "claudeAsk" && q.data?.request !== data?.request));
         queued.push({
             "name": name,
             "data": data ?? ({}),
