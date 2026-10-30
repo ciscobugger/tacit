@@ -1138,9 +1138,9 @@ Singleton {
     // ------------------------------------------------------------------ downloads
     // boring.notch DownloadWatcher: a finished browser download is a live activity. Here a new
     // file in ~/Downloads is a 3s peek and is parked on the shelf, so it can be dragged straight
-    // out of the notch. No inotify-tools on this machine: one bash loop, `find -newer` against a
-    // stamp every two seconds. Partial files (.part, .crdownload, .tmp, dotfiles) are skipped;
-    // browsers rename them into place, which is the moment the final name shows up.
+    // out of the notch. No inotify-tools on this machine: one bash loop, one `find` every two seconds
+    // (the wait is the builtin `read -t`, the time stamp is printf's, so nothing else is started).
+    // Partial files (.part, .crdownload, .tmp, dotfiles) are skipped; browsers rename them into place, which is the moment the final name shows up.
     property var announcedDownloads: ({})
 
     // Screenshots land in the same watcher: screenSnip.savePath is the second folder.
@@ -1150,7 +1150,7 @@ Singleton {
         id: downloadWatch
         running: root.enabled && Config.options.island.states.download
         // the account's Downloads folder by its own name (xdg-user-dirs names it in the account's language: ~/Téléchargements)
-        command: ["bash", "-c", `d='${StringUtils.shellSingleQuoteEscape(FileUtils.trimFileProtocol(Directories.downloads))}'; p='${StringUtils.shellSingleQuoteEscape(root.screenshotDir)}'; s=$(mktemp); n=$(mktemp); trap 'rm -f "$s" "$n"' EXIT; touch "$s"; while sleep 2; do touch "$n"; for dir in "$d" "$p"; do [ -n "$dir" ] && find "$dir" -maxdepth 1 -type f -newer "$s" ! -name '.*' ! -name '*.part' ! -name '*.crdownload' ! -name '*.tmp' -printf '%p\n' 2>/dev/null; done; find "$d" -maxdepth 1 -type f \\( -name '*.part' -o -name '*.crdownload' \\) -printf 'P\t%s\t%p\n' 2>/dev/null; mv -f "$n" "$s"; done`]
+        command: ["bash", "-c", `d='${StringUtils.shellSingleQuoteEscape(FileUtils.trimFileProtocol(Directories.downloads))}'; p='${StringUtils.shellSingleQuoteEscape(root.screenshotDir)}'; set -- "$d"; [ -n "$p" ] && set -- "$d" "$p"; exec 3<> <(:); printf -v last '%(%s)T' -1; while read -t 2 -u 3; [ $? -gt 128 ]; do printf -v now '%(%s)T' -1; find "$@" -maxdepth 1 -type f \\( \\( -name '*.part' -o -name '*.crdownload' \\) -printf 'P\\t%s\\t%p\\n' -o -newermt "@$((last-1))" ! -name '.*' ! -name '*.tmp' -printf '%p\\n' \\) 2>/dev/null; last=$now; done`]
         stdout: SplitParser {
             onRead: line => {
                 if (line.startsWith("P\t")) {   // a download still growing: name, size
