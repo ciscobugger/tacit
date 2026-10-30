@@ -63,7 +63,7 @@ def find_regions(image_path, min_width, min_height, max_width=None, max_height=N
                 regions.append({'x': int(x), 'y': int(y), 'width': int(w), 'height': int(h)})
     # Remove duplicates/overlaps
     regions = non_max_suppression(regions, iou_threshold=0.7)
-    return regions, cv2.imread(image_path)  # Return original image for drawing
+    return regions
 
 def draw_regions(image, regions, output_path):
     for region in regions:
@@ -94,7 +94,7 @@ def main():
     parser.add_argument('--hyprctl', action='store_true', help='Mimics hyprctl\'s window output, like {"at": [x, y], "size": [w, h]}')
     args = parser.parse_args()
 
-    regions, image = find_regions(
+    regions = find_regions(
         args.image,
         min_width=args.min_width,
         min_height=args.min_height,
@@ -113,7 +113,7 @@ def main():
         regions = [{"at": [r['x'], r['y']], "size": [r['width'], r['height']]} for r in regions]
     print(json.dumps(regions))
     if args.debug_output:
-        draw_regions(image, regions, args.debug_output)
+        draw_regions(cv2.imread(args.image), regions, args.debug_output)
 
 if __name__ == '__main__':
     main()
