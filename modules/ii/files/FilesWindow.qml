@@ -465,8 +465,9 @@ FloatingWindow {
     // (FilesPictures). Kept while a filter narrows the grid, so the layout does not change under the typing.
     property bool pictureFolder: false
     readonly property bool pictures: win.view === "grid" && win.pictureFolder
-    function relist() {
-        folderModel.rebuild();
+    function relist(reread = true) {
+        if (reread)
+            folderModel.rebuild();
         const n = folderModel.count;
         let byPath = ({}), names = ({}), dirs = ({}), shown = 0, seen = 0;
         for (let i = 0; i < n; i++) {
@@ -487,7 +488,9 @@ FloatingWindow {
         if (!win.gridFiltering)
             win.pictureFolder = n > 0 && seen >= n * 0.6;
     }
-    onQueryChanged: win.relist()
+    // the typed filter changes no row of the model (the list narrows by name here; the grid's own filter reloads the
+    // model, which relists), so the rows are not read and sorted again
+    onQueryChanged: win.relist(false)
     onViewChanged: win.editingIndex = -1   // the field belongs to a list row; the grid has none
     // Selected paths whose file is no longer listed: an external delete or rename would
     // otherwise leave "3 selected" naming files that are gone, and Delete would forward one.
