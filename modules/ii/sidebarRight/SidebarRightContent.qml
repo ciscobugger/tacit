@@ -276,6 +276,7 @@ Item {
                 list[i] = list[j];
                 list[j] = id;
                 root.primary = list;
+                root.saveArrangement();
                 root.focusNext(id);
             } else if (dir === "down") {
                 root.pushUndo(`Moved ${name} to the row`);
@@ -293,6 +294,7 @@ Item {
                 list[i] = list[j];
                 list[j] = id;
                 root.secondary = list;
+                root.saveArrangement();
                 root.focusNext(id);
             } else if (dir === "up") {
                 root.pushUndo(`Moved ${name} to the top buttons`);
