@@ -480,10 +480,20 @@ def install(target, quiet=False):
     except BaseException:
         wipe(stage); raise                          # a half-unpacked folder can be hundreds of MB
     if os.path.isdir(base):
-        remove(target, keep_data=True, quiet=True)
+        if os.path.exists(old):
+            remove(target, keep_data=True, quiet=True)
+        else:
+            wipe(base)                              # left by an install that died after the swap: no manifest
     os.replace(stage, base)
     root = os.path.join(base, "root")
-    made, ids, execs = integrate(target, root, tfiles)
+    made = []
+    try:
+        made, ids, execs = integrate(target, root, tfiles)
+    except BaseException:
+        for f in made:
+            with contextlib.suppress(OSError):
+                os.unlink(f)
+        wipe(base); raise
     first = next((m for m in tfiles if m.startswith("usr/bin/") and not m.endswith("/")), None)
     man = dict(package=target, version=bundle[target]["version"], versions=want, shared=used, made=made, ids=ids,
                exec=execs[0] if execs else (["/" + first] if first else []), skipped=skipped, host_stamp=host_stamp(),
