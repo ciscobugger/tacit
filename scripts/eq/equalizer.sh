@@ -25,6 +25,9 @@ STATE_DIR="$1"; shift
 cmd="${1:-}"; arg1="${2:-}"; arg2="${3:-}"
 
 mkdir -p "$STATE_DIR"
+# Slider drags start one process per step; each reads, edits and rewrites the state file.
+exec 9>"$STATE_DIR/.lock"
+flock 9
 STATE_FILE="$STATE_DIR/eq_state.json"
 PRESET_NAME="live_eq"
 DEFAULT_STATE='{"b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0, "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0, "preset": "Flat", "pending": false}'
@@ -107,7 +110,7 @@ except Exception:
         echo "equalizer.sh: EasyEffects is not installed; the preset was saved but not loaded" >&2
         exit 1
     fi
-    $EE_LOAD -l "$PRESET_NAME" >/dev/null 2>&1 &
+    $EE_LOAD -l "$PRESET_NAME" >/dev/null 2>&1 9>&- &
 }
 
 save_preset() {
