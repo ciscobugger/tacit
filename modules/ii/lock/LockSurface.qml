@@ -114,7 +114,9 @@ MouseArea {
     Image {
         id: wallSource
         anchors.fill: parent
-        source: root.wallpaper
+        // Only the blur reads this: skip the decode while the ground file is shown, and decode small (radius 48 hides the detail).
+        source: root.groundReady ? "" : root.wallpaper
+        sourceSize: Qt.size(Math.ceil(width / 4), Math.ceil(height / 4))
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
