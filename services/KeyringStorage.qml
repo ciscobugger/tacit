@@ -82,7 +82,15 @@ Singleton {
         getData.running = true;
     }
 
+    // A save asked for while secret-tool is still running is written when it exits;
+    // setting running = true on a live process does nothing.
+    property bool saveQueued: false
+
     function saveKeyringData() {
+        if (saveData.running) {
+            root.saveQueued = true;
+            return;
+        }
         saveData.stdinEnabled = true;
         saveData.running = true;
     }
@@ -93,6 +101,12 @@ Singleton {
             "secret-tool", "store", "--label=" + keyringLabel,
             ...propertiesAsArgs,
         ]
+        onExited: {
+            if (root.saveQueued) {
+                root.saveQueued = false;
+                root.saveKeyringData();
+            }
+        }
         onRunningChanged: {
             if (saveData.running) {
                 // console.log("[KeyringStorage] Saving with command: '" + saveData.command.join("' '") + "'");
