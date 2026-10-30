@@ -458,7 +458,7 @@ Singleton {
     property bool starting: false
     onBusyChanged: if (!root.busy && root.queue.length) Qt.callLater(root.sendNext)
     function sendNext() {
-        if (root.busy || root.starting || !root.queue.length) return;
+        if (root.busy || root.starting || !host.connected || !root.queue.length) return;   // offline: onConnectedChanged drains it
         const q = root.queue[0];
         root.queue = root.queue.slice(1);
         root.dispatch(q);
