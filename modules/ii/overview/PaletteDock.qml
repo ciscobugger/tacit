@@ -622,6 +622,10 @@ Item {
                         root.draggingId = "";
                         root.dragOffset = 0;
                     }
+                    onCanceled: {
+                        root.draggingId = "";
+                        root.dragOffset = 0;
+                    }
                     onClicked: mouse => {
                         if (pillArea.moved)
                             return;
