@@ -240,26 +240,49 @@ compress)   # names go in relative to their folder, so the archive holds them, n
     results+=("$target"); done_=$total
     undo=$(jq -nc --arg p "$target" '{op:"delete", paths:[$p]}')
     finish done ;;
-renames)   # pairs: <src> <new-name>; nothing moves unless every new name is free and no two are alike
+renames)   # pairs: <src> <new-name>; nothing moves unless every new name is free (or is left by another of them) and no two are alike
     total=$(( $# / 2 )); args=("$@"); write
-    declare -A taken=()
+    declare -A taken=() leaving=()
+    for ((i = 0; i < ${#args[@]}; i += 2)); do
+        from=${args[i]}; to="$(dirname -- "$from")/${args[i+1]}"
+        [ "$to" != "$from" ] && leaving[$from]=1
+    done
     for ((i = 0; i < ${#args[@]}; i += 2)); do
         from=${args[i]}; to="$(dirname -- "$from")/${args[i+1]}"
         [ "$to" = "$from" ] && continue
-        if [ -e "$to" ]; then error="${args[i+1]} is already here"; finish failed; fi
+        if [ -e "$to" ] && [ -z "${leaving[$to]:-}" ]; then error="${args[i+1]} is already here"; finish failed; fi
         if [ -n "${taken[$to]:-}" ]; then error="Two would be called ${args[i+1]}"; finish failed; fi
         taken[$to]=1
     done
-    froms=(); tos=()
+    # A chain (img 03 -> img 02, img 04 -> img 03): a file goes once its new name is no longer another's
+    # old one. A swap or ring has no such first move: one of them is parked under a hidden name.
+    # The order is the one a reverse (undo) needs too.
+    unpark() { for k in "${!parked[@]}"; do mv -n -- "${parked[$k]}" "${args[k]}" 2>/dev/null; done; }
+    froms=(); tos=(); pend=(); declare -A parked=()
     for ((i = 0; i < ${#args[@]}; i += 2)); do
-        from=${args[i]}; to="$(dirname -- "$from")/${args[i+1]}"; current=${args[i+1]}
-        if [ "$to" != "$from" ]; then
-            if ! mv -n -- "$from" "$to"; then error="Could not rename $(basename -- "$from")"; finish failed; fi
-            froms+=("$from"); tos+=("$to")
-        fi
-        results+=("$to"); done_=$((done_ + 1)); write
+        from=${args[i]}; to="$(dirname -- "$from")/${args[i+1]}"
+        if [ "$to" = "$from" ]; then results+=("$to"); done_=$((done_ + 1)); else pend+=("$i"); fi
     done
-    undo=$(jq -nc --rawfile from <(printf '%s\n' "${tos[@]}") --rawfile to <(printf '%s\n' "${froms[@]}") '{op:"move-back", from:($from | split("\n") | map(select(length > 0))), to:($to | split("\n") | map(select(length > 0)))}')
+    while [ ${#pend[@]} -gt 0 ]; do
+        rest=(); moved=0
+        for i in "${pend[@]}"; do
+            from=${args[i]}; to="$(dirname -- "$from")/${args[i+1]}"
+            if [ -n "${leaving[$to]:-}" ]; then rest+=("$i"); continue; fi
+            current=${args[i+1]}
+            if ! mv -n -- "${parked[$i]:-$from}" "$to"; then unpark; error="Could not rename $(basename -- "$from")"; finish failed; fi
+            unset "parked[$i]"; leaving[$from]=""; moved=1
+            froms+=("$from"); tos+=("$to"); results+=("$to"); done_=$((done_ + 1)); write
+        done
+        pend=("${rest[@]}")
+        if [ $moved = 0 ]; then
+            i=${pend[0]}; from=${args[i]}; park="$(dirname -- "$from")/.rename-$id-$i"
+            if ! mv -n -- "$from" "$park"; then unpark; error="Could not rename $(basename -- "$from")"; finish failed; fi
+            parked[$i]=$park; leaving[$from]=""
+        fi
+    done
+    rev_froms=(); rev_tos=()
+    for ((i = ${#tos[@]} - 1; i >= 0; i--)); do rev_froms+=("${froms[i]}"); rev_tos+=("${tos[i]}"); done
+    undo=$(jq -nc --rawfile from <(printf '%s\n' "${rev_tos[@]}") --rawfile to <(printf '%s\n' "${rev_froms[@]}") '{op:"move-back", from:($from | split("\n") | map(select(length > 0))), to:($to | split("\n") | map(select(length > 0)))}')
     finish done ;;
 delete)
     total=$#; write
