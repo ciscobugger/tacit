@@ -198,21 +198,32 @@ Singleton {
         repeat: true
         running: root.phase !== "" && !root.ending
         triggeredOnStart: true
-        onTriggered: if (!watchProc.running) watchProc.running = true
+        // the size look (two pacman database reads) only every 4th tick; the ticks between just ask whether a download runs
+        property int tick: 0
+        onRunningChanged: if (!running) tick = 0
+        onTriggered: {
+            if (watchProc.running)
+                return;
+            watchProc.full = tick++ % 4 === 0;
+            watchProc.running = true;
+        }
     }
     property int quietTicks: 0
     Process {
         id: watchProc
+        property bool full: true
         // a oneshot is "activating" while it runs, never "active", and one waiting to start is "inactive" with a job queued
-        command: ["bash", "-c", "a=0; for u in tacit-fetch-updates-now.service tacit-fetch-updates.service; do "
-            + "case $(systemctl is-active $u) in activating|active) a=1 ;; esac; [ -n \"$(systemctl list-jobs --no-legend $u)\" ] && a=1; done; "
-            + "echo \"active $a\"; echo \"result $(systemctl show -P Result tacit-fetch-updates-now.service)\"; echo \"waiting $(pacman -Qu 2>/dev/null | wc -l)\"; pacman -Sup --print-format '%s %l' 2>/dev/null | grep -v '^:'"]
+        command: ["bash", "-c", "a=0; systemctl is-active tacit-fetch-updates-now.service tacit-fetch-updates.service | grep -qxE 'activating|active' && a=1; "
+            + "[ -n \"$(systemctl list-jobs --no-legend tacit-fetch-updates-now.service tacit-fetch-updates.service)\" ] && a=1; "
+            + "echo \"active $a\"; echo \"result $(systemctl show -P Result tacit-fetch-updates-now.service)\"; "
+            + (full ? "echo \"waiting $(pacman -Qu 2>/dev/null | wc -l)\"; pacman -Sup --print-format '%s %l' 2>/dev/null | grep -v '^:'" : "true")]
         stdout: StdioCollector {
             onStreamFinished: {
                 const lines = text.split("\n");
                 const active = lines.some(l => l === "active 1");
                 const waiting = parseInt((lines.find(l => l.startsWith("waiting ")) ?? "waiting 0").split(" ")[1]) || 0;
                 let total = 0, done = 0;
+                const sized = lines.some(l => l.startsWith("waiting "));
                 for (const l of lines) {
                     const m = l.match(/^(\d+) (\S+)$/);
                     if (!m)
@@ -221,13 +232,15 @@ Singleton {
                     if (m[2].startsWith("file://"))
                         done += parseInt(m[1]);
                 }
-                if (waiting > 0 && total > 0 && done < total) {
-                    root.phase = "downloading";
-                    root.count = waiting;
+                if (sized) {
+                    if (waiting > 0 && total > 0 && done < total) {
+                        root.phase = "downloading";
+                        root.count = waiting;
+                    }
+                    root.totalMB = Math.round(total / 1e6);
+                    root.doneMB = Math.round(done / 1e6);
+                    root.progress = total > 0 ? done / total : 0;
                 }
-                root.totalMB = Math.round(total / 1e6);
-                root.doneMB = Math.round(done / 1e6);
-                root.progress = total > 0 ? done / total : 0;
                 // over once nothing runs (a few looks, so a start that has not shown up yet is not taken for the end)
                 root.quietTicks = active ? 0 : root.quietTicks + 1;
                 if (root.quietTicks >= 3) {
