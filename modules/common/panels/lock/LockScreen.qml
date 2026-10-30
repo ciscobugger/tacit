@@ -113,7 +113,17 @@ Scope {
             Quickshell.execDetached(["bash", "-c", "pidof hyprlock || hyprlock"]);
             return;
         }
-        GlobalStates.screenLocked = true;
+        lockGuard.running = true;
+    }
+
+    // The boot lock (or its hyprlock fallback) still holds the session until the ready marker
+    // exists; the compositor would refuse ours, after the bar was hidden and LockedHint flipped.
+    Process {
+        id: lockGuard
+        command: ["bash", "-c", "[ -e \"$XDG_RUNTIME_DIR/martida-lock-ready\" ] || ! { pgrep -f '[b]ootlock[.]qml' || pidof hyprlock; } >/dev/null"]
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) GlobalStates.screenLocked = true;
+        }
     }
 
     IpcHandler {
