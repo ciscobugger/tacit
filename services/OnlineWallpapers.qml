@@ -21,6 +21,7 @@ Singleton {
     property string seed:       ""          
     property var    results:    []           // list [ {thumb, full, id, provider} ]
     property int totalPages: 0
+    property bool _refetch: false
 
     property var _naiveFullResults: []
     property var _blapplesFullResults: []
@@ -71,7 +72,11 @@ Singleton {
     })
 
     function fetch() {
-        if (root.loading) return;
+        // a new request (a search typed during a load) runs once the one in flight has ended
+        if (root.loading) {
+            root._refetch = true;
+            return;
+        }
         root.page = 1;
         root.seed = "";
         root.appending = false;
@@ -151,7 +156,7 @@ Singleton {
         const url = `https://wallhaven.cc/api/v1/search?sorting=random&purity=${purity}&categories=100&ratios=16x9&atleast=${res}&page=${root.page}${seedParam}${q}${apikey}`;
 
         fetchProc.provider = "wallhaven";
-        fetchProc.command = ["curl", "-s", url];
+        fetchProc.command = ["curl", "-s", "--fail", "--connect-timeout", "5", "--max-time", "20", url];
         fetchProc.running = true;
     }
 
@@ -164,7 +169,7 @@ Singleton {
         const url = `https://api.unsplash.com/photos/random?orientation=${orientation}&count=${count}${q}&client_id=${clientId}`;
 
         fetchProc.provider = "unsplash";
-        fetchProc.command = ["curl", "-s", url];
+        fetchProc.command = ["curl", "-s", "--fail", "--connect-timeout", "5", "--max-time", "20", url];
         fetchProc.running = true;
     }
 
@@ -172,19 +177,19 @@ Singleton {
         const q = root.query.length > 0 ? root.query : "wallpaper landscape";
         const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=24&page=${root.page}`;
         fetchProc.provider = "pexels";
-        fetchProc.command  = ["curl", "-s", "-H", `Authorization: ${root.pexelsApiKey}`, url];
+        fetchProc.command  = ["curl", "-s", "--fail", "--connect-timeout", "5", "--max-time", "20", "-H", `Authorization: ${root.pexelsApiKey}`, url];
         fetchProc.running  = true;
     }
 
     function _fetchBlapples() {
         fetchProc.provider = "blapples";
-        fetchProc.command = ["curl", "-sL", root.blapplesJsonUrl];
+        fetchProc.command = ["curl", "-sL", "--fail", "--connect-timeout", "5", "--max-time", "20", root.blapplesJsonUrl];
         fetchProc.running = true;
     }
 
     function _fetchNaive() {
         fetchProc.provider = "naive";
-        fetchProc.command = ["curl", "-sL", root.naiveJsonUrl];
+        fetchProc.command = ["curl", "-sL", "--fail", "--connect-timeout", "5", "--max-time", "20", root.naiveJsonUrl];
         fetchProc.running = true;
     }
 
@@ -377,6 +382,11 @@ Singleton {
 
         onExited: (exitCode) => {
             root.loading = false;
+            if (root._refetch) {
+                root._refetch = false;
+                root.fetch();
+                return;
+            }
             if (exitCode !== 0) {
                 root.fetchError("curl exited with code " + exitCode);
                 return;
