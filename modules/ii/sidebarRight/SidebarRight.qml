@@ -22,6 +22,14 @@ Scope {
 
         readonly property bool animatedEntrance: WM.compositor !== "hyprland"
         property bool reallyVisible: false
+        // Keeping the panel built waits until the shell has settled, so building it does not
+        // block the first bar frames.
+        property bool settled: false
+        Timer {
+            interval: 5000
+            running: true
+            onTriggered: panelWindow.settled = true
+        }
         visible: reallyVisible
         // The monitor in use when the panel was opened; fixed until the next open so a
         // focus change does not carry the open panel to another screen.
@@ -156,7 +164,7 @@ Scope {
                     id: sidebarContentLoader
                     // The body sits flush in the corner; the cove to its left and the cove
                     // above it are drawn by the DockedRect inside SidebarRightContent.qml.
-                    active: panelWindow.reallyVisible || Config?.options.sidebar.keepRightSidebarLoaded
+                    active: panelWindow.reallyVisible || (panelWindow.settled && Config?.options.sidebar.keepRightSidebarLoaded)
                     anchors {
                         left: parent.left
                         right: parent.right
