@@ -1024,7 +1024,7 @@ FloatingWindow {
             if (p.within) args += ` --changed-within ${p.within}`;
             if (p.size) args += ` --size ${p.size}`;
             if (p.exts.length > 0 || p.within || p.size) args += " --type f";
-            const pattern = p.name.length > 0 ? p.name.join(".*") : ".";
+            const pattern = p.name.length > 0 ? p.name.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*") : ".";
             return ["bash", "-c", `cd '${StringUtils.shellSingleQuoteEscape(win.folder)}' && ${args} -- '${StringUtils.shellSingleQuoteEscape(pattern)}' . 2>/dev/null`];
         }
         onRunningChanged: win.searchRunning = running
