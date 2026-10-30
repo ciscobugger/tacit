@@ -108,7 +108,12 @@ AbstractBackgroundWidget {
     function enqueueFiles(urls) {
         var valid = []
         for (var i = 0; i < urls.length; i++) {
-            var cleanPath = urls[i].toString().replace(/^file:\/\//, "")
+            var cleanPath
+            try {
+                cleanPath = FileUtils.trimFileProtocol(decodeURIComponent(urls[i].toString()))
+            } catch (e) {
+                continue
+            }
             var ext = cleanPath.split(".").pop().toLowerCase()
             if (root.acceptedExtensions.indexOf(ext) !== -1)
                 valid.push(cleanPath)
