@@ -96,7 +96,7 @@ ContentPage {
 
         let cmd = `mkdir -p ${page.shQuote(dir)}`
         for (const asset of toDownload) {
-            cmd += ` && curl -sSL ${page.shQuote(asset.url)} -o ${page.shQuote(dir + "/" + asset.filename)}`
+            cmd += ` && curl -fsSL --connect-timeout 10 --max-time 60 ${page.shQuote(asset.url)} -o ${page.shQuote(dir + "/" + asset.filename)}`
         }
         presetAssetsFetchProc.command = ["bash", "-c", cmd]
         presetAssetsFetchProc.running = true
@@ -110,7 +110,7 @@ ContentPage {
         presetJsonFetchProc.metaUrl = entry.metaUrl
         presetJsonFetchProc.stagingJsonPath = stagingJsonPath
         presetJsonFetchProc.command = ["bash", "-c",
-            `mkdir -p ${page.shQuote(page.onlinePresetsDir())} && curl -sSL ${page.shQuote(entry.jsonUrl)} -o ${page.shQuote(stagingJsonPath)}`]
+            `mkdir -p ${page.shQuote(page.onlinePresetsDir())} && curl -fsSL --connect-timeout 10 --max-time 60 ${page.shQuote(entry.jsonUrl)} -o ${page.shQuote(stagingJsonPath)}`]
         presetJsonFetchProc.running = true
     }
 
@@ -230,7 +230,7 @@ ContentPage {
                 presetMetaFetchProc.entryName = presetJsonFetchProc.entryName
                 presetMetaFetchProc.entryAssets = presetJsonFetchProc.entryAssets
                 presetMetaFetchProc.stagingJsonPath = presetJsonFetchProc.stagingJsonPath
-                presetMetaFetchProc.command = ["curl", "-sSL", presetJsonFetchProc.metaUrl]
+                presetMetaFetchProc.command = ["curl", "-fsSL", "--connect-timeout", "10", "--max-time", "60", presetJsonFetchProc.metaUrl]
                 presetMetaFetchProc.running = true
             } else {
                 page.startOnlineAssetsFetch(presetJsonFetchProc.entryName, presetJsonFetchProc.stagingJsonPath, presetJsonFetchProc.entryAssets, [])
@@ -275,7 +275,7 @@ ContentPage {
             const finalJsonPath = `${page.onlinePresetsDir()}/${presetAssetsFetchProc.entryName}.json`
             const jqFilter = '$files as $files | walk(if type == "string" then ((split("/") | last) as $base | if ($files | index($base)) then ($dir + "/" + $base) else . end) else . end) | if has("profile") then .profile.avatarPath = $dir else . end | ._presetMeta.source = "online"'
             const filesJson = JSON.stringify(presetAssetsFetchProc.assetFilenames)
-            const cmd = `jq --arg dir ${page.shQuote(presetAssetsFetchProc.assetCacheDirPath)} --argjson files ${page.shQuote(filesJson)} ${page.shQuote(jqFilter)} ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)} > ${page.shQuote(finalJsonPath)} && rm -f ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)}`
+            const cmd = `jq --arg dir ${page.shQuote(presetAssetsFetchProc.assetCacheDirPath)} --argjson files ${page.shQuote(filesJson)} ${page.shQuote(jqFilter)} ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)} > ${page.shQuote(finalJsonPath + ".tmp")} && mv ${page.shQuote(finalJsonPath + ".tmp")} ${page.shQuote(finalJsonPath)} && rm -f ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)}`
             presetRewriteProc.command = ["bash", "-c", cmd]
             presetRewriteProc.running = true
         }
