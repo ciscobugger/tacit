@@ -64,10 +64,14 @@ Scope {
                 overviewScope.showDock();
         }
     }
-    function showDock() {
+    function showDock(edgeScreen) {
         if (GlobalStates.overviewOpen || GlobalStates.screenLocked)
             return;
-        overviewScope.moveToFocusedScreen();
+        // the edge strip that was touched names its screen; otherwise the focused one
+        if (edgeScreen)
+            panelWindow.screen = edgeScreen;
+        else
+            overviewScope.moveToFocusedScreen();
         overviewScope.paletteMode = true;
         overviewScope.dockAlive = true;
         overviewScope.dockShown = true;
@@ -485,28 +489,32 @@ Scope {
 
     // The bottom edge, under the dock's place: resting the pointer on it raises the dock. Not over a
     // fullscreen window, not while the palette or the dock is up.
-    PanelWindow {
-        id: dockEdge
-        screen: panelWindow.screen
-        readonly property bool fullscreenHere: WM.fullscreenOnMonitor(panelWindow.monitor?.name)
-        visible: !GlobalStates.screenLocked && !GlobalStates.overviewOpen && !overviewScope.dockShown && !dockEdge.fullscreenHere
-        WlrLayershell.namespace: "quickshell:dockEdge"
-        WlrLayershell.layer: WlrLayer.Top
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        anchors.bottom: true
-        implicitWidth: 880
-        implicitHeight: 2
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            onEntered: revealTimer.restart()
-            onExited: revealTimer.stop()
-        }
-        Timer {
-            id: revealTimer
-            interval: 90
-            onTriggered: overviewScope.showDock()
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            id: dockEdge
+            required property var modelData
+            screen: modelData
+            readonly property bool fullscreenHere: WM.fullscreenOnMonitor(modelData.name)
+            visible: !GlobalStates.screenLocked && !GlobalStates.overviewOpen && !overviewScope.dockShown && !dockEdge.fullscreenHere
+            WlrLayershell.namespace: "quickshell:dockEdge"
+            WlrLayershell.layer: WlrLayer.Top
+            exclusionMode: ExclusionMode.Ignore
+            color: "transparent"
+            anchors.bottom: true
+            implicitWidth: 880
+            implicitHeight: 2
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                onEntered: revealTimer.restart()
+                onExited: revealTimer.stop()
+            }
+            Timer {
+                id: revealTimer
+                interval: 90
+                onTriggered: overviewScope.showDock(dockEdge.modelData)
+            }
         }
     }
 
