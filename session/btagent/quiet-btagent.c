@@ -339,6 +339,27 @@ static void method(GDBusConnection *c, const gchar *sender, const gchar *path, c
 
 static const GDBusInterfaceVTable vtable = { method, NULL, NULL, { 0 } };
 
+static void bluez_appeared(GDBusConnection *conn, const gchar *name, const gchar *owner, gpointer u) {
+    GError *err = NULL;
+    GVariant *r = g_dbus_connection_call_sync(
+        conn, "org.bluez", "/org/bluez", "org.bluez.AgentManager1", "RegisterAgent",
+        g_variant_new("(os)", AGENT_PATH, CAPABILITY), NULL,
+        G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
+    if (!r) {
+        g_printerr("btagent: BlueZ refused the agent: %s\n", err->message);
+        return;
+    }
+    g_variant_unref(r);
+    /* Being the default agent is what makes BlueZ route a request started anywhere -- the remote
+     * device, bluetoothctl -- to this sheet. Another agent may already hold it (blueman), and that
+     * is not a reason to stop: this one still serves the pairings the shell itself starts. */
+    r = g_dbus_connection_call_sync(conn, "org.bluez", "/org/bluez", "org.bluez.AgentManager1",
+                                    "RequestDefaultAgent", g_variant_new("(o)", AGENT_PATH), NULL,
+                                    G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
+    if (r) g_variant_unref(r);
+    else g_printerr("btagent: not the default agent: %s\n", err->message);
+}
+
 static void quit(int sig) { if (loop) g_main_loop_quit(loop); }
 
 int main(void) {
@@ -394,23 +415,10 @@ int main(void) {
         return 0;
     }
 
-    GVariant *r = g_dbus_connection_call_sync(
-        bus, "org.bluez", "/org/bluez", "org.bluez.AgentManager1", "RegisterAgent",
-        g_variant_new("(os)", AGENT_PATH, CAPABILITY), NULL,
-        G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
-    if (!r) {
-        g_printerr("btagent: BlueZ refused the agent: %s\n", err->message);
-        return 1;
-    }
-    g_variant_unref(r);
-    /* Being the default agent is what makes BlueZ route a request started anywhere -- the remote
-     * device, bluetoothctl -- to this sheet. Another agent may already hold it (blueman), and that
-     * is not a reason to stop: this one still serves the pairings the shell itself starts. */
-    r = g_dbus_connection_call_sync(bus, "org.bluez", "/org/bluez", "org.bluez.AgentManager1",
-                                    "RequestDefaultAgent", g_variant_new("(o)", AGENT_PATH), NULL,
-                                    G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
-    if (r) g_variant_unref(r);
-    else g_printerr("btagent: not the default agent: %s\n", err->message);
+    /* BlueZ forgets its agents when bluetoothd exits, and may start after this process, so the
+     * agent registers whenever the name appears, not once. */
+    g_bus_watch_name_on_connection(bus, "org.bluez", G_BUS_NAME_WATCHER_FLAGS_NONE,
+                                   bluez_appeared, NULL, NULL, NULL);
 
     loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(loop);
