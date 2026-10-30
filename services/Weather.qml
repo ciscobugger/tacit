@@ -15,7 +15,11 @@ Singleton {
     readonly property int fetchInterval: Config.options.bar.weather.fetchInterval * 60 * 1000
     readonly property string city: Config.options.bar.weather.city
     readonly property bool useUSCS: Config.options.bar.weather.useUSCS
-    property bool gpsActive: Config.options.bar.weather.enableGPS
+    readonly property bool gpsEnabled: Config.options.bar.weather.enableGPS
+    // Set when GPS gave up; a separate flag so the Settings toggle binding stays intact.
+    property bool gpsFailed: false
+    readonly property bool gpsActive: root.gpsEnabled && !root.gpsFailed
+    onGpsEnabledChanged: root.gpsFailed = false
 
     // Weather views on screen (the desktop widgets and the bar item count themselves in and out).
     // With none, or with no key, nothing is fetched and the location service is not started.
@@ -159,14 +163,25 @@ Singleton {
         const units = root.useUSCS ? "imperial" : "metric"
         root.fetchQuery = `${place}&units=${units}&appid=${apiKey}`
 
-        if (fetcher.running)
+        if (fetcher.running) {
+            root.refetchPending = true
             return
+        }
         fetcher.command = root.curlFor(`https://api.openweathermap.org/data/2.5/weather?${root.fetchQuery}`)
         fetcher.running = true
     }
 
+    // A change that arrived while a request was in flight; fetched again once it exits.
+    property bool refetchPending: false
+
     Process {
         id: fetcher
+        onExited: {
+            if (root.refetchPending) {
+                root.refetchPending = false
+                root.getData()
+            }
+        }
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.length === 0) {
@@ -240,7 +255,7 @@ Singleton {
                     gpsAcquisition.stop()
                     root.getData()
                 } else {
-                    Qt.callLater(() => root.gpsActive = root.location.valid)
+                    Qt.callLater(() => root.gpsFailed = !root.location.valid)
                     console.error("[WeatherService] Failed to get GPS location.")
                 }
             }
@@ -250,7 +265,7 @@ Singleton {
                 positionSource.stop()
                 gpsAcquisition.stop()
                 root.location.valid = false
-                Qt.callLater(() => root.gpsActive = false)
+                Qt.callLater(() => root.gpsFailed = true)
                 console.error("[WeatherService] Position source error:", positionSource.sourceError)
                 root.getData()
             }
@@ -260,7 +275,7 @@ Singleton {
                     positionSource.stop()
                     gpsAcquisition.stop()
                     root.location.valid = false
-                    Qt.callLater(() => root.gpsActive = false)
+                    Qt.callLater(() => root.gpsFailed = true)
                     console.error("[WeatherService] Could not acquire valid GPS backend.")
                 }
             }
@@ -275,7 +290,7 @@ Singleton {
         interval: 30000
         onTriggered: {
             if (root.location.valid) return
-            root.gpsActive = false
+            root.gpsFailed = true
             console.info("[WeatherService] No GPS fix in 30s, falling back to the configured city.")
             root.getData()
         }
