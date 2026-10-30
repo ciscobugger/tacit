@@ -416,7 +416,6 @@ Item {
             root.settled = false;
             root.selectedKey = "";
             root.chosenByHand = false;
-            if (GlobalStates.overviewOpen) PaletteSearch.refreshExecutables();
             root.lastPointer = Qt.point(-1, -1);
             if (GlobalStates.overviewOpen) {
                 closedTimer.stop();
