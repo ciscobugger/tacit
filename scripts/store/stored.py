@@ -16,7 +16,7 @@ password prompt is the desktop's own (the shell's polkit agent).
 Never `pacman -Sy`: refreshing the package lists without updating the system is what leaves an Arch system half
 updated. An install that would upgrade anything already installed is refused ("needs a system update first").
 """
-import glob, gzip, hashlib, json, os, re, shutil, subprocess, sys, urllib.request
+import glob, gzip, hashlib, json, os, re, shutil, subprocess, sys, threading, urllib.parse, urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 
@@ -256,14 +256,19 @@ def icon_png(src):
     dst = os.path.join(CACHE, "icons", os.path.basename(src).rsplit(".", 1)[0] + ".png")
     if not os.path.exists(dst):
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        tmp = f"{dst}.{os.getpid()}.tmp.png"
+        tmp = f"{dst}.{os.getpid()}.{threading.get_ident()}.tmp.png"
         subprocess.run(["magick", src, tmp], capture_output=True, timeout=30)
         if os.path.exists(tmp):
             os.replace(tmp, dst)
     return dst if os.path.exists(dst) else ""
 
 
-OFFLINE = False  # set by the first shot that cannot reach the network, so one run does not wait on every picture
+# Pictures come from many sites, so one dead site is not "offline": give up only when two different hosts failed to connect and none has answered
+FAILED_HOSTS, REACHED = set(), []
+
+
+def offline():
+    return len(FAILED_HOSTS) >= 2 and not REACHED
 
 
 def shot(url, wide=1600):
@@ -273,24 +278,27 @@ def shot(url, wide=1600):
     dst = os.path.join(CACHE, "shots", name + ".jpg")
     if os.path.exists(dst):
         return dst
-    global OFFLINE
-    if OFFLINE:
+    host = urllib.parse.urlparse(url).netloc
+    if offline() or host in FAILED_HOSTS:
         return ""
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    # per process: the home and app backends can fetch the same picture at once
-    raw = f"{dst}.{os.getpid()}.download"
-    tmp = f"{dst}.{os.getpid()}.tmp.jpg"
+    # per process and thread: the home and app backends, and the prefetch threads, can fetch the same picture at once
+    me = f"{os.getpid()}.{threading.get_ident()}"
+    raw = f"{dst}.{me}.download"
+    tmp = f"{dst}.{me}.tmp.jpg"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Tacit Apps"})
         with urllib.request.urlopen(req, timeout=20) as r, open(raw, "wb") as f:
             f.write(r.read(40 * 1024 * 1024))
+        REACHED.append(host)
         subprocess.run(["magick", raw + "[0]", "-resize", f"{wide}x>", "-quality", "88", tmp], capture_output=True, timeout=60)
         if os.path.exists(tmp):
             os.replace(tmp, dst)
     except urllib.error.HTTPError:
-        pass
+        REACHED.append(host)
     except OSError as e:
-        OFFLINE = isinstance(e, urllib.error.URLError)
+        if isinstance(e, urllib.error.URLError):
+            FAILED_HOSTS.add(host)
     except Exception:
         pass
     finally:
@@ -458,6 +466,7 @@ def home():
     # first run: every picture is fetched, so fetch them together rather than one after another
     wanted = [(x["url"], 1600) for p in [ed["feature"]["pkg"]] + list(ed["picks"]) for x in cat.get(p, {}).get("shots", [])[:1]]
     wanted += [(issue_url(sp, cat), 2560) for sp in ed.get("issue", []) if sp.get("pkg")]
+    wanted = list(dict.fromkeys(wanted))
     with ThreadPoolExecutor(6) as pool:
         list(pool.map(lambda uw: shot(*uw) if uw[0] else "", wanted))
     def first_shot(p):
