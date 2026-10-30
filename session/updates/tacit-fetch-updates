@@ -1,7 +1,7 @@
 #!/bin/bash
 # tacit-fetch-updates: keep this computer's list of packages fresh and download the waiting updates, never install them
 # (macOS's "Download new updates when available"). Getting an app in Apps then finds the updates it comes with already here.
-# Runs as the system from tacit-fetch-updates.timer. Skips quietly while pacman is busy, on battery under 40 %, or offline.
+# Runs as the system from tacit-fetch-updates.timer. Skips quietly while pacman is busy, on battery under 40 %, on a metered connection, or offline.
 # (From ~/dev/tacit-updates 5b2428e; tacit-session installs it.)
 set -u
 
@@ -32,6 +32,12 @@ done
 # asked for in Settings (tacit-fetch-updates-now.service): the person wants it, whatever the battery says
 if [ "${1:-}" != now ] && [ "$on_mains" = 0 ] && [ -n "$battery" ] && [ "$battery" -lt 40 ]; then
     echo "on battery at ${battery} %: not now"
+    exit 0
+fi
+
+# the background run does not spend a metered connection (a phone's hotspot reads as guessed); Settings' own ask does
+if [ "${1:-}" != now ] && nmcli -t -g GENERAL.METERED dev show 2>/dev/null | grep -q '^yes'; then
+    echo "metered connection: not now"
     exit 0
 fi
 
