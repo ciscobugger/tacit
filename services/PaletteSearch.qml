@@ -727,11 +727,11 @@ Singleton {
                 iconName: "travel_explore",
                 iconType: LauncherSearchResult.IconType.Material,
                 execute: () => {
-                    let url = Config.options.search.engineBaseUrl + terms;
+                    let query = terms;
                     for (const site of Config.options.search.excludedSites) {
-                        url += ` -site:${site}`;
+                        query += ` -site:${site}`;
                     }
-                    Qt.openUrlExternally(url);
+                    Qt.openUrlExternally(Config.options.search.engineBaseUrl + encodeURIComponent(query));
                 }
             })];
     }
