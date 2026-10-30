@@ -579,7 +579,14 @@ Item {
         blockWrites: true              // save() answers for the write, so its outcome must be in
         watchChanges: true
         onFileChanged: reload()
-        onLoaded: { doc.missing = false; if (doc.started) doc.diskChanged(disk.text()); }
+        onLoaded: {
+            doc.missing = false;
+            if (!doc.started) return;
+            // a rewrite that is no longer UTF-8 must not reach the buffer: a save would write U+FFFD over the file
+            if (!doc.validUtf8(disk.data())) { doc.problem = doc.notUtf8; return; }
+            if (doc.problem === doc.notUtf8) doc.problem = "";
+            doc.diskChanged(disk.text());
+        }
         // only a vanished file is news; a read that failed while something rewrote the file is not
         onLoadFailed: err => { if (err == FileViewError.FileNotFound) doc.missing = true; }
         onSaved: {
@@ -591,6 +598,29 @@ Item {
             if (doc.announced) doc.lsp.saved(doc.abs);
         }
         onSaveFailed: err => { doc.selfWrite = false; doc.writeFailed(doc.reasonFor(err)); }
+    }
+    readonly property string notUtf8: "Not a UTF-8 text file."
+    // Well-formed UTF-8 by the bytes: U+FFFD in the decoded text can also be real text.
+    function validUtf8(buf) {
+        const b = new Uint8Array(buf), n = b.length;
+        for (let i = 0; i < n;) {
+            const c = b[i];
+            if (c < 0x80) { i++; continue; }
+            let k, min;
+            if (c >= 0xC2 && c <= 0xDF) { k = 1; min = 0x80; }
+            else if (c >= 0xE0 && c <= 0xEF) { k = 2; min = 0x800; }
+            else if (c >= 0xF0 && c <= 0xF4) { k = 3; min = 0x10000; }
+            else return false;
+            if (i + k >= n) return false;
+            let cp = c & (0x3F >> k);
+            for (let j = 1; j <= k; j++) {
+                if ((b[i + j] & 0xC0) !== 0x80) return false;
+                cp = (cp << 6) | (b[i + j] & 0x3F);
+            }
+            if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return false;
+            i += k + 1;
+        }
+        return true;
     }
     function diskChanged(t) {
         t = doc.fromDisk(t);
@@ -638,7 +668,7 @@ Item {
         if (raw.length > 2000000) { doc.problem = `Too large to open here — ${Voice.size(raw.length)}.`; doc.loaded = true; return; }
         if (raw.substring(0, 8000).includes("\u0000")) { doc.problem = "Not a text file."; doc.loaded = true; return; }
         // Latin-1 and the like decode with U+FFFD for each bad byte; a save would write those over the file.
-        if (raw.includes("\ufffd")) { doc.problem = "Not a UTF-8 text file."; doc.loaded = true; return; }
+        if (!doc.validUtf8(disk.data())) { doc.problem = doc.notUtf8; doc.loaded = true; return; }
         const after = doc.fromDisk(raw);
         doc.kind = doc.kindOf(after);
         doc.indentUnit = doc.detectIndent(after);
