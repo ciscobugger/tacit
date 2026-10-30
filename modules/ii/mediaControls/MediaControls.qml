@@ -110,7 +110,11 @@ Scope {
         sourceComponent: PanelWindow {
             id: panelWindow
             visible: true
-            screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
+            // The monitor in use when the popup opened; the assignment in onCompleted ends
+            // the binding so a focus change does not carry the open popup to another screen.
+            property var openScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
+            screen: openScreen
+            Component.onCompleted: openScreen = openScreen
 
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: 0
