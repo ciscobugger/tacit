@@ -147,7 +147,8 @@ ApplicationWindow {
         id: rail
         x: 16
         y: topLine.height
-        width: 264
+        // a tiled window can be far narrower than minimumWidth: the rail gives way before the page does
+        width: Math.min(264, Math.max(176, Math.round(root.width * 0.34)))
         height: parent.height - y - 16
         // on the window's ground, as Praxis's sessions rail: no slab of its own
         color: "transparent"
