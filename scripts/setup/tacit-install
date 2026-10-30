@@ -442,9 +442,15 @@ def nvidia_present():
 
 def username(name):
     base = re.sub(r"[^a-z0-9]", "", (name.split() or ["user"])[0].lower())
-    if not base or not base[0].isalpha() or base in ("root", "tacit", "sddm", "nobody", "bin", "daemon"):
+    # names already in the new system (mail, games, http, ...) would make useradd fail at the last step
+    taken = {l.split(":")[0] for l in open(f"{TARGET}/etc/passwd").read().splitlines()}
+    if not base or not base[0].isalpha() or base in taken or base in ("root", "tacit", "sddm", "nobody", "bin", "daemon"):
         base = "user" + base
-    return base[:32]
+    out, n = base[:32], 1
+    while out in taken:
+        n += 1
+        out = base[:30] + str(n)
+    return out
 
 
 def account(answers):
@@ -483,7 +489,7 @@ def account(answers):
     # the live system's root has no password: locked on the installed one
     chroot("passwd", "-l", "root")
     # fish, as the owner's (the terminal's prompt and colours are set up for it: tacit-session's fish config)
-    chroot("useradd", "-m", "-G", "wheel,video,audio,input,network", "-c", name, "-s", "/usr/bin/fish", user)
+    chroot("useradd", "-m", "-G", "wheel,video,audio,input,network", "-c", re.sub(r"[:\x00-\x1f\x7f]", "", name).strip() or user, "-s", "/usr/bin/fish", user)
     chroot("chpasswd", inp=f"{user}:{password}\n")
     # the picture chosen in Setup, where the shell, its locks and SDDM look for it (it was dropped until 2026-10-16)
     picture = answers.get("picture") or ""
