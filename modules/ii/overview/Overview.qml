@@ -24,6 +24,13 @@ Scope {
     // The workspace sheet lives from its opening until it has shrunk back into the notch, so the
     // Loader keeps it (it used to follow overviewOpen and destroyed the sheet before the close ran).
     property bool gridAlive: false
+    // Stacked or grid is chosen once, when the grid comes alive: the Alt+Tab release or a switch
+    // started over an open overview must not swap the live view for another one.
+    property bool switchGrid: false
+    onGridAliveChanged: {
+        if (gridAlive)
+            switchGrid = switching;
+    }
     // shrinking back: the window stays up, without input, until OverviewWidget says it is closed
     readonly property bool gridClosing: gridAlive && !GlobalStates.overviewOpen
     // Back in the notch: the notch is shown again first, the sheet goes two frames later and its
@@ -464,7 +471,7 @@ Scope {
                 // grid (2026-10-02). Hidden, the Column skips it.
                 visible: overviewLoader.active
                 // The Stacked style has no highlight for the Alt+Tab choice, so switching uses the grid
-                sourceComponent: (Config?.options.overview.style ?? "default") === "niri" && !overviewScope.switching ? niriComponent : defaultComponent
+                sourceComponent: (Config?.options.overview.style ?? "default") === "niri" && !overviewScope.switchGrid ? niriComponent : defaultComponent
 
                 Component {
                     id: defaultComponent
