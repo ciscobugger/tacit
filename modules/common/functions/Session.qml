@@ -46,7 +46,8 @@ Singleton {
         if (WM.compositor === "niri") {
             Quickshell.execDetached(["qs", "-p", Directories.shellFile, "ipc", "call", "lock", "activate"]);
         } else {
-            Quickshell.execDetached(["loginctl", "lock-session"]);
+            // Same chain as hypridle's lock_cmd, so a lock does not depend on hypridle running.
+            Quickshell.execDetached(["bash", "-c", "qs -p \"$1\" ipc call lock activate || pidof hyprlock || hyprlock", "lock", Directories.shellFile]);
         }
     }
 
