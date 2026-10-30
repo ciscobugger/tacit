@@ -125,8 +125,11 @@ AbstractBackgroundWidget {
         id: coverArtDownloader
         property string targetFile: root.artUrl
         property string artFilePath: root.artFilePath
-        command: ["bash", "-c", `[ -f '${StringUtils.shellSingleQuoteEscape(artFilePath)}' ] || curl -sSL '${StringUtils.shellSingleQuoteEscape(targetFile)}' -o '${StringUtils.shellSingleQuoteEscape(artFilePath)}'`]
-        onExited: { root.downloaded = true }
+        // Download to a temp name and move it in, so a failed or cut-off download is never cached.
+        command: ["bash", "-c",
+            `[ -f "$2" ] || { curl -fsSL --max-time 15 "$1" -o "$2.tmp" && mv "$2.tmp" "$2"; } || { rm -f "$2.tmp"; exit 1; }`,
+            "_", targetFile, artFilePath]
+        onExited: (exitCode, exitStatus) => { root.downloaded = exitCode === 0 }
     }
 
     StyledRectangularShadow {

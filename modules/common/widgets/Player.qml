@@ -69,10 +69,13 @@ Item {
         id: coverArtDownloader
         property string targetFile: root.artUrl
         property string artFilePath: root.artFilePath
-        // The URL comes from the player's metadata, so it is not ours to trust unescaped
-        command: ["bash", "-c", `[ -f '${artFilePath}' ] || curl -4 -sSL '${StringUtils.shellSingleQuoteEscape(targetFile)}' -o '${artFilePath}'`]
+        // The URL comes from the player's metadata, so it is passed as an argument, never spliced in.
+        // Download to a temp name and move it in, so a failed or cut-off download is never cached.
+        command: ["bash", "-c",
+            `[ -f "$2" ] || { curl -4 -fsSL --max-time 15 "$1" -o "$2.tmp" && mv "$2.tmp" "$2"; } || { rm -f "$2.tmp"; exit 1; }`,
+            "_", targetFile, artFilePath]
         onExited: (exitCode, exitStatus) => {
-            root.downloaded = true
+            root.downloaded = exitCode === 0
         }
     }
 
