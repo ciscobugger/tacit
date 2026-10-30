@@ -66,8 +66,8 @@ write() {
     local ended_json=$ended
     jq -nc --rawfile results <(printf '%s\n' "${results[@]:-}") --rawfile undo <(printf '%s' "$undo") --arg id "$id" --arg op "$op" --arg dest "$dest" --arg state "$state" \
         --argjson total "$total" --argjson done "$done_" --argjson bytes "$bytes" --argjson bytesDone "$bytesDone" \
-        --arg current "$current" --arg error "$error" --argjson started "$started" --argjson ended "$ended_json" \
-        '{id:$id, op:$op, dest:$dest, state:$state, total:$total, done:$done, bytes:$bytes, bytesDone:$bytesDone, current:$current, error:$error, started:$started, ended:$ended, results:($results | split("\n") | map(select(length > 0))), undo:($undo | fromjson)}' \
+        --arg current "$current" --arg error "$error" --argjson started "$started" --argjson ended "$ended_json" --argjson pid $$ \
+        '{id:$id, op:$op, dest:$dest, state:$state, total:$total, done:$done, bytes:$bytes, bytesDone:$bytesDone, pid:$pid, current:$current, error:$error, started:$started, ended:$ended, results:($results | split("\n") | map(select(length > 0))), undo:($undo | fromjson)}' \
         > "$report.tmp" && mv -f "$report.tmp" "$report"
 }
 finish() { state=$1; ended=$(date +%s%3N); current=""; write; rm -f "$cancel"; exit 0; }
@@ -196,13 +196,28 @@ mkdir)
     undo=$(jq -nc --arg p "$target" '{op:"delete", paths:[$p]}')
     finish done ;;
 moveback)   # pairs: from to from to ... (the undo of a move or a rename)
-    total=$(( $# / 2 )); write
-    while [ $# -ge 2 ]; do
-        from=$1; to=$2; shift 2; current=$(basename -- "$to"); write
-        if [ -e "$to" ]; then error="$(basename -- "$to") is there again"; finish failed; fi
-        mkdir -p -- "$(dirname -- "$to")"
-        if ! mv -f -- "$from" "$to"; then error="Could not put $(basename -- "$to") back"; finish failed; fi
-        results+=("$to"); done_=$((done_+1)); write
+    # Like renames: a "to" that is another pair's "from" waits for that pair; a swap or ring parks one file.
+    total=$(( $# / 2 )); args=("$@"); write
+    declare -A leaving=() parked=()
+    unpark() { for k in "${!parked[@]}"; do mv -n -- "${parked[$k]}" "${args[k]}" 2>/dev/null; done; }
+    pend=(); for ((i = 0; i < ${#args[@]} - 1; i += 2)); do leaving[${args[i]}]=1; pend+=("$i"); done
+    while [ ${#pend[@]} -gt 0 ]; do
+        rest=(); moved=0
+        for i in "${pend[@]}"; do
+            from=${args[i]}; to=${args[i+1]}; current=$(basename -- "$to")
+            if [ -n "${leaving[$to]:-}" ]; then rest+=("$i"); continue; fi
+            if [ -e "$to" ]; then unpark; error="$(basename -- "$to") is there again"; finish failed; fi
+            mkdir -p -- "$(dirname -- "$to")"
+            if ! mv -f -- "${parked[$i]:-$from}" "$to"; then unpark; error="Could not put $(basename -- "$to") back"; finish failed; fi
+            unset "parked[$i]"; leaving[$from]=""; moved=1
+            results+=("$to"); done_=$((done_+1)); write
+        done
+        pend=("${rest[@]}")
+        if [ $moved = 0 ] && [ ${#pend[@]} -gt 0 ]; then
+            i=${pend[0]}; from=${args[i]}; park="$(dirname -- "$from")/.rename-$id-$i"
+            if ! mv -n -- "$from" "$park"; then unpark; error="Could not put $(basename -- "${args[i+1]}") back"; finish failed; fi
+            parked[$i]=$park; leaving[$from]=""
+        fi
     done
     finish done ;;
 extract)   # <archive> -> a folder beside it named after it (bsdtar reads every common format)
