@@ -102,6 +102,7 @@ case "$op" in
 copy|move)
     policy=$1; dest=$2; shift 2
     srcs=("$@"); total=${#srcs[@]}
+    write   # at once: the size scan below can take longer than the shell waits for a first report
     for s in "${srcs[@]}"; do b=$(du -sb -- "$s" 2>/dev/null | cut -f1); bytes=$((bytes + ${b:-0})); done
     write
     moved_from=(); made=()
