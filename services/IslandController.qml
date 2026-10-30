@@ -1547,12 +1547,16 @@ Singleton {
         onTriggered: {
             memPressure.reload();
             memInfo.reload();
-            root.onMemory(memPressure.text() + "\n" + memInfo.text());
+            let psi = "";   // no PSI in the kernel: MemAvailable alone still drives the check
+            try { psi = memPressure.text(); } catch (e) {}
+            let info = "";
+            try { info = memInfo.text(); } catch (e) {}
+            root.onMemory(psi + "\n" + info);
         }
     }
     // read in place, no sh/head/grep every tick; onMemory takes the first avg10 (the "some" line)
-    FileView { id: memPressure; path: "/proc/pressure/memory"; blockLoading: true }
-    FileView { id: memInfo; path: "/proc/meminfo"; blockLoading: true }
+    FileView { id: memPressure; path: "/proc/pressure/memory"; blockLoading: true; printErrors: false }
+    FileView { id: memInfo; path: "/proc/meminfo"; blockLoading: true; printErrors: false }
     function onMemory(text) {
         const num = re => parseFloat((re.exec(text) ?? [])[1] ?? "0");
         const total = num(/MemTotal:\s+(\d+)/);
