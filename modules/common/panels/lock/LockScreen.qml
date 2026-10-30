@@ -94,7 +94,7 @@ Scope {
             // Post-unlock actions
             if (lockContext.alsoInhibitIdle) {
                 lockContext.alsoInhibitIdle = false;
-                Idle.toggleInhibit(true);
+                Idle.inhibitForSession();
             }
         }
     }

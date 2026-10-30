@@ -37,6 +37,11 @@ Singleton {
         }
     }
 
+    // Stay awake until the next start; not written to Persistent.
+    function inhibitForSession() {
+        root.inhibit = true;
+    }
+
     function toggleInhibit(active = null) {
         if (active !== null) {
             root.inhibit = active;
