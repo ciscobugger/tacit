@@ -129,8 +129,9 @@ Item {
         const known = id => root.catalogEntry(id) !== null;
         const p = (arrangementAdapter.primary ?? []).filter(known);
         const s = (arrangementAdapter.secondary ?? []).filter(known);
-        root.primary = p.length > 0 ? p : root.defaultPrimary;
-        root.secondary = s.length > 0 ? s : root.defaultSecondary;
+        // A default id the user already placed in the other list stays out, or it would show twice.
+        root.primary = p.length > 0 ? p : root.defaultPrimary.filter(id => !s.includes(id));
+        root.secondary = s.length > 0 ? s : root.defaultSecondary.filter(id => !p.includes(id));
     }
     function saveArrangement() {
         arrangementAdapter.primary = root.primary;
