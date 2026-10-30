@@ -245,7 +245,8 @@ static void read_line(GDataInputStream *in, GAsyncResult *res, gpointer user) {
     gchar *line = g_data_input_stream_read_line_finish(in, res, &len, NULL);
     if (!line) {                                /* the shell closed, or reloaded */
         GOutputStream *os = g_object_get_data(G_OBJECT(in), "out");
-        if (os) {
+        /* to_shell may already have dropped (and unreffed) it after a failed write */
+        if (os && g_list_find(clients, os)) {
             clients = g_list_remove(clients, os);
             g_object_unref(os);
         }
