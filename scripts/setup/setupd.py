@@ -24,6 +24,7 @@ GB = 1_000_000_000
 # Tacit itself is about 7 GB, and the swap file for hibernating is the size of the memory (tacit-install makes it only
 # where 20 GB stay free): 32 GB, as for a whole disk. tacit-install refuses less
 MIN_TACIT = 32 * GB
+WINDOWS_DATA = "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7"
 ESP = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 lock = threading.Lock()
 
@@ -127,7 +128,9 @@ def layout(name, parts):
         return {}
     out = {"gpt": t.get("label") == "gpt", "esp": any(p["type"].lower() == ESP for p in t["partitions"]),
            "free": max([(b - a + 1) * t["sectorsize"] for a, b in gaps(t)] or [0])}
-    ntfs = [p for p in parts if p.get("fstype") == "ntfs"]
+    # the partitions tacit-install checks: Windows data (Recovery and OEM are NTFS too)
+    data = {p["node"].rsplit("/", 1)[-1] for p in t["partitions"] if p["type"].lower() == WINDOWS_DATA}
+    ntfs = [p for p in parts if p.get("fstype") == "ntfs" and p["name"] in data]
     if ntfs:
         win = max(ntfs, key=lambda p: p["size"])
         node = "/dev/" + win["name"]
