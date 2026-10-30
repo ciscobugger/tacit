@@ -7,7 +7,7 @@
 
 Results are cached under ~/.cache/tacit-viewer, keyed by path + mtime + size.
 """
-import array, hashlib, json, os, re, subprocess, sys
+import array, hashlib, json, os, re, shutil, subprocess, sys
 
 CACHE = os.path.expanduser("~/.cache/tacit-viewer")
 
@@ -80,12 +80,21 @@ def facts(path):
     os.makedirs(f"{CACHE}/thumbs", exist_ok=True)
     jpg = f"{CACHE}/thumbs/{key(path)}.jpg"
     if not os.path.exists(jpg):
-        if vs:
-            run(["ffmpeg", "-v", "error", "-y", "-ss", f"{min(1.0, dur / 10):.2f}", "-i", path,
-                 "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "4", jpg])
-        elif cover:
-            run(["ffmpeg", "-v", "error", "-y", "-i", path, "-map", f"0:{cover['index']}", "-frames:v", "1",
-                 "-vf", "scale=720:720:force_original_aspect_ratio=decrease", "-q:v", "3", jpg])
+        # rendered beside the final name and renamed on success, so a cut-off ffmpeg never leaves a truncated jpg
+        tmp = f"{jpg}.{os.getpid()}.part.jpg"
+        try:
+            r = None
+            if vs:
+                r = run(["ffmpeg", "-v", "error", "-y", "-ss", f"{min(1.0, dur / 10):.2f}", "-i", path,
+                         "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "4", tmp])
+            elif cover:
+                r = run(["ffmpeg", "-v", "error", "-y", "-i", path, "-map", f"0:{cover['index']}", "-frames:v", "1",
+                         "-vf", "scale=720:720:force_original_aspect_ratio=decrease", "-q:v", "3", tmp])
+            if r and r.returncode == 0 and os.path.exists(tmp):
+                os.replace(tmp, jpg)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
     if os.path.exists(jpg):
         out["thumb"] = jpg
     return out
@@ -112,8 +121,17 @@ def peaks(path, n):
 def pages(path, limit):
     d = f"{CACHE}/pages/{key(path)}"
     if not os.path.isdir(d):
-        os.makedirs(d, exist_ok=True)
-        run(["pdftoppm", "-r", "110", "-png", "-l", str(limit), path, f"{d}/p"], timeout=240)
+        # rendered into a temp folder and renamed on success, so a timeout or a closed viewer never leaves a partial set
+        tmp = f"{d}.{os.getpid()}.part"
+        os.makedirs(tmp, exist_ok=True)
+        try:
+            r = run(["pdftoppm", "-r", "110", "-png", "-l", str(limit), path, f"{tmp}/p"], timeout=240)
+            if r.returncode == 0 and any(f.endswith(".png") for f in os.listdir(tmp)):
+                os.rename(tmp, d)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    if not os.path.isdir(d):
+        return {"pages": []}
     return {"pages": sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith(".png"))}
 
 
