@@ -43,7 +43,7 @@ Singleton {
                 continue;
             let path = "";
             try {
-                path = decodeURIComponent(href.slice("file://".length));
+                path = decodeURIComponent(href.slice("file://".length).replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
             } catch (e) {
                 continue;
             }
