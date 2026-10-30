@@ -140,10 +140,17 @@ case "$action" in
         fi
         # Filter preset input before merge so blacklisted keys never overwrite local config
         tmp=$(mktemp)
+        old_wallpaper=$(jq -r '.background.wallpaperPath // empty' "$CONFIG_FILE")
         jq "$BLACKLIST_FILTER" "$preset_file" > "$tmp"
         jq -s '.[0] * .[1] | del(._presetMeta)' "$CONFIG_FILE" "$tmp" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
         rm -f "$tmp"
-        "$SWITCHWALL" --noswitch
+        # --noswitch only recolours; a preset that brings another wallpaper (video included) needs it applied
+        new_wallpaper=$(jq -r '.background.wallpaperPath // empty' "$CONFIG_FILE")
+        if [ -n "$new_wallpaper" ] && [ "$new_wallpaper" != "$old_wallpaper" ]; then
+            "$SWITCHWALL" --image "$new_wallpaper"
+        else
+            "$SWITCHWALL" --noswitch
+        fi
         ;;
     --export-zip)
         preset_file="$PRESETS_DIR/${name}.json"
