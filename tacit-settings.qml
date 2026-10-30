@@ -2453,11 +2453,12 @@ ApplicationWindow {
                 command: ["qs", "-p", Directories.shellFile, "ipc", "call", "notifications", "silent"]
                 stdout: SplitParser { onRead: data => np.silent = data.trim() === "true" }
             }
-            Timer {
-                interval: 3000
-                running: true
-                repeat: true
-                onTriggered: readSilent.running = true
+            Connections {
+                target: root
+                function onActiveChanged() {
+                    if (root.active)
+                        readSilent.running = true;
+                }
             }
             Group {
                 SwitchRow {
