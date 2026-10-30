@@ -376,14 +376,18 @@ def cover(pkg, ed, cat):
     return cropped(shot(url, 2560), sp["crop"]) if url else ""
 
 
+def issue_url(sp, cat):
+    urls = [x["url"] for x in cat.get(sp["pkg"], {}).get("shots", [])]
+    return next((u for u in urls if hashlib.sha1(u.encode()).hexdigest().startswith(sp.get("shot", "-"))), urls[0] if urls else "")
+
+
 def issue(ed, cat):
     """the front page as an issue: each spread with its picture cropped to the work, the picture's tone and brightness"""
     spreads = []
     for sp in ed.get("issue", []):
         sp = dict(sp)
         if sp.get("pkg"):
-            urls = [x["url"] for x in cat.get(sp["pkg"], {}).get("shots", [])]
-            url = next((u for u in urls if hashlib.sha1(u.encode()).hexdigest().startswith(sp.get("shot", "-"))), urls[0] if urls else "")
+            url = issue_url(sp, cat)
             pic = cropped(shot(url, 2560), sp.get("crop")) if url else ""
             sp["picture"], sp["tone"], sp["bright"] = pic, tone(pic), brightness(pic)
             sp["aspect"] = aspect(pic)
@@ -451,6 +455,11 @@ def home():
                   | bundles() | (got() & inst))
     f = facts([p for p in pkgs if p in avail])
     apps = {p: info(p, cat, ed, avail, inst, f.get(p)) for p in pkgs}
+    # first run: every picture is fetched, so fetch them together rather than one after another
+    wanted = [(x["url"], 1600) for p in [ed["feature"]["pkg"]] + list(ed["picks"]) for x in cat.get(p, {}).get("shots", [])[:1]]
+    wanted += [(issue_url(sp, cat), 2560) for sp in ed.get("issue", []) if sp.get("pkg")]
+    with ThreadPoolExecutor(6) as pool:
+        list(pool.map(lambda uw: shot(*uw) if uw[0] else "", wanted))
     def first_shot(p):
         return next((s for s in (shot(x["url"]) for x in cat.get(p, {}).get("shots", [])[:2]) if s), "")
     feature = dict(ed["feature"], picture=cropped(first_shot(ed["feature"]["pkg"]), ed["feature"].get("crop")))
