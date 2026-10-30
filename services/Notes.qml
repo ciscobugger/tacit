@@ -14,6 +14,16 @@ Singleton {
     id: root
     property var filePath: Directories.desktopNotesPath ?? (Directories.config + "/notes.json")
     property var list: []
+    // A file that did not parse may still hold notes: it is never written over.
+    property bool broken: false
+
+    function save() {
+        if (root.broken) {
+            console.log("[Notes] Not saving: " + root.filePath + " did not parse")
+            return
+        }
+        notesFileView.setText(JSON.stringify(root.list))
+    }
 
     function addNote(content, attachments) {
         const item = {
@@ -24,7 +34,7 @@ Singleton {
         }
         list.push(item)
         root.list = list.slice(0)
-        notesFileView.setText(JSON.stringify(root.list))
+        root.save()
         return item.id
     }
 
@@ -35,7 +45,7 @@ Singleton {
             if (attachments !== undefined)
                 list[idx].attachments = attachments
             root.list = list.slice(0)
-            notesFileView.setText(JSON.stringify(root.list))
+            root.save()
         }
     }
 
@@ -44,7 +54,7 @@ Singleton {
         if (idx >= 0) {
             list.splice(idx, 1)
             root.list = list.slice(0)
-            notesFileView.setText(JSON.stringify(root.list))
+            root.save()
         }
     }
 
@@ -63,11 +73,16 @@ Singleton {
             const fileContents = notesFileView.text()
             try {
                 const parsed = JSON.parse(fileContents)
-                root.list = Array.isArray(parsed) ? parsed : []
+                if (Array.isArray(parsed)) {
+                    root.list = parsed
+                    root.broken = false
+                } else {
+                    root.broken = true
+                    console.log("[Notes] The file is not a list; keeping the notes in memory")
+                }
             } catch (e) {
-                console.log("[Notes] Corrupt or empty file, resetting to empty list. Error: " + e)
-                root.list = []
-                notesFileView.setText(JSON.stringify(root.list))
+                root.broken = true
+                console.log("[Notes] Cannot read the file, keeping the notes in memory: " + e)
             }
             console.log("[Notes] File loaded")
         }
