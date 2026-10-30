@@ -84,7 +84,10 @@ Singleton {
         repeat: true
         running: root.available
         triggeredOnStart: true
-        onTriggered: root.sample()
+        onTriggered: {
+            root.sample();
+            root.maybeSuspend();
+        }
     }
 
     property real health: (function() {
@@ -118,9 +121,14 @@ Singleton {
 
     // The low, critical, full and charger notices and their chimes are sent by the shell
     // (IslandController.qml, "notices"): the login lock loads this file too, and sent each twice.
-    onIsSuspendingAndNotChargingChanged: {
-        if (root.available && isSuspendingAndNotCharging) {
-            Quickshell.execDetached(["bash", "-c", `systemctl suspend || loginctl suspend`]);
-        }
+    // Also asked every 20 s: after a resume that is still below the threshold the condition does not change, so only
+    // the change handler would never suspend again. The gap keeps one low stretch from suspending twice in a row.
+    property double lastSuspendAt: 0
+    function maybeSuspend() {
+        if (!root.available || !isSuspendingAndNotCharging) return;
+        if (Date.now() - lastSuspendAt < 120000) return;
+        lastSuspendAt = Date.now();
+        Quickshell.execDetached(["bash", "-c", `systemctl suspend || loginctl suspend`]);
     }
+    onIsSuspendingAndNotChargingChanged: root.maybeSuspend()
 }
