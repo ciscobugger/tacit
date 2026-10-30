@@ -463,7 +463,8 @@ Scope {
                 // counted that height and the dock sat 205 px above the edge after any workspace
                 // grid (2026-10-02). Hidden, the Column skips it.
                 visible: overviewLoader.active
-                sourceComponent: (Config?.options.overview.style ?? "default") === "niri" ? niriComponent : defaultComponent
+                // The Stacked style has no highlight for the Alt+Tab choice, so switching uses the grid
+                sourceComponent: (Config?.options.overview.style ?? "default") === "niri" && !overviewScope.switching ? niriComponent : defaultComponent
 
                 Component {
                     id: defaultComponent
