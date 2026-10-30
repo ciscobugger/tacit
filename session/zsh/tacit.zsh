@@ -1,6 +1,7 @@
-# Tacit's zsh setup for everyone (tacit-session, /etc/zsh/zshrc):
-# matches fish's setup (/usr/share/fish/vendor_conf.d/tacit.fish).
-# A user's own ~/.zshrc runs after this and can override any settings.
+# Tacit's zsh setup for everyone (tacit-session, /usr/share/tacit/zsh/tacit.zsh), matching fish's
+# (/usr/share/fish/vendor_conf.d/tacit.fish). Loaded from /etc/zsh/zshenv, which tacit-session writes only where there is
+# none: /etc/zsh/zshrc belongs to grml-zsh-config and /etc/zsh/zprofile to zsh. A person's own ~/.zshrc runs after this
+# and can change any of it.
 if [[ -o interactive ]]; then
     # the prompt: Tacit's Starship (design D, /usr/share/tacit/starship.toml) unless the person has their own
     if [[ "$TERM" != "linux" ]] && (( $+commands[starship] )); then
