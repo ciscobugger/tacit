@@ -1900,6 +1900,14 @@ FloatingWindow {
         const paths = urls.map(u => FileUtils.trimFileProtocol(win.decodePath(u.toString()))).filter(x => x.length > 0);
         if (paths.length === 0)
             return;
+        if (dest === win.trashDir) {   // the Trash row: a drop there is a trash, so the record Put back needs is written
+            const out = paths.filter(x => x !== win.trashDir && !x.startsWith(win.trashDir + "/"));
+            if (out.length > 0) {
+                win.pendingTrash = out;
+                win.run("trash", out);
+            }
+            return;
+        }
         const op = (modifiers & Qt.ControlModifier) ? "copy" : (modifiers & Qt.ShiftModifier) ? "move" : (internal ? "move" : "copy");
         win.bring(op, paths, dest);
     }
