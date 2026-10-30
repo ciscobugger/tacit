@@ -310,12 +310,18 @@ Item {
     function setZoom(z) {
         zoomTo = Math.max(1, Math.min(8, z));
         zoom = zoomTo;
-        if (zoom <= 1) { panX = 0; panY = 0; } else clampPan();
+        clampPan();
     }
+    // the picture is fitted inside the window by its own shape, so its edges are not the window's: a pan
+    // stops at the picture's edge, and follows the eased zoom out back to the middle (at 1, nowhere to pan)
     function clampPan() {
-        panX = Math.max(-(zoom - 1) * width / 2, Math.min((zoom - 1) * width / 2, panX));
-        panY = Math.max(-(zoom - 1) * height / 2, Math.min((zoom - 1) * height / 2, panY));
+        const a = aspectOf(landed), fa = height > 0 ? width / height : 1;
+        const pw = a > fa ? width : height * a, ph = a > fa ? width / a : height;
+        const mx = Math.max(0, (pw * zoom - width) / 2), my = Math.max(0, (ph * zoom - height) / 2);
+        panX = Math.max(-mx, Math.min(mx, panX));
+        panY = Math.max(-my, Math.min(my, panY));
     }
+    onZoomChanged: clampPan()
 
     // turning a picture turns the view only; the file is never written
     property int rot: 0                       // quarter turns, in degrees, counted on (so 270 -> 360 keeps turning)
