@@ -106,7 +106,6 @@ Scope {
             // the binding so a focus change does not carry the open popup to another screen.
             property var openScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
             screen: openScreen
-            Component.onCompleted: openScreen = openScreen
 
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: 0
@@ -135,7 +134,10 @@ Scope {
                 item: cardBackground
             }
 
-            Component.onCompleted: GlobalFocusGrab.addDismissable(panelWindow)
+            Component.onCompleted: {
+                openScreen = openScreen;
+                GlobalFocusGrab.addDismissable(panelWindow);
+            }
             Component.onDestruction: GlobalFocusGrab.removeDismissable(panelWindow)
             Connections {
                 target: GlobalFocusGrab
