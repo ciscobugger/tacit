@@ -1594,6 +1594,10 @@ Singleton {
         const name = DesktopEntries.heuristicLookup(n.cls)?.name ?? n.cls.split(".").pop();
         n.name = name.charAt(0).toUpperCase() + name.slice(1);
         n.since = Date.now();
+        // the earlier app's dialog still waits on its fifo: answer it Wait, it asks again if the app stays stuck
+        const old = root.notAnswering;
+        if (old && old.id !== n.id)
+            Quickshell.execDetached(["sh", "-c", 'printf "%s\\n" "$2" > "$1"', "sh", old.fifo, old.buttons[1]]);
         root.notAnswering = n;
         root.notAnsweringFor = 0;
         root.closeRequested();      // an open sheet would hide it
