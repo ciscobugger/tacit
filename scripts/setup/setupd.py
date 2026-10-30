@@ -200,7 +200,7 @@ def describe(best):
             else dict(disk, case="windows", **{"used": None, **room})
     if any(f in ("ext4", "btrfs", "xfs", "f2fs") for f in fs):
         return dict(disk, case="linux", **room)
-    return dict(disk, case="empty" if not parts else "other", **room)
+    return dict(disk, case="empty" if not parts and not best.get("fstype") else "other", **room)
 
 def fake_disks(case):
     if case == "two":
