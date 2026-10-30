@@ -87,10 +87,14 @@ Singleton {
     property string missingPath: ""
     Timer {
         id: missingRetry
-        interval: 2000
+        // 2 s, then 10 s, then 60 s: a file that never comes (theming off) is not polled every 2 s all session
+        property int tries: 0
+        interval: tries < 5 ? 2000 : tries < 10 ? 10000 : 60000
         repeat: true
         running: root.missingPath.length > 0
+        onRunningChanged: if (!running) tries = 0
         onTriggered: {
+            tries++;
             const p = root.missingPath;
             root.filePath = "";
             root.filePath = p;
