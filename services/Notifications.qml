@@ -699,7 +699,8 @@ Singleton {
         onLoaded: {
             const fileContents = notifFileView.text()
             try {
-                root.list = JSON.parse(fileContents).map((notif) => {
+                // An empty file holds nothing to protect
+                root.list = (fileContents.trim() === "" ? [] : JSON.parse(fileContents)).map((notif) => {
                     return notifComponent.createObject(root, {
                         "notificationId": notif.notificationId,
                         "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
