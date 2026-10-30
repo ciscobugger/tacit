@@ -169,8 +169,8 @@ Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: 88
                             horizontalAlignment: Text.AlignHCenter
-                            // the title it came from when the desktop knows one, else the file name
-                            text: tile.more ? "all in Files" : Things.describe(tile.path).title
+                            // the file's own name: the title Origins keeps is the page it came from, not the file
+                            text: tile.more ? "all in Files" : tile.name
                             elide: Text.ElideMiddle
                             maximumLineCount: 1
                             font.family: Appearance.font.family.main
