@@ -9,6 +9,7 @@ Process {
     running: true
     property string screenshotDir: Directories.screenshotTemp
     required property ShellScreen screen
+    property bool uncompressed: false
     property string screenshotPath: `${screenshotDir}/image-${screen.name}`
-    command: ["bash", "-c", `mkdir -p '${StringUtils.shellSingleQuoteEscape(screenshotDir)}' && grim -l 0 -o '${StringUtils.shellSingleQuoteEscape(screen.name)}' '${StringUtils.shellSingleQuoteEscape(screenshotPath)}'`]
+    command: ["bash", "-c", `mkdir -p '${StringUtils.shellSingleQuoteEscape(screenshotDir)}' && grim ${uncompressed ? '-l 0 ' : ''}-o '${StringUtils.shellSingleQuoteEscape(screen.name)}' '${StringUtils.shellSingleQuoteEscape(screenshotPath)}'`]
 }

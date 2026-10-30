@@ -269,6 +269,7 @@ PanelWindow {
     // Screenshot stuff
     TempScreenshotProcess {
         id: screenshotProc
+        uncompressed: true
         running: true
         screen: root.screen
         screenshotDir: root.screenshotDir
