@@ -131,6 +131,8 @@ Singleton {
     // file-name characters, curl given argv (OnlineWallpaperGrid.qml did the same).
     function downloadAndApply(item, darkMode = Appearance.m3colors.darkmode) {
         const url = String(item?.full ?? "");
+        if (downloadProc.running)
+            return;
         if (!/^https:\/\//.test(url))
             return;
         const lower = url.toLowerCase().split("?")[0];

@@ -49,7 +49,7 @@ Item {
     }
 
     function downloadItem(item, apply) {
-        if (!item) return
+        if (!item || downloadProc.running) return
         const url = String(item.full)
         // The url and the id come verbatim out of a provider's JSON, so they are treated as
         // data throughout: refuse anything that is not an https url, keep the id to characters
