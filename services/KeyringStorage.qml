@@ -31,7 +31,20 @@ Singleton {
     )
     property string keyringLabel: Translation.tr("%1 Safe Storage").arg("illogical-impulse")
 
+    // Writes made before the first read finishes; saving then would replace every other stored key.
+    property var pendingWrites: []
+
+    function flushPendingWrites() {
+        const writes = root.pendingWrites;
+        root.pendingWrites = [];
+        writes.forEach(w => root.setNestedField(w.path, w.value));
+    }
+
     function setNestedField(path, value) {
+        if (!root.loaded) {
+            root.pendingWrites = root.pendingWrites.concat([{ path: path, value: value }]);
+            return;
+        }
         if (!root.keyringData) root.keyringData = {};
         let keys = path;
         let obj = root.keyringData;
@@ -102,11 +115,11 @@ Singleton {
                 if (data.length === 0 || !data.startsWith("{")) return;
                 try {
                     root.keyringData = JSON.parse(data);
+                    root.loaded = true;
+                    root.flushPendingWrites();
                     // console.log("[KeyringStorage] Keyring data fetched:", JSON.stringify(root.keyringData));
                 } catch (e) {
-                    console.error("[KeyringStorage] Failed to get keyring data, reinitializing.");
-                    root.keyringData = {};
-                    saveKeyringData()
+                    console.error("[KeyringStorage] Failed to parse keyring data, leaving it untouched.");
                 }
             }
         }
@@ -119,6 +132,7 @@ Singleton {
             }
             if (exitCode !== 2) {
                 root.loaded = true;
+                root.flushPendingWrites();
             } else {
                 retryLocked.restart();
             }
