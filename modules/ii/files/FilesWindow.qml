@@ -230,6 +230,17 @@ FloatingWindow {
     // Super + button down on a maximised Files window: the compositor will not drag it, so
     // it becomes a floating window first, its own size, under the cursor (the hand keeps
     // the same place across its width, as on every desktop that does this).
+    // The monitor under a point, in Hyprland's global layout space (where the cursor and every
+    // client's at/size live): its origin, its size in layout units and the bar's reserved top.
+    function monitorAt(x, y) {
+        for (const m of HyprlandData.monitors) {
+            const w = m.width / (m.scale || 1), h = m.height / (m.scale || 1);
+            if (x >= m.x && x < m.x + w && y >= m.y && y < m.y + h)
+                return { "x": m.x, "y": m.y, "w": w, "h": h, "top": m.reserved?.[1] ?? 0 };
+        }
+        const s = Quickshell.screens[0];
+        return { "x": 0, "y": 0, "w": s.width, "h": s.height, "top": HyprlandData.monitors[0]?.reserved?.[1] ?? 0 };
+    }
     function onDragBegin(text) {
         let cursor = null, list = [];
         try {
@@ -240,8 +251,7 @@ FloatingWindow {
         const c = win.meIn(list);
         if (!c || c.fullscreen !== 1 || Attention.address !== c.address)
             return;
-        const screen = Quickshell.screens[0];
-        const top = HyprlandData.monitors[0]?.reserved?.[1] ?? 0;
+        const m = win.monitorAt(cursor.x, cursor.y);
         const w = Files.windowState.w, h = Files.windowState.h;
         win.moving(1500);
         Hyprland.dispatch('hl.dsp.window.fullscreen({ mode = "maximized", action = "unset" })');
@@ -250,7 +260,8 @@ FloatingWindow {
         if (!c.floating)
             Hyprland.dispatch('hl.dsp.window.float({ action = "set" })');
         placeTimer.address = c.address;
-        placeTimer.at = [Math.round(cursor.x - w * (cursor.x / screen.width)), Math.max(top, Math.round(cursor.y - 24))];
+        placeTimer.mon = m;
+        placeTimer.at = [Math.round(cursor.x - w * ((cursor.x - m.x) / m.w)), Math.max(m.y + m.top, Math.round(cursor.y - 24))];
         placeTimer.restart();
     }
 
@@ -273,19 +284,21 @@ FloatingWindow {
         // the size and place a beat later: the float takes a frame, and a resize sent in
         // the same breath would land on the tile and be lost
         placeTimer.address = me.address;
+        placeTimer.mon = win.monitorAt(me.at[0] + me.size[0] / 2, me.at[1] + me.size[1] / 2);
         placeTimer.restart();
     }
     Timer {
         id: placeTimer
         property string address: ""
         property var at: null    // a place to land; null = the centre
+        property var mon: null   // the monitor the window is on (win.monitorAt)
         interval: 90
         onTriggered: {
-            const screen = Quickshell.screens[0];
-            const top = HyprlandData.monitors[0]?.reserved?.[1] ?? 0;
+            const m = mon ?? win.monitorAt(0, 0);
             const w = Files.windowState.w, h = Files.windowState.h;
-            const p = at ?? [Math.round((screen.width - w) / 2), Math.round(top + (screen.height - top - h) / 2)];
+            const p = at ?? [Math.round(m.x + (m.w - w) / 2), Math.round(m.y + m.top + (m.h - m.top - h) / 2)];
             at = null;
+            mon = null;
             win.placeWindow(address, p[0], p[1], w, h);
         }
     }
@@ -309,30 +322,32 @@ FloatingWindow {
             win.dragged = true;
         if (win.dropDone || !win.dragged || c.fullscreen || Attention.address !== c.address)
             return;
-        const screen = Quickshell.screens[0];
-        const W = screen.width, H = screen.height;
-        const top = HyprlandData.monitors[0]?.reserved?.[1] ?? 0;
+        // everything below is measured from the origin of the monitor the cursor is on
+        const m = win.monitorAt(cursor.x, cursor.y);
+        const W = m.w, top = m.top;
+        const cursor_ = { "x": cursor.x - m.x, "y": cursor.y - m.y };
+        const cat = [c.at[0] - m.x, c.at[1] - m.y];
         const edge = 14;
-        const cursorAtEdge = cursor.x <= edge || cursor.x >= W - 1 - edge || cursor.y <= top + edge;
-        const side = c.at[0] <= edge ? "l" : c.at[0] + c.size[0] >= W - edge ? "r" : "";
+        const cursorAtEdge = cursor_.x <= edge || cursor_.x >= W - 1 - edge || cursor_.y <= top + edge;
+        const side = cat[0] <= edge ? "l" : cat[0] + c.size[0] >= W - edge ? "r" : "";
 
         // A tile: the compositor's drag already put it where it was dropped. Dropped in
         // the middle of the screen it pulls out and floats; anywhere else it stays a tile,
         // and Files only notes which side it landed on.
         if (!c.floating) {
             const third = W / 3;
-            if (cursor.x > third && cursor.x < W - third && cursor.y > top + edge) {
+            if (cursor_.x > third && cursor_.x < W - third && cursor_.y > top + edge) {
                 win.dropDone = true;
                 win.dragged = false;
                 win.undock(true);
                 return;
             }
-            win.dock = { "side": side || (c.at[0] + c.size[0] / 2 < W / 2 ? "l" : "r"), "tiled": true };
+            win.dock = { "side": side || (cat[0] + c.size[0] / 2 < W / 2 ? "l" : "r"), "tiled": true };
             return;
         }
         if (win.dock)   // floating again after a tile (Super+Alt+Space): a plain floating window now
             win.dock = null;
-        if (side === "" && c.at[1] <= top + edge) {
+        if (side === "" && cat[1] <= top + edge) {
             win.dropDone = true;
             win.dragged = false;
             Hyprland.dispatch(`hl.dsp.focus({ window = "address:${c.address}" })`);
@@ -389,11 +404,11 @@ FloatingWindow {
             onStreamFinished: {
                 let list = [];
                 try { list = JSON.parse(text); } catch (e) { return; }
-                const screen = Quickshell.screens[0];
                 const me = win.meIn(list);
+                const m = win.monitorAt(me ? me.at[0] + me.size[0] / 2 : 0, me ? me.at[1] + me.size[1] / 2 : 0);
                 const others = list.filter(x => x.mapped && x.address !== me?.address && x.workspace?.id === me?.workspace?.id);
                 const tiles = others.filter(x => !x.floating);
-                const bigFloat = others.some(x => x.floating && x.fullscreen === 0 && x.size[0] * x.size[1] >= screen.width * screen.height * 0.6);
+                const bigFloat = others.some(x => x.floating && x.fullscreen === 0 && x.size[0] * x.size[1] >= m.w * m.h * 0.6);
                 if (me && (tiles.length > 0 || !bigFloat))
                     Hyprland.dispatch(`hl.dsp.window.float({ action = "unset", window = "address:${me.address}" })`);
             }
