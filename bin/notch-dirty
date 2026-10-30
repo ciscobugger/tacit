@@ -13,13 +13,16 @@ for repo in "$@"; do
 	repo=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || continue
 	case "$seen" in *"|$repo|"*) continue ;; esac
 	seen="$seen|$repo|"
-	count=0; oldest=$now
+	count=0; oldest=$now; paths=()
 	while IFS= read -r -d '' entry; do
-		path=${entry:3}
+		paths+=("${entry:3}")
 		count=$((count + 1))
-		mt=$(stat -c %Y -- "$repo/$path" 2>/dev/null) || mt=$now
-		[ "$mt" -lt "$oldest" ] && oldest=$mt
 	done < <(timeout 20 git -C "$repo" status --porcelain -z --untracked-files=normal 2>/dev/null)
+	[ "$count" -gt 0 ] || continue
+	# one stat for all of them; a path that is gone just prints nothing
+	while read -r mt; do
+		[ "$mt" -lt "$oldest" ] && oldest=$mt
+	done < <(cd "$repo" && printf '%s\0' "${paths[@]}" | xargs -0 stat -c %Y -- 2>/dev/null)
 	[ "$count" -gt 0 ] || continue
 	printf '%s\t%d\t%d\n' "$repo" "$count" $(( (now - oldest) / 60 ))
 done
