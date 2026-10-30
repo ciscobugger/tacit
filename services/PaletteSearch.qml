@@ -580,12 +580,12 @@ Singleton {
         }).filter(Boolean).slice(0, root.sectionLimit);
     }
 
-    // The programs on PATH, read the first time a typed word needs them and again after five minutes: "Run" is
+    // The programs on PATH, read the first time a typed word needs them and again after five minutes, or after ten seconds when a typed word is not on the list (a program installed meanwhile): "Run" is
     // offered for a first word that is one (or after Tab to commands), not for every word typed - "budget" ran as a command.
     property var executables: ({})
     property double executablesAt: 0
-    function refreshExecutables() {
-        if (execList.running || Date.now() - root.executablesAt < 300000) return;
+    function refreshExecutables(maxAge) {
+        if (execList.running || Date.now() - root.executablesAt < maxAge) return;
         root.executablesAt = Date.now();
         execList.running = true;
     }
@@ -601,10 +601,12 @@ Singleton {
         }
     }
     function runnable(text) {
-        Qt.callLater(root.refreshExecutables);
         const words = text.trim().split(/\s+/);
         const first = words[0] === "sudo" ? (words[1] ?? "") : words[0];
-        return first.length > 0 && (root.executables[first] === true || /^(\.{0,2}\/|~\/)/.test(first));
+        const path = /^(\.{0,2}\/|~\/)/.test(first);
+        const known = root.executables[first] === true;
+        Qt.callLater(root.refreshExecutables, known || path || first.length === 0 ? 300000 : 10000);
+        return first.length > 0 && (known || path);
     }
 
     readonly property list<var> commandEntries: {
