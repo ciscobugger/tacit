@@ -176,16 +176,19 @@ Singleton {
                     property int start: 0
                     property bool isBreak: false
                     property int cycle: 0
+                    property int left: 0        // seconds left while paused; 0 = full lap
                 }
                 property JsonObject stopwatch: JsonObject {
                     property bool running: false
                     property int start: 0
+                    property int elapsed: 0     // 10 ms units, kept while paused
                     property list<var> laps: []
                 }
                 property JsonObject countdown: JsonObject {
                     property bool running: false
                     property int duration: 0
                     property int start: 0
+                    property int left: 0        // seconds left while paused; 0 = full duration
                 }
             }
         }

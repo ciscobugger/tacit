@@ -39,11 +39,27 @@ Singleton {
     property int countdownSecondsLeft: countdownDuration
 
     // General
-    Component.onCompleted: {
+    // A paused reading survives a restart; a running one is rebuilt from its start time.
+    function restorePaused() {
+        const t = Persistent.states.timer;
         if (!stopwatchRunning)
-            stopwatchReset();
+            stopwatchTime = t.stopwatch.elapsed;
         if (!countdownRunning)
-            countdownSecondsLeft = countdownDuration;
+            countdownSecondsLeft = t.countdown.left > 0 ? Math.min(t.countdown.left, countdownDuration) : countdownDuration;
+        if (!pomodoroRunning && t.pomodoro.left > 0)
+            pomodoroSecondsLeft = Math.min(t.pomodoro.left, pomodoroLapDuration);
+    }
+
+    // This singleton can be built before or after the states file is read.
+    Component.onCompleted: {
+        if (Persistent.ready)
+            root.restorePaused();
+    }
+    Connections {
+        target: Persistent
+        function onReadyChanged() {
+            root.restorePaused();
+        }
     }
 
     function getCurrentTimeInSeconds() {  // Pomodoro uses Seconds
@@ -91,6 +107,8 @@ Singleton {
         if (Persistent.states.timer.pomodoro.running) {
             // Start/Resume
             Persistent.states.timer.pomodoro.start = getCurrentTimeInSeconds() + pomodoroSecondsLeft - pomodoroLapDuration;
+        } else {
+            Persistent.states.timer.pomodoro.left = pomodoroSecondsLeft;
         }
     }
 
@@ -99,6 +117,7 @@ Singleton {
         Persistent.states.timer.pomodoro.isBreak = false;
         Persistent.states.timer.pomodoro.start = getCurrentTimeInSeconds();
         Persistent.states.timer.pomodoro.cycle = 0;
+        Persistent.states.timer.pomodoro.left = 0;
         refreshPomodoro();
     }
 
@@ -128,6 +147,7 @@ Singleton {
 
     function stopwatchPause() {
         Persistent.states.timer.stopwatch.running = false;
+        Persistent.states.timer.stopwatch.elapsed = stopwatchTime;
     }
 
     function stopwatchResume() {
@@ -140,6 +160,7 @@ Singleton {
         stopwatchTime = 0;
         Persistent.states.timer.stopwatch.laps = [];
         Persistent.states.timer.stopwatch.running = false;
+        Persistent.states.timer.stopwatch.elapsed = 0;
     }
 
     function stopwatchRecordLap() {
@@ -180,6 +201,7 @@ Singleton {
         } else {
             Persistent.states.timer.countdown.duration = (Persistent.states.timer.countdown.duration ?? 0) + addSeconds;
             countdownSecondsLeft = Persistent.states.timer.countdown.duration;
+            Persistent.states.timer.countdown.left = countdownSecondsLeft;
         }
     }
 
@@ -188,12 +210,15 @@ Singleton {
         Persistent.states.timer.countdown.running = !countdownRunning;
         if (Persistent.states.timer.countdown.running) {
             Persistent.states.timer.countdown.start = getCurrentTimeInSeconds() - (countdownDuration - countdownSecondsLeft);
+        } else {
+            Persistent.states.timer.countdown.left = countdownSecondsLeft;
         }
     }
 
     function resetCountdown() {
         Persistent.states.timer.countdown.running = false;
         Persistent.states.timer.countdown.duration = 0;
+        Persistent.states.timer.countdown.left = 0;
         countdownSecondsLeft = 0;
     }
 
