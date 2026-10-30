@@ -21,6 +21,7 @@ Singleton {
     readonly property var open: Object.values(root.threads).filter(t => t.status === "open")
 
     property int retries: 0
+    property string lastRead: ""
 
     FileView {
         id: index
@@ -63,15 +64,20 @@ Singleton {
 
     Process {
         id: readProc
-        command: ["bash", "-c", 'for f in "$0"/threads/*/thread.json; do [ -f "$f" ] && jq -c . "$f"; done', root.dir]
+        // no forks: bash reads each file itself, the files are split on a record separator
+        command: ["bash", "-c", 'for f in "$0"/threads/*/thread.json; do [ -f "$f" ] && printf \'%s\\n\\x1e\\n\' "$(<"$f")"; done', root.dir]
         stdout: StdioCollector {
             onStreamFinished: {
+                // the 30 s floor reloads the same files most of the time: leave the maps alone then
+                if (text === root.lastRead)
+                    return;
+                root.lastRead = text;
                 const map = {};
-                for (const line of text.split("\n")) {
-                    if (!line.trim().startsWith("{"))
+                for (const chunk of text.split("\x1e")) {
+                    if (!chunk.trim().startsWith("{"))
                         continue;
                     try {
-                        const t = JSON.parse(line);
+                        const t = JSON.parse(chunk);
                         map[t.id] = t;
                     } catch (e) {}
                 }
