@@ -491,7 +491,7 @@ def integrate(app, root, target_files, made):
 def install(target, quiet=False):
     step = (lambda **kw: None) if quiet else say
     step(step="lists")
-    refresh_sync(max_age=0 if not quiet else 3600)
+    refresh_sync(max_age=600 if not quiet else 3600)
     bundle, used = resolve(target)
     base = os.path.join(ROOT, target); old = os.path.join(base, "manifest.json")
     prev = json.load(open(old)) if os.path.exists(old) else None
