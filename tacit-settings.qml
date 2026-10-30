@@ -502,7 +502,9 @@ ApplicationWindow {
     // Rewrites one listener's timeout line and nothing else, comments and commands kept, then
     // restarts hypridle, which reads its config only when it starts.
     function setIdleTime(kind, secs) {
-        const lines = idleFile.text().split("\n");
+        // a fresh install has only the packaged file: the edited copy becomes the user's own, which hypridle reads first
+        const own = idleFile.text() !== "";
+        const lines = (own ? idleFile.text() : idlePackaged.text()).split("\n");
         let inBlock = false, at = -1, run = "";
         for (let i = 0; i < lines.length; i++) {
             const l = lines[i];
@@ -524,11 +526,44 @@ ApplicationWindow {
                 if (root.idleKind(run) !== kind || at < 0)
                     continue;
                 lines[at] = `${lines[at].match(/^\s*/)[0]}timeout = ${secs}`;
-                idleFile.setText(lines.join("\n"));
-                Quickshell.execDetached(["bash", "-c", "if systemctl --user -q is-active hypridle; then systemctl --user restart hypridle; else pkill -x hypridle; hyprctl dispatch 'hl.dsp.exec_cmd(\"hypridle\")'; fi"]);
+                const restart = "if systemctl --user -q is-active hypridle; then systemctl --user restart hypridle; else pkill -x hypridle; hyprctl dispatch 'hl.dsp.exec_cmd(\"hypridle\")'; fi";
+                if (own) {
+                    idleFile.setText(lines.join("\n"));
+                    Quickshell.execDetached(["bash", "-c", restart]);
+                } else {
+                    Quickshell.execDetached(["bash", "-c", 'mkdir -p "$(dirname "$1")" && printf "%s" "$2" > "$1" && ' + restart, "_", FileUtils.trimFileProtocol(`${Directories.config}/hypr/hypridle.conf`), lines.join("\n")]);
+                    root.idleTimes = Object.assign({}, root.idleTimes, { [kind]: secs });
+                    idleReload.restart();
+                }
                 return;
             }
         }
+    }
+    function parseIdle(text) {
+        const t = {};
+        for (const block of text.split(/^\s*listener\s*\{/m).slice(1)) {
+            const secs = parseInt((block.match(/^\s*timeout\s*=\s*(\d+)/m) ?? [])[1]);
+            const run = (block.match(/^\s*on-timeout\s*=\s*(.*)$/m) ?? [])[1] ?? "";
+            const kind = root.idleKind(run);
+            if (kind && !isNaN(secs) && !(kind in t)) t[kind] = secs;
+        }
+        return t;
+    }
+    // XDG_CONFIG_DIRS holds the packaged hypridle.conf; ~/.config/hypr has one only once the times were changed
+    FileView {
+        id: idlePackaged
+        path: "/usr/share/tacit/xdg/hypr/hypridle.conf"
+        printErrors: false
+        onLoaded: {
+            if (idleFile.text() === "")
+                root.idleTimes = root.parseIdle(idlePackaged.text());
+        }
+    }
+    // the user's copy was just created: read it, so the next change edits it and not the packaged one again
+    Timer {
+        id: idleReload
+        interval: 400
+        onTriggered: idleFile.reload()
     }
     FileView {
         id: idleFile
@@ -537,14 +572,7 @@ ApplicationWindow {
         printErrors: false
         onFileChanged: idleFile.reload()
         onLoaded: {
-            const t = {};
-            for (const block of idleFile.text().split(/^\s*listener\s*\{/m).slice(1)) {
-                const secs = parseInt((block.match(/^\s*timeout\s*=\s*(\d+)/m) ?? [])[1]);
-                const run = (block.match(/^\s*on-timeout\s*=\s*(.*)$/m) ?? [])[1] ?? "";
-                const kind = root.idleKind(run);
-                if (kind && !isNaN(secs) && !(kind in t)) t[kind] = secs;
-            }
-            root.idleTimes = t;
+            root.idleTimes = root.parseIdle(idleFile.text());
         }
     }
 
