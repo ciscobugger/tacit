@@ -115,9 +115,12 @@ AbstractBackgroundWidget {
             root.downloaded = true
             return
         }
+        root.downloaded = false
+        // running = true on a running Process does nothing: onExited starts again if the track moved on
+        if (coverArtDownloader.running)
+            return
         coverArtDownloader.targetFile = root.artUrl
         coverArtDownloader.artFilePath = root.artFilePath
-        root.downloaded = false
         coverArtDownloader.running = true
     }
 
@@ -129,7 +132,13 @@ AbstractBackgroundWidget {
         command: ["bash", "-c",
             `[ -f "$2" ] || { curl -fsSL --max-time 15 "$1" -o "$2.tmp" && mv "$2.tmp" "$2"; } || { rm -f "$2.tmp"; exit 1; }`,
             "_", targetFile, artFilePath]
-        onExited: (exitCode, exitStatus) => { root.downloaded = exitCode === 0 }
+        onExited: (exitCode, exitStatus) => {
+            if (targetFile !== root.artUrl) {
+                root.updateArt()
+                return
+            }
+            root.downloaded = exitCode === 0
+        }
     }
 
     StyledRectangularShadow {
