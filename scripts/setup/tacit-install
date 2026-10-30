@@ -375,8 +375,11 @@ def install(disk, place, keep):
     os.makedirs(f"{TARGET}/boot/loader/entries", exist_ok=True)
     with open(f"{TARGET}/boot/loader/entries/tacit.conf", "w") as f:
         f.write(f"title Tacit\nlinux /vmlinuz-linux\ninitrd /initramfs-linux.img\noptions root=PARTUUID={partuuid} rw quiet splash loglevel=1 rd.udev.log_level=0 udev.log_level=0 systemd.show_status=false rd.systemd.show_status=false vt.global_cursor_default=0{resume}\n")
-    # loader.conf is read from the EFI partition only
-    with open(f"{TARGET}/{'efi' if place == 'next' else 'boot'}/loader/loader.conf", "w") as f:
+    # loader.conf is read from the EFI partition only; another Linux's on a shared one is kept beside it
+    loader = f"{TARGET}/{'efi' if place == 'next' else 'boot'}/loader/loader.conf"
+    if place == "next" and os.path.isfile(loader) and not os.path.exists(loader + ".bak"):
+        shutil.copy2(loader, loader + ".bak")
+    with open(loader, "w") as f:
         f.write("default tacit.conf\ntimeout 0\neditor no\n")
     # next to another Linux: systemd-boot finds Windows by itself, not GRUB, so each other system's loader on the EFI
     # partition gets an entry (shown with Space, as Windows is)
