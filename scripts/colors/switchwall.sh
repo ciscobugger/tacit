@@ -353,8 +353,17 @@ switch() {
         output_scss="$STATE_DIR/user/generated/material_colors.scss"
     fi
 
-    python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
-        > "$output_scss"
+    # a temp file: writing straight to the scss emptied it when the picture could not be read, and applycolor.sh then sent
+    # the terminals the template's unfilled placeholders
+    local scss_tmp
+    scss_tmp=$(mktemp)
+    if ! python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" > "$scss_tmp" || [[ ! -s "$scss_tmp" ]]; then
+        rm -f "$scss_tmp"
+        deactivate
+        notify-send "Wallpaper" "The colours did not follow the new wallpaper." -a "Tacit" &
+        return 1
+    fi
+    mv -f "$scss_tmp" "$output_scss"
     # how much of this wallpaper the glass lets through (generated/seethrough.json), for the shell's surfaces, the
     # terminals' alpha (applycolor.sh) and Hyprland's opacity rules at the reload in post_process. A colour picked
     # without a picture is measured on the wallpaper in use.
@@ -418,7 +427,7 @@ main() {
                 ;;
             --color)
                 if [[ "$2" =~ ^#?[A-Fa-f0-9]{6}$ ]]; then
-                    set_accent_color "$2"
+                    set_accent_color "#${2#\#}"
                     shift 2
                 elif [[ "$2" == "clear" ]]; then
                     set_accent_color ""
@@ -428,7 +437,7 @@ main() {
                     # one was saved and the desktop went back to the wallpaper's colours)
                     picked=$(hyprpicker --no-fancy)
                     [[ "$picked" =~ ^#?[A-Fa-f0-9]{6}$ ]] || exit 0
-                    set_accent_color "$picked"
+                    set_accent_color "#${picked#\#}"
                     shift
                 fi
                 ;;
@@ -483,7 +492,7 @@ main() {
     config_color="$(get_accent_color_from_config)"
     if [[ "$config_color" =~ ^#?[A-Fa-f0-9]{6}$ ]]; then
         color_flag="1"
-        color="$config_color"
+        color="#${config_color#\#}"
     fi
 
     if [[ -z "$type_flag" ]]; then
