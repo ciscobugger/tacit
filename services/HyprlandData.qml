@@ -74,10 +74,15 @@ Singleton {
         getMonitors.running = true;
     }
 
+    function updateActiveWorkspace() {
+        if (WM.compositor !== "hyprland") return;
+        getActiveWorkspace.running = true;
+    }
+
     function updateWorkspaces() {
         if (WM.compositor !== "hyprland") return;
         getWorkspaces.running = true;
-        getActiveWorkspace.running = true;
+        updateActiveWorkspace();
     }
 
     function updateAll() {
@@ -114,12 +119,15 @@ Singleton {
             if (w.clients) root.updateWindowList();
             if (w.monitors) root.updateMonitors();
             if (w.workspaces) root.updateWorkspaces();
+            else if (w.active) root.updateActiveWorkspace();
         }
     }
 
     // Which lists the events since the last refresh can have changed.
     property var pending: ({})
-    readonly property var clientOnlyEvents: ["activewindow", "windowtitle", "urgent", "pin"]
+    readonly property var clientOnlyEvents: ["windowtitle", "urgent", "pin"]
+    // A focus change moves the active workspace's lastwindow, which marks the focused window.
+    readonly property var focusEvents: ["activewindow"]
     readonly property var workspaceEvents: ["workspace", "createworkspace", "destroyworkspace", "moveworkspace", "renameworkspace", "activespecial"]
     readonly property var monitorEvents: ["monitoradded", "monitorremoved", "focusedmon", "configreloaded"]
 
@@ -133,6 +141,7 @@ Singleton {
             const n = event.name;
             const p = root.pending;
             if (root.clientOnlyEvents.includes(n)) p.clients = true;
+            else if (root.focusEvents.includes(n)) { p.clients = true; p.active = true; }
             else if (root.workspaceEvents.includes(n)) p.workspaces = true;
             else if (root.monitorEvents.includes(n)) { p.monitors = true; p.workspaces = true; }
             else { p.clients = true; p.workspaces = true; p.monitors = true; }

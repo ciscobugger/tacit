@@ -78,6 +78,7 @@ Scope {
         target: HyprlandData
         function onWindowListChanged() { root.refresh() }
         function onWorkspacesChanged() { root.refresh() }
+        function onActiveWorkspaceChanged() { root.refresh() }
         function onMonitorsChanged() { root.refresh() }
     }
 }
