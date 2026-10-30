@@ -553,7 +553,7 @@ Singleton {
         const file = Persistent.states.record.file;
         if (root.recording || file === "")
             return;
-        DropShelf.addItems(["file://" + file]);
+        DropShelf.addItems(["file://" + encodeURI(file)]);
         root.recordSaved();
     }
     // A running timer is a status glyph; the hover strip carries its remaining time and controls.
@@ -1177,7 +1177,7 @@ Singleton {
         const name = path.split("/").pop();
         const isShot = root.screenshotDir.length > 0 && path.startsWith(root.screenshotDir + "/");
         Origins.recordArrival(path, isShot);   // which page / window / phone it came from, now
-        DropShelf.addItems(["file://" + path]);
+        DropShelf.addItems(["file://" + encodeURI(path)]);
         Recents.addFile(path, isShot);
         Journal.log(isShot ? "file.screenshot" : "file.download", { "path": path });
         root.request("download", {
@@ -1196,7 +1196,7 @@ Singleton {
         }
         function onImportFailed(path, reason) {
             // not a VPN after all: it is a file, and files dropped here park on the shelf
-            DropShelf.addItems(["file://" + path]);
+            DropShelf.addItems(["file://" + encodeURI(path)]);
             root.request("download", { "icon": "vpn_key_off", "text": Translation.tr("Not a VPN file · parked") }, 55);
         }
     }

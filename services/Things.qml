@@ -99,7 +99,7 @@ Singleton {
         if (t.kind !== "folder")
             list.push({ "id": "phone", "label": PhoneLink.menuWords, "glyph": "smartphone", "run": () => root.toPhone(path) });
         if (!DropShelf.items.includes(path))
-            list.push({ "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + path]) });
+            list.push({ "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + encodeURI(path)]) });
         list.push({ "id": "hand", "label": "Hand to Praxis", "glyph": "smart_toy", "run": () => root.hand(path) });
         if (t.kind === "image")
             list.push({ "id": "wallpaper", "label": "Set as wallpaper", "glyph": "wallpaper", "run": () => Wallpapers.apply(path) });

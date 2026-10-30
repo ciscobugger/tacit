@@ -106,7 +106,7 @@ Singleton {
         target: "shelf"
 
         function add(path: string): void {
-            root.addItems([path.startsWith("file://") ? path : "file://" + path]);
+            root.addItems([path.startsWith("file://") ? path : "file://" + encodeURI(path)]);
         }
 
         function clear(): void {

@@ -537,7 +537,7 @@ FloatingWindow {
                { "id": "terminal", "label": "Open in terminal", "glyph": "terminal", "run": () => Quickshell.execDetached(["foot", "-D", p]) },
                Files.pins.includes(p) ? { "id": "unpin", "label": "Unpin from the rail", "glyph": "keep_off", "run": () => Files.unpin(p) }
                                       : { "id": "pin", "label": "Pin to the rail", "glyph": "push_pin", "run": () => Files.pin(p) },
-               { "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + p + "/"]) },
+               { "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + encodeURI(p + "/")]) },
                { "id": "hand", "label": "Hand to Praxis", "glyph": "smart_toy", "run": () => Recents.launch(p, "Look around this folder. What is here, and what should I know about it?") },
                { "id": "path", "label": "Copy path", "glyph": "content_copy", "run": () => Things.copyPath(p) }].concat(win.rowOps(p))
             : [];
@@ -614,7 +614,7 @@ FloatingWindow {
            { "id": "copy", "label": "Copy", "glyph": "content_copy", "run": () => win.copySelection(false) },
            { "id": "cut", "label": "Cut", "glyph": "content_cut", "run": () => win.copySelection(true) },
            { "id": "trash", "label": "Move to the trash", "glyph": "delete", "run": () => win.trashSelection() },
-           { "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(win.selectedPaths.map(p => "file://" + p)) },
+           { "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(win.selectedPaths.map(p => "file://" + encodeURI(p))) },
            { "id": "hand", "label": "Hand to Praxis", "glyph": "smart_toy", "run": () => Recents.launch(win.folder, `Look at these files: ${win.selectedPaths.join(", ")}. What are they, and what should I do with them?`) },
            { "id": "path", "label": "Copy paths", "glyph": "content_copy", "run": () => win.copyPaths() }]
     readonly property var folderActions: [
@@ -622,7 +622,7 @@ FloatingWindow {
         { "id": "newfolder", "label": "New folder", "glyph": "create_new_folder", "run": () => win.newFolder() },
         { "id": "newfile", "label": "New file", "glyph": "note_add", "run": () => win.newFile() },
         { "id": "paste", "label": "Paste", "glyph": "content_paste", "run": () => win.paste() },
-        { "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + win.folder + "/"]) },
+        { "id": "park", "label": "Park on the shelf", "glyph": "stacks", "run": () => DropShelf.addItems(["file://" + encodeURI(win.folder + "/")]) },
         { "id": "hand", "label": "Hand to Praxis", "glyph": "smart_toy", "run": () => Recents.launch(win.folder, "Look around this folder. What is here, and what should I know about it?") },
         { "id": "path", "label": "Copy path", "glyph": "content_copy", "run": () => Things.copyPath(win.folder) }
     ].concat(Object.keys(Files.habits).length > 0 ? [{ "id": "forget", "label": "Forget where I file things", "glyph": "visibility_off", "run": () => Files.forgetHabits() }] : [])
@@ -1925,7 +1925,7 @@ FloatingWindow {
         let list = [];
         if (PhoneLink.paired)
             list.push({ "id": "phone", "label": `${PhoneLink.phoneName} · on the network`, "glyph": "smartphone", "run": () => PhoneLink.send(paths) });
-        list.push({ "id": "shelf", "label": "The shelf · carry it anywhere", "glyph": "stacks", "run": () => DropShelf.addItems(paths.map(p => "file://" + p)) });
+        list.push({ "id": "shelf", "label": "The shelf · carry it anywhere", "glyph": "stacks", "run": () => DropShelf.addItems(paths.map(p => "file://" + encodeURI(p))) });
         list.push({ "id": "claude", "label": "Praxis · a new session here", "glyph": "smart_toy", "run": () => Recents.launch(win.folder, `Look at ${paths.join(", ")}. What is this, and what should I do about it?`) });
         sheet.title = `Send ${what} to`;
         sheet.lines = [];
