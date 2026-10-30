@@ -60,13 +60,14 @@ restore_by_name() {
     return 1
 }
 
+# A JSON array from lines on stdin. Lists go to jq as files: one argv string is capped at 128 KiB,
+# which a few thousand paths pass, and the report then stopped updating and stayed "running".
 write() {
     local ended_json=$ended
-    jq -nc --arg id "$id" --arg op "$op" --arg dest "$dest" --arg state "$state" \
+    jq -nc --rawfile results <(printf '%s\n' "${results[@]:-}") --rawfile undo <(printf '%s' "$undo") --arg id "$id" --arg op "$op" --arg dest "$dest" --arg state "$state" \
         --argjson total "$total" --argjson done "$done_" --argjson bytes "$bytes" --argjson bytesDone "$bytesDone" \
         --arg current "$current" --arg error "$error" --argjson started "$started" --argjson ended "$ended_json" \
-        --argjson results "$(printf '%s\n' "${results[@]:-}" | jq -R . | jq -sc 'map(select(length > 0))')" --argjson undo "$undo" \
-        '{id:$id, op:$op, dest:$dest, state:$state, total:$total, done:$done, bytes:$bytes, bytesDone:$bytesDone, current:$current, error:$error, started:$started, ended:$ended, results:$results, undo:$undo}' \
+        '{id:$id, op:$op, dest:$dest, state:$state, total:$total, done:$done, bytes:$bytes, bytesDone:$bytesDone, current:$current, error:$error, started:$started, ended:$ended, results:($results | split("\n") | map(select(length > 0))), undo:($undo | fromjson)}' \
         > "$report.tmp" && mv -f "$report.tmp" "$report"
 }
 finish() { state=$1; ended=$(date +%s%3N); current=""; write; rm -f "$cancel"; exit 0; }
@@ -137,9 +138,9 @@ copy|move)
         done_=$((done_+1)); write
     done
     if [ "$op" = move ]; then
-        undo=$(jq -nc --argjson to "$(printf '%s\n' "${made[@]}" | jq -R . | jq -sc .)" --argjson from "$(printf '%s\n' "${moved_from[@]}" | jq -R . | jq -sc .)" '{op:"move-back", from:$to, to:$from}')
+        undo=$(jq -nc --rawfile to <(printf '%s\n' "${made[@]}") --rawfile from <(printf '%s\n' "${moved_from[@]}") '{op:"move-back", from:($to | split("\n") | map(select(length > 0))), to:($from | split("\n") | map(select(length > 0)))}')
     else
-        undo=$(jq -nc --argjson paths "$(printf '%s\n' "${made[@]}" | jq -R . | jq -sc .)" '{op:"delete", paths:$paths}')
+        undo=$(jq -nc --rawfile paths <(printf '%s\n' "${made[@]}") '{op:"delete", paths:($paths | split("\n") | map(select(length > 0)))}')
     fi
     finish done ;;
 trash)
@@ -153,7 +154,7 @@ trash)
         fi
         results+=("$s"); done_=$((done_+1)); write
     done
-    undo=$(jq -nc --argjson paths "$(printf '%s\n' "${results[@]}" | jq -R . | jq -sc .)" '{op:"restore-paths", paths:$paths}')
+    undo=$(jq -nc --rawfile paths <(printf '%s\n' "${results[@]}") '{op:"restore-paths", paths:($paths | split("\n") | map(select(length > 0)))}')
     finish done ;;
 restore-paths)
     total=$#; write
@@ -257,7 +258,7 @@ renames)   # pairs: <src> <new-name>; nothing moves unless every new name is fre
         fi
         results+=("$to"); done_=$((done_ + 1)); write
     done
-    undo=$(jq -nc --argjson from "$(printf '%s\n' "${tos[@]}" | jq -R . | jq -sc 'map(select(length > 0))')" --argjson to "$(printf '%s\n' "${froms[@]}" | jq -R . | jq -sc 'map(select(length > 0))')" '{op:"move-back", from:$from, to:$to}')
+    undo=$(jq -nc --rawfile from <(printf '%s\n' "${tos[@]}") --rawfile to <(printf '%s\n' "${froms[@]}") '{op:"move-back", from:($from | split("\n") | map(select(length > 0))), to:($to | split("\n") | map(select(length > 0)))}')
     finish done ;;
 delete)
     total=$#; write
