@@ -6,6 +6,7 @@
 fc-list -q "Material Symbols Rounded" || exit 0
 for d in /sys/class/power_supply/book4-ec-battery /sys/class/power_supply/*; do
   [[ -r $d/status && $(<"$d/type") == Battery ]] || continue
+  [[ ! -r $d/scope || $(<"$d/scope") != Device ]] || continue
   [[ $(<"$d/status") == Charging ]] && { echo bolt; exit; }
   break
 done
