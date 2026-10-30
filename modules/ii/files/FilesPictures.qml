@@ -48,6 +48,7 @@ Item {
 
     // ------------------------------------------------------------------ what is shown
     property var shapes: ({})               // path -> width / height, kept for the window's life
+    property bool headProbed: false         // this folder's first batch of shapes has been asked for
     property var items: []                  // [{ i, path, name, isDir, size, modified, ratio, group }], the model's order
     function dayName(d) {
         const day = new Date(d.getTime()); day.setHours(0, 0, 0, 0);
@@ -77,7 +78,10 @@ Item {
         }
         pics.items = out;
         if (unknown.length > 0 && !shapeProbe.running) {
-            shapeProbe.paths = unknown.slice(0, 3000);
+            // the first screenful alone at a folder's first look, so the view need not wait for every header
+            shapeProbe.paths = unknown.slice(0, pics.headProbed ? 3000 : 100);
+            shapeProbe.more = unknown.length > shapeProbe.paths.length;
+            pics.headProbed = true;
             shapeProbe.running = true;
         }
     }
@@ -93,6 +97,8 @@ Item {
     Process {
         id: shapeProbe
         property var paths: []
+        property bool more: false
+        onRunningChanged: if (!running && more) rebuildSoon.restart()   // the rest, once this batch has exited
         command: ["magick", "identify", "-ping", "-format", "%w %h %i\n"].concat(shapeProbe.paths)
         stdout: StdioCollector {
             onStreamFinished: {
@@ -112,10 +118,10 @@ Item {
     }
     // A folder's first look waits for its shapes (at most 1.5 s) rather than showing every picture at 3:2 and then moving.
     Timer { id: shapeWait; interval: 1500 }
-    onModelChanged: shapeWait.restart()
+    onModelChanged: { pics.headProbed = false; shapeWait.restart(); }
     Connections {
         target: pics.model
-        function onFolderChanged() { shapeWait.restart(); }
+        function onFolderChanged() { pics.headProbed = false; shapeWait.restart(); }
     }
     readonly property bool waiting: shapeProbe.running && shapeWait.running
 
