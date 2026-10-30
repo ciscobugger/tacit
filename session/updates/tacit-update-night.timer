@@ -1,4 +1,4 @@
-# Started only when the person chose Tonight (tacit-update tonight), so it never wakes the computer otherwise
+# Enabled only when the person chose Tonight (tacit-update tonight), so it never wakes the computer otherwise
 [Unit]
 Description=Tacit: the updates tonight, at three on the charger
 
@@ -7,3 +7,6 @@ OnCalendar=*-*-* 03:00
 WakeSystem=true
 AccuracySec=1min
 Unit=tacit-update@night.service
+
+[Install]
+WantedBy=timers.target

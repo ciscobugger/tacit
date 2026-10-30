@@ -33,7 +33,8 @@ cancel)
 	rm -f /system-update
 	;;
 tonight)
-	systemctl start tacit-update-night.timer
+	# enabled, not only started: a restart before three o'clock keeps Tonight
+	systemctl enable --now tacit-update-night.timer
 	;;
 night)
 	mains=0 battery=0
@@ -49,13 +50,15 @@ night)
 	[ "$mains" = 1 ] || [ "$battery" = 0 ] || exit 0
 	# someone at the computer at three in the morning keeps their work: only a locked screen restarts
 	for s in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
+		# the sign-in screen is an unlocked graphical session too, with nobody at it
+		[ "$(loginctl show-session "$s" -p Class --value)" = greeter ] && continue
 		[ "$(loginctl show-session "$s" -p Active --value)" = yes ] && [ "$(loginctl show-session "$s" -p Type --value)" = wayland ] \
 			&& [ "$(loginctl show-session "$s" -p LockedHint --value)" != yes ] && exit 0
 	done
 	# the timer is stopped only once the download is here: offline at three, the next night tries again (it was stopped
 	# first, and Tonight was lost without a word)
 	ready || exit 1
-	systemctl stop tacit-update-night.timer
+	systemctl disable --now tacit-update-night.timer
 	ln -sfn /var/cache/pacman/pkg /system-update
 	systemctl reboot
 	;;
