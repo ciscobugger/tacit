@@ -214,7 +214,12 @@ Scope {
 
                     Image {
                         anchors.fill: parent
-                        readonly property string path: Config.options.background.wallpaperPath ?? ""
+                        readonly property string wallpaper: Config.options.background.wallpaperPath ?? ""
+                        readonly property string thumbnail: Config.options.background.thumbnailPath ?? ""
+                        // Image cannot decode a live wallpaper (an .mp4, .webm, ...); the still made for the wallpaper
+                        // strip can. Without it the map was a black card.
+                        readonly property string path: /\.(mp4|webm|mkv|mov|m4v|gif)$/i.test(wallpaper) && thumbnail.length > 0
+                            ? thumbnail : wallpaper
                         source: path.length === 0 ? "" : path.startsWith("/") ? `file://${path}` : path
                         fillMode: Image.PreserveAspectCrop
                         sourceSize.width: 464
