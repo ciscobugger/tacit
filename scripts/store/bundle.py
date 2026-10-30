@@ -301,14 +301,26 @@ def host_stamp():
     return int(os.stat(LOCAL_DB).st_mtime)
 
 
+@contextlib.contextmanager
+def locked(app):
+    """one install, update, remove or refresh of an app at a time; a second one waits for the first"""
+    os.makedirs(CACHE, exist_ok=True)
+    with open(os.path.join(CACHE, app + ".lock"), "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
+
+
 def run(app, cmd):
     base = os.path.join(ROOT, app)
     man = json.load(open(os.path.join(base, "manifest.json")))
     if man.get("host_stamp") != host_stamp():
         # the system changed since this bundle was made: bring the bundle in line before starting
         try:
-            install(man["package"], quiet=True)
-            man = json.load(open(os.path.join(base, "manifest.json")))
+            with locked(app):
+                man = json.load(open(os.path.join(base, "manifest.json")))     # a launch ahead of us may have done it
+                if man.get("host_stamp") != host_stamp():
+                    install(man["package"], quiet=True)
+                    man = json.load(open(os.path.join(base, "manifest.json")))
         except Exception:
             pass                                    # offline or a failed refresh: start what we have
     root = os.path.join(base, "root")
@@ -533,9 +545,11 @@ def main():
         if a[0] == "plan":
             say(**plan(a[1]))
         elif a[0] in ("install", "update"):
-            install(a[1])
+            with locked(a[1]):
+                install(a[1])
         elif a[0] == "remove":
-            remove(a[1], keep_data="--data" not in a)
+            with locked(a[1]):
+                remove(a[1], keep_data="--data" not in a)
         elif a[0] == "list":
             for m in sorted(glob.glob(os.path.join(ROOT, "*/manifest.json"))):
                 j = json.load(open(m)); say(app=j["package"], version=j["version"], size=j["size"], packages=len(j["versions"]))
