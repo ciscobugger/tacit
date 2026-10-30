@@ -14,7 +14,7 @@ outside the bundle changes: no password, no partial upgrade of the system. Packa
 /etc/pacman.conf and are checked against the database's SHA-256 and the packager's signature (pacman's own keyring).
 The app's own files (settings, caches) live in a private home; it sees the user's folders its permissions allow.
 """
-import concurrent.futures, glob, hashlib, json, os, re, shlex, shutil, subprocess, sys, tarfile, time
+import concurrent.futures, contextlib, fcntl, glob, hashlib, json, os, re, shlex, shutil, subprocess, sys, tarfile, time
 
 HOME = os.path.expanduser("~")
 ROOT = os.path.join(HOME, ".local/share/tacit/bundles")
@@ -309,8 +309,8 @@ def run(app, cmd):
         try:
             install(man["package"], quiet=True)
             man = json.load(open(os.path.join(base, "manifest.json")))
-        except Refused:
-            pass                                    # offline: start what we have
+        except Exception:
+            pass                                    # offline or a failed refresh: start what we have
     root = os.path.join(base, "root")
     perm = man["permissions"]
     uid = os.getuid(); rt = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{uid}"
@@ -467,15 +467,18 @@ def install(target, quiet=False):
     stage = base + ".new"; wipe(stage)
     root = os.path.join(stage, "root"); os.makedirs(root)
     skipped = []
-    for n, f in files.items():
-        step(step="unpack", package=n)
-        tops = {m.split("/", 1)[0] for m in lists[n] if m and not m.startswith(".")}
-        skipped += [f"{n}:{t}" for t in tops - {"usr", "etc", "opt"}]
-        subprocess.run(["bsdtar", "-xpf", f, "-C", root, "--exclude", ".PKGINFO", "--exclude", ".BUILDINFO", "--exclude", ".MTREE",
-                        "--exclude", ".INSTALL", "--exclude", ".CHANGELOG", *[x for t in tops - {"usr", "etc", "opt"} for x in ("--exclude", t)]],
-                       check=True, capture_output=True)
-    step(step="caches")
-    refresh_caches(root)
+    try:
+        for n, f in files.items():
+            step(step="unpack", package=n)
+            tops = {m.split("/", 1)[0] for m in lists[n] if m and not m.startswith(".")}
+            skipped += [f"{n}:{t}" for t in tops - {"usr", "etc", "opt"}]
+            subprocess.run(["bsdtar", "-xpf", f, "-C", root, "--exclude", ".PKGINFO", "--exclude", ".BUILDINFO", "--exclude", ".MTREE",
+                            "--exclude", ".INSTALL", "--exclude", ".CHANGELOG", *[x for t in tops - {"usr", "etc", "opt"} for x in ("--exclude", t)]],
+                           check=True, capture_output=True)
+        step(step="caches")
+        refresh_caches(root)
+    except BaseException:
+        wipe(stage); raise                          # a half-unpacked folder can be hundreds of MB
     if os.path.isdir(base):
         remove(target, keep_data=True, quiet=True)
     os.replace(stage, base)
