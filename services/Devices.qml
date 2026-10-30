@@ -167,8 +167,8 @@ Singleton {
                     root.failed(why);
                     if (proc.cb) proc.cb("");
                 } else if (proc.cb) {
-                    const m = /at (\S+)/.exec(o);
-                    proc.cb(m ? m[1].replace(/\.$/, "") : "");
+                    const m = /\bat (.+?)\.?$/m.exec(o);   // a label may hold spaces
+                    proc.cb(m ? m[1] : "");
                 }
                 proc.destroy();
             }
