@@ -835,8 +835,8 @@ Item {
                                 ScreencopyView {
                                     id: copy
                                     anchors.fill: parent
-                                    // every window holds a frame, so sliding to one shows it at once; only the one shown stays live
-                                    captureSource: peekTab.visible ? shot.modelData : null
+                                    // the shown window and its neighbours hold a frame, so sliding to one shows it at once; only the one shown stays live
+                                    captureSource: peekTab.visible && Math.abs(shot.rel) <= 1 ? shot.modelData : null
                                     live: shot.rel === 0
                                     opacity: copy.hasContent ? 1 : 0
                                     Behavior on opacity {
