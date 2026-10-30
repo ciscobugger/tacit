@@ -208,7 +208,7 @@ Singleton {
         root.all = list;
     }
 
-    // ---- the official roster: `claude agents --json` (about 150ms) every 5s. It carries the
+    // ---- the official roster: `claude agents --json` (about 150ms) every 15s, every minute with no session. It carries the
     // session's own name and status; hooks stay for instant transitions and the window. Without
     // Claude Code installed nothing is started: a missing binary logged a failed start every poll.
     Process {
@@ -270,8 +270,9 @@ Singleton {
     Timer {
         running: IslandController.enabled
         // the hooks carry state as it happens; the roster only adopts and prunes. Each poll
-        // starts the agent CLI (0.15 s of CPU), so every 15 s, not 5.
-        interval: 15000
+        // starts the agent CLI (0.15 s of CPU), so every 15 s, not 5; with no session there is
+        // nothing to prune and only a session the hooks never saw to adopt, so once a minute.
+        interval: root.all.length > 0 ? 15000 : 60000
         repeat: true
         triggeredOnStart: true
         onTriggered: {
