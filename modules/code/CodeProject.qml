@@ -223,7 +223,7 @@ Item {
     }
     Process {
         id: diffProc
-        command: ["git", "-C", p.root, "-c", "core.quotePath=false", "diff", "--name-status", "-z", p.base]
+        command: ["git", "-C", p.root, "-c", "core.quotePath=false", "diff", "--relative", "--name-status", "-z", p.base]
         stdout: StdioCollector { onStreamFinished: { p._diff = this.text; untracked.running = true; } }
     }
     Process {
@@ -242,7 +242,7 @@ Item {
     // The file as it was at `base`, for a changed file opened to be typed. Each ask is
     // its own short process; the answer is delivered once its output is complete.
     function before(rel, cb) {
-        showComp.createObject(p, { command: ["git", "-C", p.root, "show", p.base + ":" + rel], cb: cb, running: true });
+        showComp.createObject(p, { command: ["git", "-C", p.root, "show", p.base + ":./" + rel], cb: cb, running: true });
     }
     Component {
         id: showComp
