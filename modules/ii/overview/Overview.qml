@@ -141,6 +141,9 @@ Scope {
         searchWidget.cancelSearch();
         overviewScope.moveToFocusedScreen();
         overviewScope.gridRequested = true;
+        // already open (the palette or dock): overviewOpen does not change, so the handler never brings the grid up
+        if (GlobalStates.overviewOpen)
+            overviewScope.gridAlive = true;
         GlobalStates.overviewOpen = true;
         // no change when it was already open (the palette): cleared here, not only in the handler
         overviewScope.gridRequested = false;
@@ -199,6 +202,8 @@ Scope {
         searchWidget.cancelSearch();
         overviewScope.moveToFocusedScreen();
         overviewScope.gridRequested = true;
+        if (GlobalStates.overviewOpen)
+            overviewScope.gridAlive = true;
         GlobalStates.overviewOpen = true;
         overviewScope.gridRequested = false;
     }
