@@ -105,8 +105,10 @@ ApplicationWindow {
         const known = appOf(pkg) ?? (found?.apps ?? []).find(x => x.pkg === pkg) ?? null;
         appInfo = known ? Object.assign({ shots: [], description: [], whatsNew: [], loading: true }, known) : null;
         go("app");
-        appProc.pkg = pkg; appProc.running = true;
+        loadApp(pkg);
     }
+    // one backend process for the page: a request made while it runs waits for it to exit
+    function loadApp(pkg) { appProc.pkg = pkg; if (appProc.running) appProc.again = true; else appProc.running = true; }
     function openJob(j) { job = j; go("job"); wantHeroes(j.pkgs); }
     function launch(a) {
         const id = (a?.desktop || "").replace(/\.desktop$/, "");
@@ -139,7 +141,7 @@ ApplicationWindow {
     function act(a) { const st = stateOf(a); if (st === "installed") launch(a); else if (st === "get") get(a.pkg); }
     function loadHome() { homeFailed = false; homeProc.running = true; }
     // the search's answers too: they said Get after the app was in (the backend reads the installed list again)
-    function refresh() { homeProc.running = true; if (page === "app" && appInfo) { appProc.pkg = appInfo.pkg; appProc.running = true; }
+    function refresh() { homeProc.running = true; if (page === "app" && appInfo) loadApp(appInfo.pkg);
         if (found?.query && searchProc.running) searchProc.write(JSON.stringify({ op: "search", q: found.query }) + "\n"); }
     function runSearch(q) {
         query = q;
@@ -184,8 +186,9 @@ ApplicationWindow {
     // ---- the backend
     Process { id: homeProc; running: true; command: ["python3", "-I", root.backend, "home"]
         stdout: StdioCollector { onStreamFinished: { try { root.home = JSON.parse(text); root.homeFailed = false; } catch (e) { root.homeFailed = true; console.warn("store: home", e); } } } }
-    Process { id: appProc; property string pkg: ""; command: ["python3", "-I", root.backend, "app", pkg]
-        stdout: StdioCollector { onStreamFinished: { try { const j = JSON.parse(text); if (root.appInfo && j.pkg === root.appInfo.pkg) root.appInfo = j; } catch (e) { console.warn("store: app", e); } } } }
+    Process { id: appProc; property string pkg: ""; property bool again: false; command: ["python3", "-I", root.backend, "app", pkg]
+        stdout: StdioCollector { onStreamFinished: { try { const j = JSON.parse(text); if (root.appInfo && j.pkg === root.appInfo.pkg) root.appInfo = j; } catch (e) { console.warn("store: app", e); } } }
+        onExited: if (again) { again = false; running = true; } }
     Process { id: heroProc; property string pkg: ""; command: ["python3", "-I", root.backend, "app", pkg]
         stdout: StdioCollector { onStreamFinished: { try {
             const a = JSON.parse(text);
