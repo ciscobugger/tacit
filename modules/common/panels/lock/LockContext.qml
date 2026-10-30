@@ -182,7 +182,7 @@ Scope {
             if (result == PamResult.Success) {
                 root.unlocked(root.targetAction);
                 stopFingerPam();
-            } else if (result == PamResult.Error) { // if timeout or etc..
+            } else { // error, failed or out of tries: arm the reader again
                 root.noteFingerError();
             }
         }
