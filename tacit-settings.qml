@@ -684,20 +684,22 @@ ApplicationWindow {
     // Files and folders are picked in Tacit's own Files (Pinax), the pick mode Praxis attaches
     // with (services/Files.qml pick): a Files window with a Choose bar, whose choice comes back
     // through `settingsApp picked`. The callback gets the first path; Cancel calls nothing.
+    // A folder is `pickdir`: Choose with nothing selected takes the folder the window shows, where
+    // `pick` waits for a file to be selected and would hand back a picture for a wallpaper folder.
     readonly property string selfPath: FileUtils.trimFileProtocol(Quickshell.shellPath("tacit-settings.qml"))
     property var pickDone: null
     property bool pickImages: false
-    function startPick(folder, label, images, done) {
+    function startPick(folder, label, images, dir, done) {
         root.pickDone = done;
         root.pickImages = images;
-        Quickshell.execDetached(["qs", "-p", Directories.shellFile, "ipc", "call", "files", "pick",
+        Quickshell.execDetached(["qs", "-p", Directories.shellFile, "ipc", "call", "files", dir ? "pickdir" : "pick",
             folder || Quickshell.env("HOME"), root.selfPath, "settingsApp", label]);
     }
     function pickFile(label, folder, done) {
-        root.startPick(folder, label, true, done);
+        root.startPick(folder, label, true, false, done);
     }
     function pickFolder(label, folder, done) {
-        root.startPick(folder, `${label} · select it, then Choose`, false, done);
+        root.startPick(folder, `${label} · select it, then Choose`, false, true, done);
     }
     // the list arrives as JSON text, as one path, or already unwrapped (claude.qml's picked)
     function receivePick(json) {
