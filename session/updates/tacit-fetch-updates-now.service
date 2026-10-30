@@ -4,8 +4,8 @@ Description=Tacit: download the waiting updates now, as asked in Settings (never
 # and a check asked for took minutes with nothing to show (Discord, 2026-10-20). While that one runs, this one ends at
 # once (pacman is busy) and Settings follows the one running. No network-online.target: on installs that kept the live
 # image's systemd-networkd, its wait-online waits for links it does not manage and gave up only after two minutes, while
-# NetworkManager had the computer online all along (VM, 2026-10-20); offline, pacman fails at once and Settings says so
-ConditionPathExists=!/run/archiso
+# NetworkManager had the computer online all along (VM, 2026-10-20); offline, pacman fails at once and Settings says so.
+# The live image is refused by the script itself (a skipped unit reads as a good check)
 
 [Service]
 Type=oneshot

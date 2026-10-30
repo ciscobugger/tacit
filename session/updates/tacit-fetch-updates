@@ -8,9 +8,17 @@ set -u
 # pacman at work: not now. A lock with no pacman behind it is one a stopped pacman left (a restart in the middle of a
 # download), and kept every later download from starting
 if [ -e /var/lib/pacman/db.lck ]; then
-    pgrep -x pacman >/dev/null && exit 0
+    # asked for in Settings: only the background download running is a check under way; anything else (an install in the
+    # Store) means nothing was checked, and the unit must not end as a success
+    if pgrep -x pacman >/dev/null; then
+        [ "${1:-}" = now ] && ! systemctl is-active --quiet tacit-fetch-updates.service && exit 75
+        exit 0
+    fi
     rm -f /var/lib/pacman/db.lck
 fi
+
+# the unit's archiso condition skipped it as a success, which Settings read as a check that worked
+[ "${1:-}" = now ] && [ -e /run/archiso ] && exit 75
 
 on_mains=0 battery=""
 for d in /sys/class/power_supply/*; do
