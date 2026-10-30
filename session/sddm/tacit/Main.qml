@@ -24,7 +24,7 @@ Rectangle {
     // the Tacit session, whatever else is installed
     readonly property int tacitSession: {
         for (let i = 0; i < sessionModel.rowCount(); i++) {
-            const file = sessionModel.data(sessionModel.index(i, 0), Qt.UserRole + 3) ?? "";   // SessionModel's FileRole
+            const file = sessionModel.data(sessionModel.index(i, 0), Qt.UserRole + 2) ?? "";   // SessionModel's FileRole (+1 is the directory, +3 the type)
             if (String(file).endsWith("tacit.desktop")) return i;
         }
         return sessionModel.lastIndex;
