@@ -102,7 +102,8 @@ ContentPage {
 
         ContentSubsection {
             title: Translation.tr("Show the notch on")
-            visible: Hyprland.monitors.values.length > 1
+            // a saved list naming an unplugged monitor hides the notch everywhere; keep "All" reachable
+            visible: Hyprland.monitors.values.length > 1 || Config.options.island.screenList.length > 0
 
             WidgetsMonitorSelector {
                 configEntry: Config.options.island

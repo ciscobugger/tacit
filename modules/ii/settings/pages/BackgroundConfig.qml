@@ -984,7 +984,7 @@ ContentPage {
 
             ContentSubsection {
                 title: Translation.tr("Show widgets on")
-                visible: Hyprland.monitors.values.length > 1
+                visible: Hyprland.monitors.values.length > 1 || Config.options.background.screenList.length > 0
                 Layout.bottomMargin: 10
 
                 WidgetsMonitorSelector {
