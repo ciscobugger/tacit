@@ -21,6 +21,7 @@ ContentPage {
 
     property list<var> onlinePresets: []
     property string onlinePresetsError: ""
+    property string hostnameError: ""
     property bool onlinePresetsLoading: false
     property bool importPickerMissing: false
 
@@ -130,6 +131,9 @@ ContentPage {
         onExited: (exitCode, exitStatus) => {
             if (exitCode === 0) {
                 SystemInfo.refreshHostname()
+            } else {
+                page.hostnameError = Translation.tr("The name could not be changed")
+                hostnameField.value = SystemInfo.hostname
             }
         }
     }
@@ -296,6 +300,11 @@ ContentPage {
     function applyHostname() {
         const newName = page.hostnameInput.trim()
         if (newName.length === 0 || newName === SystemInfo.hostname) return
+        if (!/^[A-Za-z0-9-]{1,63}$/.test(newName)) {
+            page.hostnameError = Translation.tr("Use only letters, numbers and dashes, up to 63 characters")
+            return
+        }
+        page.hostnameError = ""
         hostnameSetProc.command = ["hostnamectl", "set-hostname", newName]
         hostnameSetProc.running = true
     }
@@ -467,9 +476,12 @@ ContentPage {
                         buttonIcon: "dns"
                         placeholderText: SystemInfo.hostname
                         text: Translation.tr("Hostname")
-                        description: Translation.tr("Requires authentication to change")
+                        description: page.hostnameError !== "" ? page.hostnameError : Translation.tr("Requires authentication to change")
                         value: page.hostnameInput
-                        onValueChanged: page.hostnameInput = value
+                        onValueChanged: {
+                            page.hostnameInput = value
+                            page.hostnameError = ""
+                        }
 
                         confirmButtonVisible: page.hostnameInput.trim() !== "" && page.hostnameInput.trim() !== SystemInfo.hostname
                         onConfirmClicked: {
