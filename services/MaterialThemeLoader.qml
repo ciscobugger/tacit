@@ -85,6 +85,8 @@ Singleton {
     // no file to watch, and the re-arm above waits for a wallpaper change that an accent change never makes, so the
     // desktop kept the built-in colours until a relogin (Discord, Noid). Look again every 2 s until it loads.
     property string missingPath: ""
+    // a different file starts again at the quick retry
+    onMissingPathChanged: missingRetry.tries = 0
     Timer {
         id: missingRetry
         // 2 s, then 10 s, then 60 s: a file that never comes (theming off) is not polled every 2 s all session
