@@ -343,6 +343,16 @@ def host_stamp():
     return int(os.stat(LOCAL_DB).st_mtime)
 
 
+def shared_versions(names):
+    host = load_host()[0]
+    return {n: host.get(n) for n in names}
+
+
+def stale(man):
+    """the folder's time moves with every package on the system; a bundle only needs remaking when a system package it relies on changed"""
+    return man.get("host_versions") != shared_versions(man.get("shared", []))
+
+
 @contextlib.contextmanager
 def locked(app):
     """one install, update, remove or refresh of an app at a time; a second one waits for the first"""
@@ -361,7 +371,11 @@ def run(app, cmd):
             with locked(app):
                 man = json.load(open(os.path.join(base, "manifest.json")))     # a launch ahead of us may have done it
                 if man.get("host_stamp") != host_stamp():
-                    install(man["package"], quiet=True)
+                    if stale(man):
+                        install(man["package"], quiet=True)
+                    else:
+                        man["host_stamp"] = host_stamp()
+                        json.dump(man, open(os.path.join(base, "manifest.json"), "w"), indent=1)
                     man = json.load(open(os.path.join(base, "manifest.json")))
         except Exception:
             pass                                    # offline or a failed refresh: start what we have
@@ -498,7 +512,8 @@ def install(target, quiet=False):
     want = {n: p["version"] for n, p in bundle.items()}
     if prev and prev.get("versions") == want:
         # the catalogue's permissions as they are now: kept from the first install, a change to them reached nobody
-        prev["host_stamp"] = host_stamp(); prev["permissions"] = perms_for(target, [])
+        prev["host_stamp"] = host_stamp(); prev["shared"] = used; prev["host_versions"] = shared_versions(used)
+        prev["permissions"] = perms_for(target, [])
         json.dump(prev, open(old, "w"), indent=1)
         refresh_caches(os.path.join(base, "root"))
         step(step="done", app=target, changed=False); return prev
@@ -548,7 +563,7 @@ def install(target, quiet=False):
         ids, execs = integrate(target, root, tfiles, made)
         first = next((m for m in tfiles if m.startswith("usr/bin/") and not m.endswith("/")), None)
         man = dict(package=target, version=bundle[target]["version"], versions=want, shared=used, made=made, ids=ids,
-                   exec=execs[0] if execs else (["/" + first] if first else []), skipped=skipped, host_stamp=host_stamp(),
+                   exec=execs[0] if execs else (["/" + first] if first else []), skipped=skipped, host_stamp=host_stamp(), host_versions=shared_versions(used),
                    size=size, installed=int(time.time()), permissions=perms_for(target, []))
         json.dump(man, open(os.path.join(base, "manifest.json"), "w"), indent=1)
     except BaseException:
