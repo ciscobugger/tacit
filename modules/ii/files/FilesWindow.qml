@@ -1351,7 +1351,7 @@ FloatingWindow {
     function uriList(i) {
         const p = win.pathAt(i);
         const paths = win.selectedMap[p] ? win.selectedPaths : [p];
-        return paths.map(x => "file://" + x).join("\r\n");
+        return paths.map(x => win.fileUrl(x)).join("\r\n");
     }
 
     // ------------------------------------------------------------------ changing things
@@ -2704,7 +2704,7 @@ FloatingWindow {
                                     onPressed: mouse => { K.Kit.focusVisible = false; hitArea.rightHeld = mouse.button !== Qt.LeftButton; }
                                     drag.onActiveChanged: {
                                         if (drag.active) {
-                                            dragProxy.Drag.mimeData = { "text/uri-list": "file://" + hit.modelData.path };
+                                            dragProxy.Drag.mimeData = { "text/uri-list": win.fileUrl(hit.modelData.path) };
                                             dragProxy.Drag.active = true;
                                         } else {
                                             dragProxy.Drag.active = false;
