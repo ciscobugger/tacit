@@ -121,13 +121,15 @@ Singleton {
         target: sink?.audio ?? null
         property bool lastReady: false
         property real lastVolume: 0
-        // A new default sink starts from its own level, not the old device's
-        onTargetChanged: {
-            lastReady = false;
-            lastVolume = 0;
-        }
+        property var seenAudio: null
         function onVolumeChanged() {
             if (!Config.options.audio.protection.enable) return;
+            // A new default sink starts from its own level, not the old device's
+            if (seenAudio !== sink.audio) {
+                seenAudio = sink.audio;
+                lastReady = false;
+                lastVolume = 0;
+            }
             const newVolume = sink.audio.volume;
             // when resuming from suspend, we should not write volume to avoid pipewire volume reset issues
             if (isNaN(newVolume) || newVolume === undefined || newVolume === null) {
