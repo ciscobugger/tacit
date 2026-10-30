@@ -24,17 +24,23 @@ MouseArea {
     onPressed: (event) => {
         switch (event.button) {
         case Qt.LeftButton:
-            item.activate();
+            if (item.onlyMenu && item.hasMenu)
+                root.toggleMenu();
+            else
+                item.activate();
             break;
         case Qt.RightButton:
             if (item.hasMenu)
-                if (menu.active && menu.item && typeof menu.item.close === "function")
-                    menu.item.close();
-                else 
-                    menu.open();
+                root.toggleMenu();
             break;
         }
         event.accepted = true;
+    }
+    function toggleMenu() {
+        if (menu.active && menu.item && typeof menu.item.close === "function")
+            menu.item.close();
+        else
+            menu.open();
     }
     onEntered: {
         tooltip.text = TrayService.getTooltipForItem(root.item);
