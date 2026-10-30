@@ -3931,11 +3931,12 @@ ApplicationWindow {
                 readScreens.running = true;
                 readMonitorsFile.running = true;
             }
-            Timer {
-                interval: 3000
-                running: true
-                repeat: true
-                onTriggered: {
+            // Brightness keys and the night light are the shell's; read again when the window comes forward.
+            Connections {
+                target: root
+                function onActiveChanged() {
+                    if (!root.active)
+                        return;
                     if (!brightnessSlider.pressed && !brightnessWrite.running)
                         readBrightness.running = true;
                     readNight.running = true;
