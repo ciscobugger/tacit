@@ -1,7 +1,8 @@
 #!/bin/bash
-# tacit-update now|tonight|night|install: Tacit's updates, installed while the computer restarts (systemd's offline
+# tacit-update now|cancel|tonight|night|install: Tacit's updates, installed while the computer restarts (systemd's offline
 # updates, systemd.offline-updates(7)). tacit-fetch-updates has already downloaded them.
 #   now      the next start installs them (the notch's or Settings' Restart, through tacit-update@now.service)
+#   cancel   takes the link of now away again when the restart was refused (the shell runs as the user, / is root's)
 #   tonight  at 03:00, on the charger, with the screen locked (tacit-update-night.timer wakes the computer for it)
 #   night    what that timer runs; not on the charger, or someone at the computer: the next night
 #   install  what the start runs before anything else (tacit-system-update.service); then it restarts
@@ -27,6 +28,9 @@ now)
 	# a download that failed restarts nothing: the install at the start has no network and would fail
 	ready || exit 1
 	ln -sfn /var/cache/pacman/pkg /system-update
+	;;
+cancel)
+	rm -f /system-update
 	;;
 tonight)
 	systemctl start tacit-update-night.timer
@@ -78,7 +82,7 @@ install)
 	systemctl reboot
 	;;
 *)
-	echo "usage: tacit-update now|tonight|night|install" >&2
+	echo "usage: tacit-update now|cancel|tonight|night|install" >&2
 	exit 2
 	;;
 esac

@@ -80,7 +80,7 @@ Singleton {
     // the download for the install is made first; when it fails nothing restarts, and the notch says so
     Process {
         id: restartProc
-        command: ["bash", "-c", "systemctl start tacit-update@now.service || exit 1; systemctl reboot || { rm -f /system-update; exit 3; }"]
+        command: ["bash", "-c", "systemctl start tacit-update@now.service || exit 1; systemctl reboot || { systemctl start tacit-update@cancel.service; exit 3; }"]
         onExited: (code, status) => {
             if (code !== 0) {
                 root.restartFailed = true;

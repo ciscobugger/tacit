@@ -1,11 +1,11 @@
 // The person at the computer installs Tacit's updates without a password (the notch's and Settings' Restart and
-// Tonight start tacit-update@now and tacit-update@tonight), and asks for a check now (Settings' Check for updates
+// Tonight start tacit-update@now and tacit-update@tonight; a refused restart starts tacit-update@cancel), and asks for a check now (Settings' Check for updates
 // starts tacit-fetch-updates); everything else systemd does still asks.
 polkit.addRule(function (action, subject) {
     if (action.id == "org.freedesktop.systemd1.manage-units" && subject.local && subject.active &&
         subject.isInGroup("wheel") && action.lookup("verb") == "start") {
         var unit = action.lookup("unit");
-        if (unit == "tacit-update@now.service" || unit == "tacit-update@tonight.service" ||
+        if (unit == "tacit-update@now.service" || unit == "tacit-update@cancel.service" || unit == "tacit-update@tonight.service" ||
             unit == "tacit-fetch-updates.service" || unit == "tacit-fetch-updates-now.service")
             return polkit.Result.YES;
     }
