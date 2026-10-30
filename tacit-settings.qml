@@ -640,10 +640,19 @@ ApplicationWindow {
             root.flowWords = lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith("#"));
         }
     }
+    // FileView does not create missing folders, so make ~/.config/flow first and write when mkdir is done.
+    property string flowWordsPending: ""
+    Process {
+        id: flowDirMaker
+        command: ["mkdir", "-p", `${Quickshell.env("HOME")}/.config/flow`]
+        onExited: flowWordsFile.setText(root.flowWordsPending)
+    }
     function setFlowWords(words) {
         root.flowWords = words;
         const head = root.flowWordsHeader.length > 0 ? root.flowWordsHeader : "# One term per line: Flow spells these exactly.";
-        flowWordsFile.setText(`${head}\n${words.join("\n")}\n`);
+        root.flowWordsPending = `${head}\n${words.join("\n")}\n`;
+        flowDirMaker.running = false;
+        flowDirMaker.running = true;
     }
     property string flowKey: ""
     readonly property var flowKeyOptions: {
