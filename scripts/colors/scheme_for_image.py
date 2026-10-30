@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
-import cv2
-import numpy as np
+import math
+from PIL import Image
 
 # Allowed scheme types
 SCHEMES = [
@@ -17,15 +17,15 @@ SCHEMES = [
 
 def image_colorfulness(image):
     # Based on Hasler and Süsstrunk's colorfulness metric
-    (B, G, R) = cv2.split(image.astype("float"))
-    rg = np.absolute(R - G)
-    yb = np.absolute(0.5 * (R + G) - B)
-    std_rg = np.std(rg)
-    std_yb = np.std(yb)
-    mean_rg = np.mean(rg)
-    mean_yb = np.mean(yb)
-    colorfulness = np.sqrt(std_rg ** 2 + std_yb ** 2) + (0.3 * np.sqrt(mean_rg ** 2 + mean_yb ** 2))
-    return colorfulness
+    data = image.tobytes()
+    rg = [abs(r - g) for r, g in zip(data[0::3], data[1::3])]
+    yb = [abs(0.5 * (r + g) - b) for r, g, b in zip(data[0::3], data[1::3], data[2::3])]
+    n = len(rg)
+    mean_rg = sum(rg) / n
+    mean_yb = sum(yb) / n
+    std_rg = math.sqrt(sum((v - mean_rg) ** 2 for v in rg) / n)
+    std_yb = math.sqrt(sum((v - mean_yb) ** 2 for v in yb) / n)
+    return math.sqrt(std_rg ** 2 + std_yb ** 2) + 0.3 * math.sqrt(mean_rg ** 2 + mean_yb ** 2)
 
 # scheme-content respects the image's colors very well, but it might
 # look too saturated, so we only use it for not very colorful images to be safe
@@ -36,13 +36,14 @@ def pick_scheme(colorfulness):
         return "scheme-tonal-spot"
 
 def load_and_resize_image(img_path, max_dim=128):
-    img = cv2.imread(img_path)
-    if img is None:
+    try:
+        img = Image.open(img_path)
+        img.draft("RGB", (max_dim, max_dim))
+        img = img.convert("RGB")
+    except Exception:
         return None
-    h, w = img.shape[:2]
-    if max(h, w) > max_dim:
-        scale = max_dim / max(h, w)
-        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    if max(img.size) > max_dim:
+        img.thumbnail((max_dim, max_dim), Image.Resampling.BOX)
     return img
 
 def main():
