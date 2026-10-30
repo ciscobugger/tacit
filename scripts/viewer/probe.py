@@ -48,8 +48,8 @@ def facts(path):
             "iso": ex.get("Exif.Photo.ISOSpeedRatings", ""),
         }
         # orientation 5-8 is a quarter turn: the picture is shown with width and height swapped
-        o = run(["exiv2", "-q", "-g", "Exif.Image.Orientation", "-Pv", path]).stdout.strip()
-        if o.isdigit() and int(o) >= 5 and "w" in out:
+        # -Pkt prints it as words ("right, top"); the first word is left or right for 5-8
+        if ex.get("Exif.Image.Orientation", "").startswith(("left", "right")) and "w" in out:
             out["w"], out["h"] = out["h"], out["w"]
         return out
     r = run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path])
