@@ -309,6 +309,7 @@ def real_install(disk, place, keep):
     p = subprocess.Popen(["sudo", "-n", "python3", "-I", INSTALLER], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=open("/tmp/tacit-install.log", "w"), text=True)   # what it says on the way, for a failure
     install["proc"] = p
+    install["sent"] = False   # a retry's new installer has not had the answers yet
     p.stdin.write(json.dumps({"disk": disk, "place": place, "keep": keep}) + "\n")
     p.stdin.flush()
     if install.get("answers"):
