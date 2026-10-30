@@ -150,6 +150,9 @@ Item {
             if (entry) {
                 PaletteFrecency.record(`app:${entry.id}`);
                 AppScope.launch(entry);
+            } else {
+                root.launching = "";
+                launchTimer.stop();
             }
         }
         root.opened();
