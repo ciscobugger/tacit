@@ -132,8 +132,9 @@ ContentPage {
             if (exitCode === 0) {
                 SystemInfo.refreshHostname()
             } else {
-                page.hostnameError = Translation.tr("The name could not be changed")
+                // Reset first: changing value runs onValueChanged, which clears the error
                 hostnameField.value = SystemInfo.hostname
+                page.hostnameError = Translation.tr("The name could not be changed")
             }
         }
     }
