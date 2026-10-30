@@ -76,10 +76,10 @@ hl.window_rule({ match = { class = "browser" },   opacity = pair(0.85, 0.77) }) 
 -- Helium's compact tab strip starts 4px in; the global 22px corner cuts the first tab.
 hl.window_rule({ match = { class = "[hH]elium" }, rounding = 16 })
 
--- foot already draws its surface at alpha 0.85 (colors-dark.alpha), so the
--- compositor must NOT fade it further on focus, and only to 0.906 when
+-- foot and kitty draw their surface at alpha 0.85 (colors-dark.alpha / background_opacity),
+-- so the compositor must NOT fade them further on focus, and only to 0.906 when
 -- unfocused: 0.85 * 0.906 = 0.77, the same effective pair as the browsers.
-hl.window_rule({ match = { class = "foot" }, opacity = pair(1.0, 0.906) })
+hl.window_rule({ match = { class = "^(foot|footclient|kitty)$" }, opacity = pair(1.0, 0.906) })
 -- Nautilus wears the shell's frost: libadwaita is opaque, so the translucency comes from
 -- Hyprland (the blur behind it is the same one the panels get). 0.84 keeps the list readable.
 hl.window_rule({ match = { class = "org.gnome.Nautilus" }, opacity = pair(0.84, 0.78) })
