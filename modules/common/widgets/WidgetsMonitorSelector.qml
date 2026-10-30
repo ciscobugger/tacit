@@ -31,6 +31,10 @@ Flow {
             buttonText: modelData.name
             toggled: root.configEntry.screenList.includes(modelData.name)
             onClicked: {
+                if (root.configEntry.screenList.length === 0) {
+                    root.configEntry.screenList = [modelData.name]
+                    return
+                }
                 const allNames = Array.from({length: Hyprland.monitors.length}, (_, i) => Hyprland.monitors[i].name)
                 let list = root.configEntry.screenList.length === 0 ? allNames.slice() : root.configEntry.screenList.slice()
                 if (toggled) list = list.filter(s => s !== modelData.name)
