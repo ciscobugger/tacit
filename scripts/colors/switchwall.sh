@@ -211,9 +211,8 @@ switch() {
     # The picture is applied whenever one was given, even when the palette comes from a fixed
     # accent colour instead of the image: an accent must not stop the wallpaper from changing.
     if [[ -n "$imgpath" ]]; then
-        check_and_prompt_upscale "$imgpath" &
-
         if [[ -z "$colors_only_flag" ]]; then
+            check_and_prompt_upscale "$imgpath" &
             kill_existing_mpvpaper
         fi
 
@@ -395,7 +394,6 @@ main() {
     noswitch_flag=""
     colors_only_flag=""
     colors_lock_flag=""
-    explicit_image=""
     start_dir_flag=""
 
     get_type_from_config() {
@@ -443,7 +441,6 @@ main() {
                 ;;
             --image)
                 imgpath="$2"
-                explicit_image="1"
                 shift 2
                 ;;
             --start-dir)
@@ -485,7 +482,9 @@ main() {
     # none, is made dark here, so the end-4 buttons still asking for light change nothing.
     mode_flag="dark"
 
-    if [[ -n "$noswitch_flag" && -n "$explicit_image" ]]; then
+    # --noswitch only recolours: the picture (read from config.json when not given) is not re-applied,
+    # so a video keeps playing and the small-picture notice is not repeated.
+    if [[ -n "$noswitch_flag" ]]; then
         colors_only_flag="1"
     fi
 
