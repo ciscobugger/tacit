@@ -427,19 +427,24 @@ def restart():
         subprocess.run(["sudo", "-n", "systemctl", "reboot"])
 
 def main():
+    # os.read, not sys.stdin: a buffered readline() keeps lines select() can no longer see
+    fd, buf = sys.stdin.fileno(), b""
     while True:
-        r, _, _ = select.select([sys.stdin], [], [], 10)
+        r, _, _ = select.select([fd], [], [], 10)
         if not r:
             emit({"ev": "power", "power": power()})
             continue
-        line = sys.stdin.readline()
-        if not line:
+        chunk = os.read(fd, 65536)
+        if not chunk:
             return
-        try:
-            req = json.loads(line)
-        except ValueError:
-            continue
-        threading.Thread(target=act, args=(req,), daemon=True).start()
+        buf += chunk
+        *lines, buf = buf.split(b"\n")
+        for line in lines:
+            try:
+                req = json.loads(line)
+            except ValueError:
+                continue
+            threading.Thread(target=act, args=(req,), daemon=True).start()
 
 if __name__ == "__main__":
     main()
