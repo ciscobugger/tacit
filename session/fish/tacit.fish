@@ -11,9 +11,14 @@ if status is-interactive
         starship init fish | source
         enable_transience
     end
-    # the wallpaper's colours (switchwall.sh writes them)
+    # the wallpaper's colours (switchwall.sh writes them). kitty takes the see-through background ([alpha]#rrggbb,
+    # foot's form) for no colour and goes back to black, so it is left out there
     if test -f ~/.local/state/quickshell/user/generated/terminal/sequences.txt
-        cat ~/.local/state/quickshell/user/generated/terminal/sequences.txt
+        if set -q KITTY_WINDOW_ID
+            sed 's/\x1b\]11;\[[0-9]*\][^\x1b]*\x1b\\\\//g' ~/.local/state/quickshell/user/generated/terminal/sequences.txt
+        else
+            cat ~/.local/state/quickshell/user/generated/terminal/sequences.txt
+        end
     end
     alias clear "printf '\033[2J\033[3J\033[1;1H'"
     if test "$TERM" != "linux"; and command -q eza

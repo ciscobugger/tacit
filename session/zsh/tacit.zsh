@@ -11,9 +11,14 @@ if [[ -o interactive ]]; then
         eval "$(starship init zsh)"
     fi
 
-    # the wallpaper's colours (switchwall.sh writes them)
+    # the wallpaper's colours (switchwall.sh writes them). kitty takes the see-through background ([alpha]#rrggbb,
+    # foot's form) for no colour and goes back to black, so it is left out there
     if [[ -f "$HOME/.local/state/quickshell/user/generated/terminal/sequences.txt" ]]; then
-        cat "$HOME/.local/state/quickshell/user/generated/terminal/sequences.txt"
+        if [[ -n "$KITTY_WINDOW_ID" ]]; then
+            sed 's/\x1b\]11;\[[0-9]*\][^\x1b]*\x1b\\//g' "$HOME/.local/state/quickshell/user/generated/terminal/sequences.txt"
+        else
+            cat "$HOME/.local/state/quickshell/user/generated/terminal/sequences.txt"
+        fi
     fi
 
     alias clear="printf '\033[2J\033[3J\033[1;1H'"
