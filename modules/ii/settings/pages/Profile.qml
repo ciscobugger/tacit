@@ -275,7 +275,7 @@ ContentPage {
             const finalJsonPath = `${page.onlinePresetsDir()}/${presetAssetsFetchProc.entryName}.json`
             const jqFilter = '$files as $files | walk(if type == "string" then ((split("/") | last) as $base | if ($files | index($base)) then ($dir + "/" + $base) else . end) else . end) | if has("profile") then .profile.avatarPath = $dir else . end | ._presetMeta.source = "online"'
             const filesJson = JSON.stringify(presetAssetsFetchProc.assetFilenames)
-            const cmd = `jq --arg dir ${page.shQuote(presetAssetsFetchProc.assetCacheDirPath)} --argjson files ${page.shQuote(filesJson)} ${page.shQuote(jqFilter)} ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)} > ${page.shQuote(finalJsonPath + ".tmp")} && mv ${page.shQuote(finalJsonPath + ".tmp")} ${page.shQuote(finalJsonPath)} && rm -f ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)}`
+            const cmd = `jq --arg dir ${page.shQuote(presetAssetsFetchProc.assetCacheDirPath)} --argjson files ${page.shQuote(filesJson)} ${page.shQuote(jqFilter)} ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)} > ${page.shQuote(finalJsonPath + ".tmp")} && mv ${page.shQuote(finalJsonPath + ".tmp")} ${page.shQuote(finalJsonPath)} && rm -f ${page.shQuote(presetAssetsFetchProc.stagingJsonPath)} || { rm -f ${page.shQuote(finalJsonPath + ".tmp")}; exit 1; }`
             presetRewriteProc.command = ["bash", "-c", cmd]
             presetRewriteProc.running = true
         }
