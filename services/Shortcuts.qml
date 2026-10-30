@@ -280,8 +280,6 @@ Singleton {
         id: file
         path: root.filePath
         printErrors: false
-        // a fresh account has no shellOverrides/ folder; without it the save was dropped silently
-        createParentFolders: true
         watchChanges: true
         onFileChanged: file.reload()
         onLoaded: {
