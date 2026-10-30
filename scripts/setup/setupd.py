@@ -131,11 +131,19 @@ def layout(name, parts):
     if ntfs:
         win = max(ntfs, key=lambda p: p["size"])
         node = "/dev/" + win["name"]
-        info = as_root("ntfsresize", "--info", "--no-action", node)
-        hib = as_root("sh", "-c", 'ntfscat "$1" hiberfil.sys 2>/dev/null | head -c 4', "sh", node)
+        # Fast Startup's image sits on the system volume but caches every NTFS volume, so each one is looked at
+        stopped = None
+        for p in ntfs:
+            n = "/dev/" + p["name"]
+            i = as_root("ntfsresize", "--info", "--no-action", n)
+            h = as_root("sh", "-c", 'ntfscat "$1" hiberfil.sys 2>/dev/null | head -c 4', "sh", n)
+            if i and (i.returncode != 0 or (h and h.stdout.lower() == "hibr")):
+                stopped = stopped or (i, h)
+            if p is win:
+                info = i
         m = re.search(r"You might resize at (\d+) bytes", info.stdout if info else "")
-        if info and (info.returncode != 0 or (hib and hib.stdout.lower() == "hibr")):
-            out.update(asleep=True, **windows_stopped(info, hib))
+        if stopped:
+            out.update(asleep=True, **windows_stopped(*stopped))
         elif m:
             out.update(used=int(m.group(1)), winSize=win["size"])
     return out

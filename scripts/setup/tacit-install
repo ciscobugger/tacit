@@ -144,11 +144,15 @@ def windows_shrink(t, keep):
         raise Refused("there is no Windows partition to make room in")
     win = max(ntfs, key=lambda p: p["size"])
     node, ss = win["node"], t["sectorsize"]
-    # a volume due a check, or one Fast Startup hibernated, has state Windows keeps in memory: never resized
-    info = subprocess.run(["ntfsresize", "--info", "--no-action", node], input="", capture_output=True, text=True)
-    hib = subprocess.run(["sh", "-c", 'ntfscat "$1" hiberfil.sys 2>/dev/null | head -c 4', "sh", node], capture_output=True).stdout.lower()
-    if info.returncode != 0 or hib == b"hibr":
-        raise Refused("Windows did not shut down fully")
+    # a volume due a check, or one Fast Startup hibernated, has state Windows keeps in memory: never resized. The
+    # hibernation image sits on the system volume and caches every NTFS volume's state, so each one is looked at.
+    for p in ntfs:
+        i = subprocess.run(["ntfsresize", "--info", "--no-action", p["node"]], input="", capture_output=True, text=True)
+        h = subprocess.run(["sh", "-c", 'ntfscat "$1" hiberfil.sys 2>/dev/null | head -c 4', "sh", p["node"]], capture_output=True).stdout.lower()
+        if i.returncode != 0 or h == b"hibr":
+            raise Refused("Windows did not shut down fully")
+        if p is win:
+            info = i
     m = re.search(r"You might resize at (\d+) bytes", info.stdout)
     if not m:
         raise Refused("ntfsresize did not say how small Windows can be")
