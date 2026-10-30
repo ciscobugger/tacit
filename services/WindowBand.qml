@@ -259,6 +259,7 @@ Singleton {
                 root.dragAddress = f[1];
                 root.dragApp = root.appIdOf(f[1]);
                 root.zone = "none";
+                IslandController.closeRequested();      // a sheet opened by an earlier hover would cover the band
                 break;
             case "zone":
                 root.zone = f[2] ?? "none";

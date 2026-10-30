@@ -572,7 +572,8 @@ Item {
         id: hoverTimer
         interval: 300
         repeat: false
-        onTriggered: if (!IslandController.recording && !IslandController.recordArming) root.openSheet()
+        // a window held by its band on the way to the notch must not meet the sheet opening over it
+        onTriggered: if (!IslandController.recording && !IslandController.recordArming && WindowBand.dragAddress === "") root.openSheet()
     }
 
     function openSheet() {
