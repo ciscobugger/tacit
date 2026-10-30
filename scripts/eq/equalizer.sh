@@ -110,7 +110,8 @@ except Exception:
         echo "equalizer.sh: EasyEffects is not installed; the preset was saved but not loaded" >&2
         exit 1
     fi
-    $EE_LOAD -l "$PRESET_NAME" >/dev/null 2>&1 9>&- &
+    # Without a running service, -l starts one; keep it out of sight like EasyEffects.enable() does.
+    $EE_LOAD --hide-window --service-mode -l "$PRESET_NAME" >/dev/null 2>&1 9>&- &
 }
 
 save_preset() {
