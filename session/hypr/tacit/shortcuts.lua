@@ -58,8 +58,11 @@ function M.apply(path)
                     if rec.opts ~= nil then bind(toKeys, rec.dispatcher, rec.opts)
                     else bind(toKeys, rec.dispatcher) end
                 end
-                -- the keys it takes were somebody's: they have no shortcut now
-                for _, rec in ipairs(by[to] or {}) do remove[#remove + 1] = rec end
+                -- the keys it takes were somebody's: they have no shortcut now. With nothing bound on
+                -- `from` (a stale move) nothing replaces them, so they stay.
+                if #(by[from] or {}) > 0 then
+                    for _, rec in ipairs(by[to] or {}) do remove[#remove + 1] = rec end
+                end
             end
             for _, rec in ipairs(by[from] or {}) do remove[#remove + 1] = rec end
         end)
