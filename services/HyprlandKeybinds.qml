@@ -15,7 +15,9 @@ import Quickshell.Hyprland
 Singleton {
     id: root
     property string keybindParserPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/hyprland/get_keybinds.py`)
+    // An install has no ~/.config/hypr: the session's own copy under TACIT_HYPR holds the keys there. The person's copy wins.
     property string defaultKeybindConfigPath: FileUtils.trimFileProtocol(`${Directories.config}/hypr/hyprland/keybinds.lua`)
+    property string shippedKeybindConfigPath: `${Quickshell.env("TACIT_HYPR") || "/usr/share/tacit/hypr"}/hyprland/keybinds.lua`
     property string userKeybindConfigPath: FileUtils.trimFileProtocol(`${Directories.config}/hypr/custom/keybinds.lua`)
     property var defaultKeybinds: {"children": []}
     property var userKeybinds: {"children": []}
@@ -48,7 +50,8 @@ Singleton {
     Process {
         id: getDefaultKeybinds
         running: true
-        command: [root.keybindParserPath, "--path", root.defaultKeybindConfigPath]
+        command: ["sh", "-c", 'p="$2"; [ -r "$p" ] || p="$3"; exec "$1" --path "$p"', "sh",
+            root.keybindParserPath, root.defaultKeybindConfigPath, root.shippedKeybindConfigPath]
         
         stdout: SplitParser {
             onRead: data => {
