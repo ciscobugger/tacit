@@ -96,9 +96,14 @@ Singleton {
     }
 
     // ---- the rule: untrusted Wi-Fi -> auto VPN up; trusted or wired -> down
+    property bool ruleSkipped: false
     function applyRule(): void {
-        if (root.autoVpn.length === 0 || root.busy)
+        if (root.autoVpn.length === 0)
             return;
+        if (root.busy) {
+            root.ruleSkipped = true;
+            return;
+        }
         const wifi = Network.active;
         const wired = Network.ethernet;
         const trusted = wired || (wifi && Network.isTrusted(wifi.ssid));
@@ -165,7 +170,10 @@ Singleton {
             waitTimer.stop();
             root.busy = false;
             root.refresh();
-            ruleLater.restart();   // a network change that came in while busy was skipped
+            if (root.ruleSkipped) {   // a network change that came in while busy was skipped
+                root.ruleSkipped = false;
+                ruleLater.restart();
+            }
             if (root.pendingConnect.length > 0) {
                 const next = root.pendingConnect;
                 root.pendingConnect = "";
