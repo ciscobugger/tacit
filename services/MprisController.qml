@@ -71,7 +71,8 @@ Singleton {
 			}
 
 			function onPlaybackStateChanged() {
-				if (root.trackedPlayer !== modelData) root.trackedPlayer = modelData;
+				// A player that pauses or stops must not take over from one still playing.
+				if (root.trackedPlayer !== modelData && (modelData.isPlaying || !root.trackedPlayer?.isPlaying)) root.trackedPlayer = modelData;
 			}
 		}
 	}
