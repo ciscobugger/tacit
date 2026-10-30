@@ -89,11 +89,10 @@ Item {
                 implicitHeight: btn.implicitHeight
 
                 property bool isRecording: Persistent.states.record.enable
-                property int elapsedSeconds: 0
-
-                onIsRecordingChanged: {
-                    if (!isRecording) elapsedSeconds = 0
-                }
+                property real now: Date.now()
+                // From the start time record.sh stored, so a reloaded bar carries on instead of restarting at 00:00
+                property int elapsedSeconds: isRecording && Persistent.states.record.started > 0
+                    ? Math.max(0, Math.floor((now - Persistent.states.record.started) / 1000)) : 0
 
                 function formatTime(s) {
                     return Math.floor(s / 60).toString().padStart(2, '0') + ":" + (s % 60).toString().padStart(2, '0')
@@ -103,7 +102,8 @@ Item {
                     interval: 1000
                     repeat: true
                     running: recordingItem.isRecording
-                    onTriggered: recordingItem.elapsedSeconds++
+                    triggeredOnStart: true
+                    onTriggered: recordingItem.now = Date.now()
                 }
 
                 CircleUtilButton {
