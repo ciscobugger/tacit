@@ -16,7 +16,7 @@
 #   job.sh <id> renames <src> <new-name> ...            (many at once; every name checked before any moves)
 #
 # Report: $XDG_STATE_HOME/quickshell/user/files/jobs/<id>.json
-#   { id, op, dest, state: running|done|failed|cancelled, total, done, bytes, bytesDone,
+#   { id, op, dest, state: running|done|failed|cancelled, total, done, bytes, bytesDone, pid,
 #     current, error, started, ended, results: [...], undo: {...} }
 # Cancel: touch <id>.cancel next to the report.
 set -u

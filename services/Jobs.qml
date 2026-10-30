@@ -201,11 +201,12 @@ Singleton {
     }
 
     // On start: whatever the runner left behind - still running (a reload mid-copy), or done
-    // while the shell was down. Reports older than a day are dropped.
+    // while the shell was down. Reports older than a day are dropped. A report that says running
+    // whose runner (the pid in it) is gone - a power cut, a SIGKILL - is turned into a failure.
     Process {
         id: sweep
         running: true
-        command: ["bash", "-c", `d='${StringUtils.shellSingleQuoteEscape(root.jobsDir)}'; mkdir -p "$d"; find "$d" -name '*.json' -mtime +1 -delete; find "$d" -name '*.cancel' -mmin +60 -delete; ls -t "$d" | grep '\\.json$' | head -30 | sed 's/\\.json$//'`]
+        command: ["bash", "-c", `d='${StringUtils.shellSingleQuoteEscape(root.jobsDir)}'; mkdir -p "$d"; find "$d" -name '*.json' -mtime +1 -delete; for f in "$d"/*.json; do [ -e "$f" ] || continue; p=$(jq -r 'select(.state == "running") | .pid // empty' "$f" 2>/dev/null); [ -n "$p" ] || continue; grep -qa 'job[.]sh' "/proc/$p/cmdline" 2>/dev/null && continue; jq -c '.state = "failed" | .error = "Files stopped before it finished" | .current = "" | .ended = (now * 1000 | floor)' "$f" > "$f.tmp" && mv -f "$f.tmp" "$f"; done; find "$d" -name '*.cancel' -mmin +60 -delete; ls -t "$d" | grep '\\.json$' | head -30 | sed 's/\\.json$//'`]
         stdout: SplitParser {
             onRead: line => { const id = line.trim(); if (id.length > 0) root.watch(id); }
         }
