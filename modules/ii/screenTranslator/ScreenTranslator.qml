@@ -13,7 +13,7 @@ Scope {
         GlobalStates.screenTranslatorOpen = false
     }
 
-    readonly property var currentScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
+    readonly property var currentScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
     
     Loader {
         id: translatorLoader
@@ -37,7 +37,18 @@ Scope {
         }
     }
 
+    // The panel freezes the screen; restored after an unlock it would be a stale picture of the pre-lock desktop.
+    Connections {
+        target: GlobalStates
+        function onScreenLockedChanged() {
+            if (GlobalStates.screenLocked)
+                root.dismiss()
+        }
+    }
+
     function translate() {
+        // Reset first so a press that left the flag set without a visible panel still reopens it.
+        GlobalStates.screenTranslatorOpen = false
         GlobalStates.screenTranslatorOpen = true
     }
 
