@@ -473,19 +473,6 @@ Singleton {
         });
     }
 
-    // A list line is "glyph name keywords"; the keywords start at the first word that repeats one
-    // already said ("grinning face with sweat face hot ..." is "grinning face with sweat").
-    function emojiName(entry) {
-        const words = entry.replace(/^\s*\S+\s+/, "").split(" ");
-        const seen = new Set();
-        for (let i = 0; i < words.length; i++) {
-            if (seen.has(words[i]))
-                return words.slice(0, i).join(" ");
-            seen.add(words[i]);
-        }
-        return words.join(" ");
-    }
-
     readonly property list<var> emojiEntries: {
         if (!root.wants("emoji") || root.activeSection !== "emoji")
             return [];
@@ -493,7 +480,7 @@ Singleton {
             const glyph = entry.match(/^\s*(\S+)/)?.[1] ?? "";
             return resultComp.createObject(null, {
                 rawValue: entry,
-                name: root.emojiName(entry),
+                name: entry.replace(/^\s*\S+\s+/, ""),
                 type: root.sectionTitles.emoji,
                 verb: Translation.tr("Insert"),
                 iconName: glyph,
