@@ -121,6 +121,11 @@ Singleton {
         target: sink?.audio ?? null
         property bool lastReady: false
         property real lastVolume: 0
+        // A new default sink starts from its own level, not the old device's
+        onTargetChanged: {
+            lastReady = false;
+            lastVolume = 0;
+        }
         function onVolumeChanged() {
             if (!Config.options.audio.protection.enable) return;
             const newVolume = sink.audio.volume;
