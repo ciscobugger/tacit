@@ -145,6 +145,7 @@ Item {
     // ---- opening
     function urlOf(path) { return "file://" + path.split("/").map(encodeURIComponent).join("/"); }
     function open(path) {
+        released = false;
         const dir = path.replace(/\/[^\/]*$/, "") || "/";
         wantPath = path;
         loadOrigins();
@@ -168,6 +169,7 @@ Item {
     Timer { id: relistLater; interval: 120; onTriggered: vw.relist() }
     // the list again, keeping the framed file framed; a file the filters miss is added in its place
     function relist() {
+        if (released) return;     // hidden: the folder model still reports changes, but nothing is to be framed
         const keep = wantPath.length ? wantPath : (entries[cur]?.path ?? "");
         const list = [];
         for (let i = 0, n = Math.min(entriesFor.count, 5000); i < n; i++) {
@@ -201,6 +203,8 @@ Item {
             settle = 1;
             animate = on;
             land();
+            if (resume && resume.path === keep) applyResume();
+            resume = null;
             if (kind === "video" || kind === "audio") wantPlay = true;
         } else if (moved) { pos = i; land(); }
         if (!bare) dwell.restart();
@@ -432,7 +436,10 @@ Item {
         videoOutput: vw.videoSink
         audioOutput: AudioOutput { device: mediaDevices.defaultAudioOutput; volume: vw.volume; muted: vw.muted }
         playbackRate: vw.rate
-        onMediaStatusChanged: if (mediaStatus === MediaPlayer.LoadedMedia && vw.wantPlay) { vw.wantPlay = false; play(); }
+        onMediaStatusChanged: {
+            if (mediaStatus === MediaPlayer.LoadedMedia && vw.resumeMs > 0) { position = vw.resumeMs; vw.resumeMs = 0; }
+            if (mediaStatus === MediaPlayer.LoadedMedia && vw.wantPlay) { vw.wantPlay = false; play(); }
+        }
         onPlaybackStateChanged: if (playbackState === MediaPlayer.PlayingState) vw.played = true
         onErrorOccurred: (e, text) => vw.mediaError = text
     }
@@ -443,7 +450,24 @@ Item {
     }
     function pause() { if (playing) player.pause(); }
     // hidden: let go of the list, so the decoded pictures and the player go with it; the next open() lists and lands again
-    function release() { pause(); wantPath = ""; asked = ""; landed = -1; cur = 0; pos = 0; entries = []; probed = ({}); probeQueue = []; peaks = []; }
+    property bool released: false
+    property var resume: null                 // how the file was left, for a reopen of the same file
+    property int resumeMs: 0
+    property int resumePage: -1
+    function release() {
+        pause();
+        resume = landed >= 0 && entry ? { path: entry.path, zoom: zoomTo, rot: rot, page: pdfPage, ms: player.position } : null;
+        released = true;
+        wantPath = ""; asked = ""; landed = -1; cur = 0; pos = 0; entries = []; probed = ({}); probeQueue = []; peaks = [];
+    }
+    function applyResume() {
+        const r = resume;
+        zoomEase = false; setZoom(r.zoom); zoomEase = true;
+        rotEase = false; rot = r.rot; rotEase = true;
+        resumeMs = r.ms;      // the player takes it once the file has loaded
+        resumePage = r.page;  // the reader takes it once it reports its pages
+    }
+    onPdfPagesChanged: if (resumePage >= 0 && pdfPages > 0) Qt.callLater(() => { if (reader && resumePage >= 0) { reader.goTo(resumePage, false); resumePage = -1; } })
     function seekTo(f) { player.position = Math.max(0, Math.min(1, f)) * duration; showChrome(); }
     function seekBy(ms) { player.position = Math.max(0, Math.min(duration, player.position + ms)); toast(Info.clock(player.position)); }
     function setVolume(x) { volume = Math.max(0, Math.min(1, x)); muted = false; toast("Volume " + Math.round(volume * 100)); }
