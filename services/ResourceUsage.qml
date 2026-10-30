@@ -171,7 +171,9 @@ Singleton {
         stdout: StdioCollector {
             id: outputCollector
             onStreamFinished: {
-                root.maxAvailableCpuString = (parseFloat(outputCollector.text) / 1000).toFixed(0) + " GHz"
+                const mhz = parseFloat(outputCollector.text);
+                if (isFinite(mhz) && mhz > 0)
+                    root.maxAvailableCpuString = (mhz / 1000).toFixed(0) + " GHz"
             }
         }
     }
