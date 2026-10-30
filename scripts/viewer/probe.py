@@ -7,7 +7,7 @@
 
 Results are cached under ~/.cache/tacit-viewer, keyed by path + mtime + size.
 """
-import array, hashlib, json, os, re, shutil, subprocess, sys
+import array, glob, hashlib, json, os, re, shutil, subprocess, sys
 
 CACHE = os.path.expanduser("~/.cache/tacit-viewer")
 
@@ -123,11 +123,19 @@ def pages(path, limit):
     if not os.path.isdir(d):
         # rendered into a temp folder and renamed on success, so a timeout or a closed viewer never leaves a partial set
         tmp = f"{d}.{os.getpid()}.part"
+        # a killed probe leaves its folder behind; remove those whose process is gone
+        for f in glob.glob(f"{d}.*.part"):
+            pid = f.rsplit(".", 2)[-2]
+            if pid.isdigit() and not os.path.exists(f"/proc/{pid}"):
+                shutil.rmtree(f, ignore_errors=True)
         os.makedirs(tmp, exist_ok=True)
         try:
             r = run(["pdftoppm", "-r", "110", "-png", "-l", str(limit), path, f"{tmp}/p"], timeout=240)
             if r.returncode == 0 and any(f.endswith(".png") for f in os.listdir(tmp)):
-                os.rename(tmp, d)
+                try:
+                    os.rename(tmp, d)
+                except OSError:
+                    pass  # another probe finished the same folder first; use that one
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     if not os.path.isdir(d):
