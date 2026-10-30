@@ -420,7 +420,8 @@ Singleton {
             // Popup - unless the app is muted (then it only lands in the centre, unread)
             const muted = (Persistent.states.notifications.mutedApps ?? []).some(a => a.toLowerCase() === (notification.appName ?? "").toLowerCase());
             const fromPhone = (notification.desktopEntry ?? "") === "org.kde.kdeconnect.daemon";
-            const interval = notification.expireTimeout == 0 ? 0 : notification.expireTimeout < 0 ? (Config?.options.notifications.timeout ?? 7000) : notification.expireTimeout;
+            // a critical one stays until it is dealt with (as the spec says), whatever timeout the sender gave
+            const interval = notification.urgency === NotificationUrgency.Critical || notification.expireTimeout == 0 ? 0 : notification.expireTimeout < 0 ? (Config?.options.notifications.timeout ?? 7000) : notification.expireTimeout;
             if (!root.popupInhibited && !muted && (!earlier || showing) && !newNotifObject.quiet) {
                 // A phone notification waits for its record, a fraction of a second: what the phone posted silently (a
                 // "For you" from YouTube) goes to the centre without a popup, as it does on the phone.
