@@ -63,10 +63,14 @@ Item {
     }
 
     function setBand(index, value) {
+        // The gain is whole dB: a drag step inside the same dB, once the backend is already
+        // Custom + pending, would only rewrite the same state.
+        const same = Math.round(root.bands[index] ?? 0) === Math.round(value) && root.presetName === "Custom" && root.pending
         root.bands[index] = value
         root.bandsChanged()
         root.presetName = "Custom"
         root.pending = true
+        if (same) return
         root.runEq(["set_band", String(index + 1), String(Math.round(value))])
     }
 
