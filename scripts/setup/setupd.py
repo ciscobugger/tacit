@@ -9,7 +9,8 @@
 #
 # TACIT_SETUP_SCENARIO=windows|bitlocker|asleep|full|empty|linux|linuxroom  shows a disk case this computer does not have
 #                     two                                   two disks: Windows on one, the other empty
-# TACIT_SETUP_FAIL=1                                        the practice install stops at 60 %
+#                     check|unread                          Windows with a disk check waiting, or a partition not read
+# TACIT_SETUP_FAIL=1                                       the practice install stops at 60 %
 # TACIT_SETUP_SECONDS=90                                    how long the practice install takes
 import json, os, re, select, subprocess, sys, threading, time
 
@@ -134,10 +135,28 @@ def layout(name, parts):
         hib = as_root("sh", "-c", 'ntfscat "$1" hiberfil.sys 2>/dev/null | head -c 4', "sh", node)
         m = re.search(r"You might resize at (\d+) bytes", info.stdout if info else "")
         if info and (info.returncode != 0 or (hib and hib.stdout.lower() == "hibr")):
-            out["asleep"] = True
+            out.update(asleep=True, **windows_stopped(info, hib))
         elif m:
             out.update(used=int(m.group(1)), winSize=win["size"])
     return out
+
+def windows_stopped(info, hib):
+    """Why Windows' partition cannot be sized now, from ntfsresize's own sentences. Every refusal used to read "Windows
+    didn't shut down fully"; a disk check Windows had waiting looked the same (ygnk, 2026-10-30). All it said goes to
+    /tmp/tacit-windows.log, and a reason that is none of these is shown in its words."""
+    said = "\n".join(s for s in (info.stderr, info.stdout) if s).strip()
+    try:
+        with open("/tmp/tacit-windows.log", "w") as f:
+            f.write(said + "\n")
+    except OSError:
+        pass
+    low = said.lower()
+    if (hib and hib.stdout.lower() == "hibr") or "hibernat" in low or "journal file is unclean" in low:
+        return {"why": "asleep"}
+    if "scheduled for check" in low or "chkdsk" in low:
+        return {"why": "check"}
+    lines = [l.strip() for l in said.splitlines() if l.strip() and not l.startswith("ntfsresize v")]
+    return {"why": "other", "says": " ".join(lines[-2:])[:240]}
 
 # the disk picked in Setup's disk list (op "disk"); None until then
 chosen = {"name": None}
@@ -177,7 +196,8 @@ def describe(best):
     # what Windows uses and the free room need root: a practice run says so rather than guess
     room = layout(disk["name"], parts) if parts else {}
     if "ntfs" in fs:
-        return dict(disk, case="asleep") if room.get("asleep") else dict(disk, case="windows", **{"used": None, **room})
+        return dict(disk, case="asleep", why=room.get("why", "asleep"), says=room.get("says", "")) if room.get("asleep") \
+            else dict(disk, case="windows", **{"used": None, **room})
     if any(f in ("ext4", "btrfs", "xfs", "f2fs") for f in fs):
         return dict(disk, case="linux", **room)
     return dict(disk, case="empty" if not parts else "other", **room)
@@ -196,6 +216,11 @@ def fake_disk(case):
         return dict(disk, case="windows", used=480 * GB, winSize=510 * GB)
     if case == "linuxroom":
         return dict(disk, case="linux", free=120 * GB)
+    if case == "check":
+        return dict(disk, case="asleep", why="check", says="")
+    if case == "unread":
+        return dict(disk, case="asleep", why="other", says="This software has detected that the NTFS volume is already "
+                    "opened by another software thus it refuses to progress to preserve data consistency.")
     return dict(disk, case=case)
 
 def plan(d):
@@ -224,6 +249,10 @@ def no_room(d, pl):
     """Why "next to" cannot go on this disk, in the words Setup shows after "What stopped it:"."""
     if d.get("case") == "bitlocker":
         return "BitLocker is on for this disk"
+    if d.get("case") == "asleep" and d.get("why") == "check":
+        return "Windows has a disk check waiting (restart Windows twice, then shut it down)"
+    if d.get("case") == "asleep" and d.get("why") == "other":
+        return "Setup could not read Windows' partition safely"
     if d.get("case") == "asleep":
         return "Windows is hibernated rather than shut down (turn off Fast Startup in Windows, then shut it down)"
     if not d.get("gpt"):

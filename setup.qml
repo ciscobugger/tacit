@@ -322,6 +322,8 @@ ApplicationWindow {
                     readonly property string size: `${Math.round((backend.disk.size ?? 0) / 1e9)} GB`
                     Headline {
                         text: parent.c === "bitlocker" ? "Windows is locked."
+                            : parent.c === "asleep" && backend.disk.why === "check" ? "Windows has a disk check waiting."
+                            : parent.c === "asleep" && backend.disk.why === "other" ? "Tacit can't read the Windows disk yet."
                             : parent.c === "asleep" ? "Windows didn't shut down fully."
                             : parent.c === "windows" && !parent.room && backend.plan ? "There is no room next to Windows."
                             : parent.c === "none" ? "There is no disk to install on."
@@ -330,6 +332,8 @@ ApplicationWindow {
                     }
                     Sentence {
                         text: parent.c === "bitlocker" ? "This disk is locked with BitLocker, so Tacit can't make room next to Windows. Start Windows, turn BitLocker off in Settings, then start from this USB stick again."
+                            : parent.c === "asleep" && backend.disk.why === "check" ? "Windows marked its disk to be checked, so Tacit can't make room next to it yet. Start Windows and restart it twice so the check runs, then shut it down and start from this USB stick again."
+                            : parent.c === "asleep" && backend.disk.why === "other" ? `Tacit can't make room next to Windows until it can read the disk safely. Start Windows, restart it, shut it down, then start from this USB stick again. The disk said: “${backend.disk.says}”`
                             : parent.c === "asleep" ? "Windows is paused rather than shut down, so Tacit can't make room next to it yet. Start Windows, hold Shift while you choose Shut down, then start from this USB stick again."
                             : parent.c === "windows" && backend.plan && !parent.room ? `Windows and your files use ${Math.round(backend.disk.used / 1e9)} GB of the ${parent.size} disk. Free up space in Windows, or install instead of Windows.`
                             : parent.c === "windows" && backend.plan ? `This computer has Windows on its ${parent.size} disk, with ${Math.round(backend.disk.used / 1e9)} GB in use.`
