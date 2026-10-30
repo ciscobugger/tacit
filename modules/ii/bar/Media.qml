@@ -59,9 +59,16 @@ Item {
             root.artDownloaded = true
             return
         }
+        root.artDownloaded = false
+        root.startArtDownload()
+    }
+
+    // A Process that is already running ignores running = true; onExited calls this again
+    // when the track changed meanwhile.
+    function startArtDownload() {
+        if (artDownloader.running) return
         artDownloader.targetFile  = root.artUrl
         artDownloader.artFilePath = root.artFilePath
-        root.artDownloaded = false
         artDownloader.running = true
     }
 
@@ -69,9 +76,16 @@ Item {
         id: artDownloader
         property string targetFile:  root.artUrl
         property string artFilePath: root.artFilePath
+        // Download to a temp name and move it in, so a failed or cut-off download is never cached.
         command: ["bash", "-c",
-            `[ -f ${artFilePath} ] || curl -sSL '${StringUtils.shellSingleQuoteEscape(targetFile)}' -o '${artFilePath}'`]
-        onExited: { root.artDownloaded = true }
+            `[ -f "$2" ] || { curl -fsSL --max-time 15 "$1" -o "$2.tmp" && mv "$2.tmp" "$2"; } || { rm -f "$2.tmp"; exit 1; }`,
+            "_", targetFile, artFilePath]
+        onExited: (exitCode, exitStatus) => {
+            if (artFilePath === root.artFilePath)
+                root.artDownloaded = exitCode === 0
+            else if (root.artUrl.startsWith("http"))
+                root.startArtDownload()
+        }
     }
 
     Layout.fillHeight: true
