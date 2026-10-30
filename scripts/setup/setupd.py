@@ -72,10 +72,10 @@ def layouts():
 def wifi():
     nets = {}
     for line in run("nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list").splitlines():
-        p = re.split(r"(?<!\\):", line)
+        p = [re.sub(r"\\(.)", r"\1", f) for f in re.findall(r"((?:\\.|[^:\\])*)(?::|$)", line)]
         if len(p) < 4 or not p[1]:
             continue
-        ssid = p[1].replace("\\:", ":")
+        ssid = p[1]
         n = {"ssid": ssid, "signal": int(p[2] or 0), "secure": p[3] not in ("", "--"), "inUse": p[0] == "*"}
         if ssid not in nets or n["signal"] > nets[ssid]["signal"]:
             nets[ssid] = n
