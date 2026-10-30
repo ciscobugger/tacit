@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
+import qs
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -91,7 +92,7 @@ MouseArea {
     Timer {
         interval: 1000
         repeat: true
-        running: root.visible
+        running: root.visible && !GlobalStates.screenLocked
         onTriggered: networkStats.reload()
     }
 
