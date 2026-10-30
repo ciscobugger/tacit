@@ -103,6 +103,9 @@ Scope {
         id: lock
         locked: GlobalStates.screenLocked
         surface: root.sessionLockSurface
+        // The compositor refuses a second lock while another client (bootlock) holds one.
+        // Follow it, or screenLocked stays true with no lock surface and cannot be set again.
+        onLockedChanged: if (!locked && GlobalStates.screenLocked) GlobalStates.screenLocked = false
     }
 
     function lock() {
