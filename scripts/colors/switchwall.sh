@@ -117,7 +117,7 @@ check_and_prompt_upscale() {
             local small_body="${img_width}×${img_height} on a ${min_width_desired}×${min_height_desired} screen, so it will look soft."
             if command -v upscayl &>/dev/null; then
                 action=$(notify-send "$small_title" "$small_body" -A "open_upscayl=Open Upscayl" -a "Wallpaper")
-                [[ "$action" == "open_upscayl" ]] && nohup upscayl > /dev/null 2>&1 &
+                [[ "$action" == "open_upscayl" ]] && nohup upscayl > /dev/null 2>&1 8>&- &
             else
                 notify-send "$small_title" "$small_body" -a "Wallpaper"
             fi
@@ -212,7 +212,8 @@ switch() {
     # accent colour instead of the image: an accent must not stop the wallpaper from changing.
     if [[ -n "$imgpath" ]]; then
         if [[ -z "$colors_only_flag" ]]; then
-            check_and_prompt_upscale "$imgpath" &
+            # without the run lock (fd 8): the notification can wait for a click, and Upscayl can stay open
+            check_and_prompt_upscale "$imgpath" 8>&- &
             kill_existing_mpvpaper
         fi
 
