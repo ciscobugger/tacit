@@ -22,6 +22,7 @@ Singleton {
     property var activeWorkspace: null
     property var monitors: []
     property var layers: ({})
+    property string lastClientsText: ""
 
     // Convenient stuff
 
@@ -83,7 +84,6 @@ Singleton {
         if (WM.compositor !== "hyprland") return;
         updateWindowList();
         updateMonitors();
-        updateLayers();
         updateWorkspaces();
     }
 
@@ -107,8 +107,21 @@ Singleton {
     Timer {
         id: refreshDebounce
         interval: 80
-        onTriggered: root.updateAll()
+        onTriggered: {
+            // Layers are read only by the region selector, which asks for them when it opens.
+            const w = root.pending;
+            root.pending = ({});
+            if (w.clients) root.updateWindowList();
+            if (w.monitors) root.updateMonitors();
+            if (w.workspaces) root.updateWorkspaces();
+        }
     }
+
+    // Which lists the events since the last refresh can have changed.
+    property var pending: ({})
+    readonly property var clientOnlyEvents: ["activewindow", "windowtitle", "urgent", "pin"]
+    readonly property var workspaceEvents: ["workspace", "createworkspace", "destroyworkspace", "moveworkspace", "renameworkspace", "activespecial"]
+    readonly property var monitorEvents: ["monitoradded", "monitorremoved", "focusedmon", "configreloaded"]
 
     Connections {
         target: Hyprland
@@ -117,6 +130,12 @@ Singleton {
         function onRawEvent(event) {
             if (event.name.endsWith("v2")) return;
             if (["openlayer", "closelayer", "screencast"].includes(event.name)) return;
+            const n = event.name;
+            const p = root.pending;
+            if (root.clientOnlyEvents.includes(n)) p.clients = true;
+            else if (root.workspaceEvents.includes(n)) p.workspaces = true;
+            else if (root.monitorEvents.includes(n)) { p.monitors = true; p.workspaces = true; }
+            else { p.clients = true; p.workspaces = true; p.monitors = true; }
             refreshDebounce.restart()
         }
     }
@@ -129,12 +148,14 @@ Singleton {
             onStreamFinished: {
                 // Empty or truncated output - hyprctl under load, or Hyprland shutting down - used
                 // to throw here and leave the lists stale with no way back until the next event.
+                if (clientsCollector.text === root.lastClientsText) return;
                 let clients;
                 try {
                     clients = JSON.parse(clientsCollector.text);
                 } catch (e) {
                     return;
                 }
+                root.lastClientsText = clientsCollector.text;
                 root.windowList = clients;
                 let tempWinByAddress = {};
                 for (var i = 0; i < root.windowList.length; ++i) {
