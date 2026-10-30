@@ -22,6 +22,8 @@ Scope {
                 closeAnimTimer.stop();
                 root.reallyOpen = true;
             } else {
+                // a cancelled lock-screen pick must not aim the next pick at the lock
+                GlobalStates.wallpaperSelectorTarget = "wallpaper";
                 closeAnimTimer.restart();
             }
         }

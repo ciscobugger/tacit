@@ -62,6 +62,7 @@ Singleton {
     function openFallbackPicker(darkMode = Appearance.m3colors.darkmode, startDir = "") {
         root.pickDarkMode = darkMode;
         root.pickTarget = GlobalStates.wallpaperSelectorTarget;
+        GlobalStates.wallpaperSelectorTarget = "wallpaper";
         Files.pick(startDir !== "" ? startDir : root.effectiveDirectory,
             FileUtils.trimFileProtocol(Quickshell.shellPath("shell.qml")), "wallpapers",
             root.pickTarget === "lockWall" ? "Use for the lock" : "Use as wallpaper");
