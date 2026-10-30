@@ -19,6 +19,10 @@ Singleton {
     onReadyChanged: {
         root.previousHyprlandInstanceSignature = root.states.hyprlandInstanceSignature
         root.states.hyprlandInstanceSignature = Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || ""
+        // A recording cut off by a crash or power loss leaves enable true; with no wf-recorder running
+        // (a shell reload keeps a live one), record.sh --stop clears it.
+        if (root.ready && root.states.record.enable)
+            Quickshell.execDetached(["bash", "-c", 'pgrep -x wf-recorder > /dev/null || exec "$0" --stop', Directories.recordScriptPath]);
     }
 
     Timer {
