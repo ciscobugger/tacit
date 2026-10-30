@@ -1149,11 +1149,14 @@ FloatingWindow {
         const p = win.folder;
         let base = "/";
         let parts = p.split("/").filter(s => s.length > 0);
-        if (p === win.home || p.startsWith(win.home + "/")) {
+        if (win.inTrash) {   // the trash's folder is called files on disk: it reads "Trash", nothing above it
+            base = win.trashDir;
+            parts = p.substring(win.trashDir.length).split("/").filter(s => s.length > 0);
+        } else if (p === win.home || p.startsWith(win.home + "/")) {
             base = win.home;
             parts = p.substring(win.home.length).split("/").filter(s => s.length > 0);
         }
-        let list = [{ "name": base === "/" ? "/" : "Home", "path": base }];
+        let list = [{ "name": base === "/" ? "/" : win.inTrash ? "Trash" : "Home", "path": base }];
         let acc = base === "/" ? "" : base;
         for (const part of parts) {
             acc += "/" + part;
