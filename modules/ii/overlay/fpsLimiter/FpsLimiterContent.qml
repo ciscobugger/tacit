@@ -51,7 +51,7 @@ OverlayBackground {
             "else echo 'fps_limit=" + fpsValue + "' >> " + path + "; fi";
         }).join("; ");
 
-        var cmd = updateCommands + "; pkill -SIGUSR2 mangohud";
+        var cmd = "mkdir -p ~/.config/MangoHud; " + updateCommands + "; pkill -SIGUSR2 mangohud";
 
         fpsSetter.command = ["bash", "-c", cmd];
         fpsSetter.startDetached();
