@@ -133,7 +133,7 @@ ContentPage {
                         icon: "swap_horiz"
                         text: Translation.tr("Position X")
                         value: monitorConfig.monitors[monitorCanvas.selectedIndex]?.x ?? 0
-                        from: 0; to: 7680; stepSize: 1
+                        from: -16384; to: 16384; stepSize: 1
                         onValueChanged: {
                             if (value === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.x ?? 0)) return
                             monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { x: value })
@@ -145,7 +145,7 @@ ContentPage {
                         icon: "swap_vert"
                         text: Translation.tr("Position Y")
                         value: monitorConfig.monitors[monitorCanvas.selectedIndex]?.y ?? 0
-                        from: 0; to: 4320; stepSize: 1
+                        from: -16384; to: 16384; stepSize: 1
                         onValueChanged: {
                             if (value === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.y ?? 0)) return
                             monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { y: value })
