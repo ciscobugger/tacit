@@ -1150,7 +1150,7 @@ Singleton {
         id: downloadWatch
         running: root.enabled && Config.options.island.states.download
         // the account's Downloads folder by its own name (xdg-user-dirs names it in the account's language: ~/Téléchargements)
-        command: ["bash", "-c", `d='${StringUtils.shellSingleQuoteEscape(FileUtils.trimFileProtocol(Directories.downloads))}'; p='${StringUtils.shellSingleQuoteEscape(root.screenshotDir)}'; set -- "$d"; [ -n "$p" ] && set -- "$d" "$p"; exec 3<> <(:); printf -v last '%(%s)T' -1; while read -t 2 -u 3; [ $? -gt 128 ]; do printf -v now '%(%s)T' -1; find "$@" -maxdepth 1 -type f \\( \\( -name '*.part' -o -name '*.crdownload' \\) -printf 'P\\t%s\\t%p\\n' -o -newermt "@$((last-1))" ! -name '.*' ! -name '*.tmp' -printf '%p\\n' \\) 2>/dev/null; last=$now; done`]
+        command: ["bash", "-c", `d='${StringUtils.shellSingleQuoteEscape(FileUtils.trimFileProtocol(Directories.downloads))}'; p='${StringUtils.shellSingleQuoteEscape(root.screenshotDir)}'; set -- "$d"; [ -n "$p" ] && set -- "$d" "$p"; exec 3<> <(:); printf -v last '%(%s)T' -1; last=$((last+1)); while read -t 2 -u 3; [ $? -gt 128 ]; do printf -v now '%(%s)T' -1; find "$@" -maxdepth 1 -type f \\( \\( -name '*.part' -o -name '*.crdownload' \\) -printf 'P\\t%s\\t%p\\n' -o -newermt "@$((last-1))" ! -name '.*' ! -name '*.tmp' -printf '%p\\n' \\) 2>/dev/null; last=$now; done`]
         stdout: SplitParser {
             onRead: line => {
                 if (line.startsWith("P\t")) {   // a download still growing: name, size
