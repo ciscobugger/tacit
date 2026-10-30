@@ -215,6 +215,7 @@ Item {
         mediaError = "";
         peaks = [];
         landed = cur;     // after the resets: a PDF's reader reports its pages the moment it exists
+        ensureProbe(entries[cur].path);     // first, so an idle probe starts on the landed file and not on cur-2
         for (let k = Math.max(0, cur - 2); k <= Math.min(entries.length - 1, cur + 2); k++) ensureProbe(entries[k].path);
         if (kind === "audio") { peaksProc.command = ["python3", probeScript, "peaks", entry.path, "120"]; peaksProc.running = false; peaksProc.running = true; }
         forceActiveFocus();
