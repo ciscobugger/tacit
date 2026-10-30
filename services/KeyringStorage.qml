@@ -128,12 +128,11 @@ Singleton {
             if (exitCode === 1) {
                 console.error("[KeyringStorage] Entry not found, initializing.");
                 root.keyringData = {};
-                saveKeyringData()
-            }
-            if (exitCode !== 2) {
                 root.loaded = true;
+                saveKeyringData()
                 root.flushPendingWrites();
-            } else {
+            } else if (!root.loaded) {
+                // Locked, failed or unreadable output: keep queued writes until a read succeeds.
                 retryLocked.restart();
             }
         }
