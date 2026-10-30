@@ -67,10 +67,13 @@ ContentPage {
                     ConfigSwitch {
                         buttonIcon: "tv_off"
                         text: Translation.tr("Enabled")
-                        enabled: monitorConfig.monitors.length > 1
+                        // never switch off the last enabled screen: the setting is saved and survives a restart
+                        enabled: monitorConfig.monitors.filter(m => !m.disabled).length > 1
+                            || (monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)
                         checked: !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)
                         onSwitched: (value) => {
                             if (value === !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)) return
+                            if (!value && monitorConfig.monitors.filter(m => !m.disabled).length <= 1) return
                             monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { disabled: !value })
                             monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
                         }
