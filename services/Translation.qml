@@ -116,14 +116,14 @@ Singleton {
         required property string translationsDir
         signal languagesScanned(var languages)
 
-        command: ["find", translationScanner.translationsDir, "-name", "*.json", "-exec", "basename", "{}", ".json", ";"]
+        command: ["find", translationScanner.translationsDir, "-name", "*.json", "-printf", "%f\\n"]
         running: true
 
         stdout: StdioCollector {
             id: languagesCollector
             onStreamFinished: {
                 const output = languagesCollector.text;
-                const files = output.trim().split('\n').map(f => f.trim()).filter(f => f.length > 0);
+                const files = output.trim().split('\n').map(f => f.trim().replace(/\.json$/, "")).filter(f => f.length > 0);
                 translationScanner.languagesScanned(files);
             }
         }
