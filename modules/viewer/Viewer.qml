@@ -396,9 +396,7 @@ Item {
     function needFallback(path) {
         if (fallback[path] !== undefined) return;
         const n = Object.assign({}, fallback); n[path] = []; fallback = n;
-        pagesProc.target = path;
-        pagesProc.command = ["python3", probeScript, "pages", path, "60"];
-        pagesProc.running = true;
+        pagesComp.createObject(vw, { target: path });
     }
     function pdfGoTo(p) { if (reader) reader.goTo(p, true); else pdfPage = p; if (!bare && !searchOpen) pdfPage = p; }
     function pdfGoToFraction(f) { if (reader) reader.scrollTo(f * reader.total - reader.head - reader.list.height * 0.4 + 8, false); }
@@ -500,17 +498,24 @@ Item {
         id: peaksProc
         stdout: StdioCollector { onStreamFinished: { try { vw.peaks = JSON.parse(text).peaks ?? []; } catch (e) {} } }
     }
-    Process {
+    // one Process per path: documents that fail together each keep their own command and result
+    Component {
+      id: pagesComp
+      Process {
         id: pagesProc
         property string target: ""
+        command: ["python3", vw.probeScript, "pages", target, "60"]
+        running: true
         stdout: StdioCollector {
             onStreamFinished: {
                 let pages = [];
                 try { pages = JSON.parse(text).pages.map(p => "file://" + p); } catch (e) {}
                 if (pages.length > 0) { const n = Object.assign({}, vw.fallback); n[pagesProc.target] = pages; vw.fallback = n; }
                 else { const n = Object.assign({}, vw.fallbackFailed); n[pagesProc.target] = true; vw.fallbackFailed = n; }
+                pagesProc.destroy();
             }
         }
+      }
     }
     function metaOf(path) { return probed[path] ?? null; }
     function thumbOf(path) { const t = probed[path]?.thumb; return t ? "file://" + t : ""; }
