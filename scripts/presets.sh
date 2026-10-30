@@ -19,7 +19,8 @@ mkdir -p "$LOCAL_PRESETS_DIR" "$ONLINE_PRESETS_DIR" "$IMPORTED_PRESETS_DIR"
 
 # Blacklist: General (time/battery/audio/sounds/language/workSafety) + Services (ai/networking/musicRecognition/search/screenRecord/screenSnip/updates/bar.weather) + Hyprland non-styling
 # Keep: appearance/background/bar(non-weather)/dock/lock/overview/panelFamily etc. + hyprland.decoration/gaps/animations
-# Note: apps/profile/wallpaperSelector are NOT blacklisted here (would make preset look empty) - only General+Services per Settings tabs
+# Note: profile/wallpaperSelector are NOT blacklisted here (would make preset look empty) - only General+Services per Settings tabs
+# apps IS blacklisted: its values are run with bash -c, so a shared preset must not carry them
 # The bar switches, the dock switch and the panel family are left out too: a preset made for stock
 # end4-pC would otherwise bring back surfaces Tacit removed.
 # The notch, the command palette and the Bluetooth filter are function, not a look: --apply is a
@@ -30,6 +31,7 @@ BLACKLIST_FILTER='del(._presetMeta)
   | del(.ai, .networking, .musicRecognition, .search, .screenRecord, .screenSnip, .updates)
   | del(.bar.weather)
   | del(.island, .commandPalette, .bluetooth)
+  | del(.apps)
   | del(.bar.enable, .bar.vertical, .dock.enable, .panelFamily)
   | del(.hyprland.input, .hyprland.autostartApps, .hyprland.general.layout)'
 
