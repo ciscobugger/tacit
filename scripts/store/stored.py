@@ -256,7 +256,10 @@ def icon_png(src):
     dst = os.path.join(CACHE, "icons", os.path.basename(src).rsplit(".", 1)[0] + ".png")
     if not os.path.exists(dst):
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        subprocess.run(["magick", src, dst], capture_output=True, timeout=30)
+        tmp = f"{dst}.{os.getpid()}.tmp.png"
+        subprocess.run(["magick", src, tmp], capture_output=True, timeout=30)
+        if os.path.exists(tmp):
+            os.replace(tmp, dst)
     return dst if os.path.exists(dst) else ""
 
 
@@ -268,17 +271,22 @@ def shot(url, wide=1600):
     if os.path.exists(dst):
         return dst
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    raw = dst + ".download"
+    # per process: the home and app backends can fetch the same picture at once
+    raw = f"{dst}.{os.getpid()}.download"
+    tmp = f"{dst}.{os.getpid()}.tmp.jpg"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Tacit Apps"})
         with urllib.request.urlopen(req, timeout=20) as r, open(raw, "wb") as f:
             f.write(r.read(40 * 1024 * 1024))
-        subprocess.run(["magick", raw + "[0]", "-resize", f"{wide}x>", "-quality", "88", dst], capture_output=True, timeout=60)
+        subprocess.run(["magick", raw + "[0]", "-resize", f"{wide}x>", "-quality", "88", tmp], capture_output=True, timeout=60)
+        if os.path.exists(tmp):
+            os.replace(tmp, dst)
     except Exception:
         pass
     finally:
-        if os.path.exists(raw):
-            os.remove(raw)
+        for p in (raw, tmp):
+            if os.path.exists(p):
+                os.remove(p)
     return dst if os.path.exists(dst) else ""
 
 
