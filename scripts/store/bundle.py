@@ -408,9 +408,10 @@ def desktop_files(root, target_files):
     return [os.path.join(root, f) for f in target_files if f.startswith("usr/share/applications/") and f.endswith(".desktop")]
 
 
-def integrate(app, root, target_files):
-    """the app's launcher entries and icons in the user's own folders, starting it through its sandbox"""
-    made, ids, execs = [], [], []
+def integrate(app, root, target_files, made):
+    """the app's launcher entries and icons in the user's own folders, starting it through its sandbox.
+    Every file written is appended to `made` as it is written, so a caller can undo a failed run."""
+    ids, execs = [], []
     os.makedirs(APPS_DIR, exist_ok=True)
     for src in desktop_files(root, target_files):
         name = os.path.basename(src); dst = os.path.join(APPS_DIR, name)
@@ -442,7 +443,7 @@ def integrate(app, root, target_files):
                 d = os.path.join(ICONS_DIR, rel); os.makedirs(os.path.dirname(d), exist_ok=True)
                 shutil.copy2(f, d); made.append(d)
     subprocess.run(["update-desktop-database", APPS_DIR], capture_output=True)
-    return made, ids, [e for *_, e in sorted(execs, key=lambda e: e[:2])]
+    return ids, [e for *_, e in sorted(execs, key=lambda e: e[:2])]
 
 
 def install(target, quiet=False):
@@ -491,31 +492,49 @@ def install(target, quiet=False):
         refresh_caches(root)
     except BaseException:
         wipe(stage); raise                          # a half-unpacked folder can be hundreds of MB
+    # the old bundle waits in '<app>.old' until the new one is integrated, so a failure here can put it back
+    aside = base + ".old"; wipe(aside)
     if os.path.isdir(base):
         if os.path.exists(old):
-            remove(target, keep_data=True, quiet=True)
+            os.replace(base, aside)
         else:
             wipe(base)                              # left by an install that died after the swap: no manifest
     os.replace(stage, base)
     root = os.path.join(base, "root")
     made = []
     try:
-        made, ids, execs = integrate(target, root, tfiles)
+        ids, execs = integrate(target, root, tfiles, made)
+        first = next((m for m in tfiles if m.startswith("usr/bin/") and not m.endswith("/")), None)
+        man = dict(package=target, version=bundle[target]["version"], versions=want, shared=used, made=made, ids=ids,
+                   exec=execs[0] if execs else (["/" + first] if first else []), skipped=skipped, host_stamp=host_stamp(),
+                   size=size, installed=int(time.time()), permissions=perms_for(target, []))
+        json.dump(man, open(os.path.join(base, "manifest.json"), "w"), indent=1)
     except BaseException:
+        kept = set(prev["made"]) if prev and os.path.isdir(aside) else set()
         for f in made:
-            with contextlib.suppress(OSError):
-                os.unlink(f)
-        wipe(base); raise
-    first = next((m for m in tfiles if m.startswith("usr/bin/") and not m.endswith("/")), None)
-    man = dict(package=target, version=bundle[target]["version"], versions=want, shared=used, made=made, ids=ids,
-               exec=execs[0] if execs else (["/" + first] if first else []), skipped=skipped, host_stamp=host_stamp(),
-               size=size, installed=int(time.time()), permissions=perms_for(target, []))
-    json.dump(man, open(os.path.join(base, "manifest.json"), "w"), indent=1)
+            if f not in kept:                       # a launcher the old bundle had is rewritten in place and stays
+                with contextlib.suppress(OSError):
+                    os.unlink(f)
+        wipe(base)
+        if os.path.isdir(aside):
+            os.replace(aside, base)
+        raise
+    if os.path.isdir(aside):
+        for f in prev.get("made", []):
+            if f not in made:
+                with contextlib.suppress(OSError):
+                    os.unlink(f)
+        wipe(aside)
+        subprocess.run(["update-desktop-database", APPS_DIR], capture_output=True)
+    # older versions of this bundle's packages; other apps' files may be in use by an install running now
+    names = {p["filename"].rsplit("-", 3)[0] for p in bundle.values()}
     keep = {p["filename"] + e for p in bundle.values() for e in ("", ".sig")}
     for f in glob.glob(os.path.join(CACHE, "pkg", "*")):
-        if os.path.basename(f) not in keep:
-            with contextlib.suppress(OSError):
-                os.unlink(f)                        # the cache holds this install's packages only
+        b = os.path.basename(f)
+        if b in keep or b.endswith(".part") or b.rsplit("-", 3)[0] not in names:
+            continue
+        with contextlib.suppress(OSError):
+            os.unlink(f)
     step(step="done", app=target, changed=True, packages=len(bundle), size=size)
     return man
 
