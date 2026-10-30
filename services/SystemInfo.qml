@@ -143,16 +143,6 @@ Singleton {
         printErrors: false
     }
 
-    // The eight probes below only ever ran from refresh(), which only Settings called, so
-    // every other surface that shows CPU, GPU, memory or packages stayed blank until the
-    // settings app had been opened once. Late enough not to compete with shell startup.
-    Timer {
-        interval: 3000
-        running: true
-        repeat: false
-        onTriggered: root.refresh()
-    }
-
     Process {
         id: getKernel
         running: false

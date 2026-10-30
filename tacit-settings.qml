@@ -4782,6 +4782,8 @@ ApplicationWindow {
             property real memoryKb: 0
             property real diskSize: 0
             property real diskFree: 0
+            // the probes run when About opens (the shell's Settings does the same), not at login
+            Component.onCompleted: if (SystemInfo.cpu === "") SystemInfo.refresh()
             function gb(bytes) {
                 return `${Math.round(bytes / 1e9)} GB`;
             }
