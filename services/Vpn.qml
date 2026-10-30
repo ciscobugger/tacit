@@ -59,6 +59,8 @@ Singleton {
     }
     property string pendingConnect: ""
     function toggle(name: string): void {
+        if (root.busy)
+            return;
         if (root.active && root.active.name === name) {
             root.disconnect();
         } else if (root.active) {
@@ -163,6 +165,7 @@ Singleton {
             waitTimer.stop();
             root.busy = false;
             root.refresh();
+            ruleLater.restart();   // a network change that came in while busy was skipped
             if (root.pendingConnect.length > 0) {
                 const next = root.pendingConnect;
                 root.pendingConnect = "";
