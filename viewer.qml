@@ -52,8 +52,8 @@ ApplicationWindow {
         if (f && f.length) viewer.open(f);
     }
 
-    // hidden, it stops playing
-    onVisibleChanged: if (!visible) viewer.pause()
+    // hidden, it stops playing and lets go of the pictures
+    onVisibleChanged: if (!visible) viewer.release()
 
     Rectangle {
         anchors.fill: parent

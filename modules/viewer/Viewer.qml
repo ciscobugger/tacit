@@ -441,6 +441,8 @@ Item {
         showChrome();
     }
     function pause() { if (playing) player.pause(); }
+    // hidden: let go of the list, so the decoded pictures and the player go with it; the next open() lists and lands again
+    function release() { pause(); wantPath = ""; asked = ""; landed = -1; cur = 0; pos = 0; entries = []; probed = ({}); probeQueue = []; peaks = []; }
     function seekTo(f) { player.position = Math.max(0, Math.min(1, f)) * duration; showChrome(); }
     function seekBy(ms) { player.position = Math.max(0, Math.min(duration, player.position + ms)); toast(Info.clock(player.position)); }
     function setVolume(x) { volume = Math.max(0, Math.min(1, x)); muted = false; toast("Volume " + Math.round(volume * 100)); }
