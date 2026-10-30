@@ -717,6 +717,7 @@ Singleton {
                 const active = ToplevelManager.activeToplevel;
                 const jobs = appProbe.jobs;
                 appProbe.jobs = [];
+                probeLimit.stop();
                 for (const j of jobs)
                     (active && active.title === s.title && s.selected === j.id) ? j.on() : j.off();
             }
@@ -729,5 +730,17 @@ Singleton {
         if (!active || !["org.quickshell", "praxis"].includes(active.appId)) { off(); return; }
         appProbe.jobs = appProbe.jobs.concat([{ id: id, off: off, on: shown }]);
         if (!appProbe.running) appProbe.running = true;
+        probeLimit.restart();
+    }
+    // A wedged Praxis never answers the probe; after this the queued peeks are shown as if it were not in front.
+    Timer {
+        id: probeLimit
+        interval: 1500
+        onTriggered: {
+            const jobs = appProbe.jobs;
+            appProbe.jobs = [];
+            appProbe.running = false;
+            for (const j of jobs) j.off();
+        }
     }
 }
