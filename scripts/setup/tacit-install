@@ -289,16 +289,19 @@ def install(disk, place, keep):
     progress(0.05, "copying")
 
     # the live system's image, as it ran: unsquashfs says how far it is in percent
-    p = subprocess.Popen(["unsquashfs", "-f", "-d", TARGET, "-percentage", sfs], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    p = subprocess.Popen(["unsquashfs", "-f", "-d", TARGET, "-percentage", sfs], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     last = 0
+    warned = []     # stderr shares the pipe: a separate one, read after this loop, could fill and stall unsquashfs
     for line in p.stdout:
         if line.strip().isdigit():
             pct = int(line.strip())
             if pct >= last + 1:
                 last = pct
                 progress(0.05 + 0.70 * pct / 100, "copying")
+        elif line.strip():
+            warned = (warned + [line.strip()])[-5:]
     if p.wait() != 0:
-        raise Refused(f"copying failed: {p.stderr.read().strip()[-300:]}")
+        raise Refused(f"copying failed: {' '.join(warned)[-300:]}")
 
     # the live system's own parts out; the package defaults they had replaced back
     progress(0.76, "system")
