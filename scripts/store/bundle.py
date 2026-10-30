@@ -499,6 +499,11 @@ def install(target, quiet=False):
                exec=execs[0] if execs else (["/" + first] if first else []), skipped=skipped, host_stamp=host_stamp(),
                size=size, installed=int(time.time()), permissions=perms_for(target, []))
     json.dump(man, open(os.path.join(base, "manifest.json"), "w"), indent=1)
+    keep = {p["filename"] + e for p in bundle.values() for e in ("", ".sig")}
+    for f in glob.glob(os.path.join(CACHE, "pkg", "*")):
+        if os.path.basename(f) not in keep:
+            with contextlib.suppress(OSError):
+                os.unlink(f)                        # the cache holds this install's packages only
     step(step="done", app=target, changed=True, packages=len(bundle), size=size)
     return man
 
