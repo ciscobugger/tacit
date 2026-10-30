@@ -233,13 +233,30 @@ def du(path):
     except (OSError, subprocess.SubprocessError, ValueError):
         return 0
 
+def newest_mtime(e, cap=20000):
+    """A folder's own mtime ignores edits inside it: take the newest in the tree (first `cap` entries)."""
+    m = e.stat(follow_symlinks=False).st_mtime
+    if not e.is_dir(follow_symlinks=False):
+        return m
+    n = 0
+    for root, dirs, files in os.walk(e.path):
+        for name in dirs + files:
+            try:
+                m = max(m, os.lstat(os.path.join(root, name)).st_mtime)
+            except OSError:
+                pass
+            n += 1
+            if n >= cap:
+                return m
+    return m
+
 def old_downloads():
     d = os.path.join(HOME, "Downloads"); cut = time.time() - OLD_DAYS * 86400
     out = []
     try:
         for e in os.scandir(d):
             try:
-                if e.stat(follow_symlinks=False).st_mtime < cut:
+                if newest_mtime(e) < cut:
                     out.append(e.path)
             except OSError:
                 pass
