@@ -63,9 +63,32 @@ NestableObject {
         applyProc.running = true
     }
 
+    // A Process ignores running = true while it runs, so rapid changes are
+    // collected and applied once, after the previous run has finished.
+    property var _pendingApply: ({})
+
     function applyAndSave(index) {
-        root.applyMonitor(root.monitors[index])
-        root.save()
+        root._pendingApply[index] = true
+        applyTimer.restart()
+    }
+
+    Timer {
+        id: applyTimer
+        interval: 150
+        onTriggered: {
+            if (applyProc.running || saveProc.running) {
+                restart()
+                return
+            }
+            const pending = Object.keys(root._pendingApply)
+            root._pendingApply = ({})
+            // One apply Process: only the last changed monitor is applied live;
+            // the saved file and the reload that follows cover the rest.
+            if (pending.length > 0) {
+                root.applyMonitor(root.monitors[pending[pending.length - 1]])
+                root.save()
+            }
+        }
     }
 
     function logicalWidth(m) {
