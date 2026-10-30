@@ -3894,9 +3894,23 @@ ApplicationWindow {
                 const mirror = o.mirror !== undefined ? o.mirror : (m.mirrorOf && m.mirrorOf !== "none" ? m.mirrorOf : "");
                 return `hl.monitor({ output = "${m.name}", mode = "${mode}", position = "${position}", scale = ${o.scale ?? m.scale}${mirror ? `, mirror = "${mirror}"` : ""} })`;
             }
+            // Positions are in logical pixels, so a new scale or mode on one screen moves the screens
+            // that sat beyond its far edge by the change in its logical size.
+            function shiftedPosition(m, name, change) {
+                const c = dp.screens.find(x => x.name === name);
+                if (!c || (change.scale === undefined && change.mode === undefined))
+                    return undefined;
+                const md = change.mode ? change.mode.match(/^(\d+)x(\d+)@/) : null;
+                const sc = change.scale ?? c.scale;
+                const dw = Math.round((md ? +md[1] : c.width) / sc) - Math.round(c.width / c.scale);
+                const dh = Math.round((md ? +md[2] : c.height) / sc) - Math.round(c.height / c.scale);
+                const x = m.x >= c.x + Math.round(c.width / c.scale) ? m.x + dw : m.x;
+                const y = m.y >= c.y + Math.round(c.height / c.scale) ? m.y + dh : m.y;
+                return `${x}x${y}`;
+            }
             function setMonitor(name, change) {
                 const lines = ["-- Written by Tacit Settings (Display & power). Delete it to go back to hyprland/general.lua."]
-                    .concat(dp.screens.map(m => dp.monitorLine(m, m.name === name ? change : {})));
+                    .concat(dp.screens.map(m => dp.monitorLine(m, m.name === name ? change : { position: dp.shiftedPosition(m, name, change) })));
                 writeMonitors.command = ["bash", "-c", 'printf "%s\\n" "$@" > "$HOME/.config/hypr/monitors.lua" && hyprctl reload >/dev/null', "_"].concat(lines);
                 writeMonitors.running = true;
             }
