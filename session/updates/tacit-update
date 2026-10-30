@@ -34,8 +34,10 @@ tonight)
 night)
 	mains=0 battery=0
 	for d in /sys/class/power_supply/*; do
+		# a wireless mouse's battery is not the computer's
+		[ "$(cat "$d/scope" 2>/dev/null)" = Device ] && continue
 		case "$(cat "$d/type" 2>/dev/null)" in
-			Mains) [ "$(cat "$d/online" 2>/dev/null)" = 1 ] && mains=1 ;;
+			Mains|USB|USB_C|USB_PD*) [ "$(cat "$d/online" 2>/dev/null)" = 1 ] && mains=1 ;;
 			Battery) battery=1 ;;
 		esac
 	done
