@@ -28,6 +28,13 @@ Singleton {
     readonly property list<string> extensions: [ // TODO: add videos
         "jpg", "jpeg", "png", "webp", "avif", "bmp", "svg"
     ]
+    // mpvpaper plays these, in its own process and on its own surface (Background.qml repeats the
+    // test for the pictures it draws itself)
+    readonly property list<string> videoExtensions: ["mp4", "webm", "mkv", "avi", "mov"]
+    function isVideo(path) {
+        const lower = FileUtils.trimFileProtocol(String(path ?? "")).toLowerCase();
+        return root.videoExtensions.some(ext => lower.endsWith(`.${ext}`));
+    }
     property list<string> wallpapers: [] // List of absolute file paths (without file://)
     readonly property bool thumbnailGenerationRunning: thumbgenProc.running
     property real thumbnailGenerationProgress: 0
@@ -370,6 +377,14 @@ Singleton {
         target: Config.options.background
         function onWallpaperPathChanged() {
             root.confirmedPath = "";
+        }
+        // "Blur the wallpaper" reaches a picture through Background.qml's FastBlur, but a video is
+        // drawn by mpvpaper outside the shell, so switchwall.sh hands mpv a blur filter instead.
+        // mpv takes its options when it starts: the player is started again, which is also the only
+        // way to take the filter off.
+        function onShowBlurChanged() {
+            if (!root.isVideo(Config.options.background.wallpaperPath)) return;
+            Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--video"]);
         }
     }
 

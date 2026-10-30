@@ -103,6 +103,8 @@ Variants {
             }
         }
         readonly property bool overviewBlurActive: Config.options.overview.style === "niri" && GlobalStates.overviewOpen && Config.options.overview.enable
+        // A video is played by mpvpaper on its own surface, not drawn here, so this glass has nothing
+        // to sample: switchwall.sh hands mpv the blur instead, and it follows the same setting.
         readonly property bool userBlurActive: Config.options.background.showBlur && !bgRoot.wallpaperIsVideo
         readonly property bool blurFullScreen: bgRoot.overviewBlurActive || bgRoot.splitFraction >= 1.0
 
