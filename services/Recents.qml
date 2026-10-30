@@ -282,9 +282,9 @@ Singleton {
     // "run" types the command into a new terminal's prompt; you press Enter.
     function run(item) {
         const cmd = (item.text + "").trim().replace(/^\$ /, "");
-        const q = cmd.replace(/'/g, "'\\''");
-        Quickshell.execDetached(["foot", "fish", "-C",
-            `function __notch_prefill --on-event fish_prompt; commandline -r '${q}'; functions -e __notch_prefill; end`]);
+        // the text travels in the environment, never as fish source: a quote or backslash in it cannot run anything
+        Quickshell.execDetached(["env", `__notch_cmd=${cmd}`, "foot", "fish", "-C",
+            "function __notch_prefill --on-event fish_prompt; commandline -r -- $__notch_cmd; functions -e __notch_prefill; set -e __notch_cmd; end"]);
     }
 
     // ------------------------------------------------------------------ hand to Claude
