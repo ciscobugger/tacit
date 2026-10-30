@@ -1155,7 +1155,9 @@ Singleton {
             onRead: line => {
                 if (line.startsWith("P\t")) {   // a download still growing: name, size
                     const f = line.split("\t");
-                    Jobs.sampleDownload(f[2].trim(), parseInt(f[1]));
+                    const path = f[2].trim();
+                    if (!(root.screenshotDir.length > 0 && path.startsWith(root.screenshotDir + "/")))   // sizes are for Downloads only
+                        Jobs.sampleDownload(path, parseInt(f[1]));
                 } else {
                     root.onDownloaded(line.trim());
                 }
