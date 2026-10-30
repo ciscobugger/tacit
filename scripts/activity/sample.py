@@ -623,19 +623,26 @@ def act(req):
         # stays and resumes on the next message), which is what gives the memory back
         r = host({"op": op, "id": req.get("id", "")})
         emit({"ev": "done", "op": op, "id": req.get("id"), "ok": bool(r) and r.get("ev") != "error"})
-    elif op == "trashOld":
-        old = old_downloads()
-        ok = subprocess.run(["gio", "trash", "--"] + old, capture_output=True, timeout=120).returncode == 0 if old else True
-        emit({"ev": "done", "op": op, "ok": ok, "n": len(old)})
-        disk_start(force=True)
-    elif op == "clearCaches":
-        for c in CACHES:
-            p = os.path.join(HOME, c)
-            if os.path.isdir(p) and os.path.realpath(p).startswith(HOME + "/"):
-                for e in os.scandir(p):
-                    subprocess.run(["rm", "-rf", "--one-file-system", "--", e.path], capture_output=True, timeout=300)
-        emit({"ev": "done", "op": op, "ok": True})
-        disk_start(force=True)
+    elif op in ("trashOld", "clearCaches"):
+        # slow disks: off the sampling thread, and a timeout still answers
+        threading.Thread(target=slow_action, args=(op,), daemon=True).start()
+
+def slow_action(op):
+    try:
+        if op == "trashOld":
+            old = old_downloads()
+            ok = subprocess.run(["gio", "trash", "--"] + old, capture_output=True, timeout=120).returncode == 0 if old else True
+            emit({"ev": "done", "op": op, "ok": ok, "n": len(old)})
+        else:
+            for c in CACHES:
+                p = os.path.join(HOME, c)
+                if os.path.isdir(p) and os.path.realpath(p).startswith(HOME + "/"):
+                    for e in os.scandir(p):
+                        subprocess.run(["rm", "-rf", "--one-file-system", "--", e.path], capture_output=True, timeout=300)
+            emit({"ev": "done", "op": op, "ok": True})
+    except (OSError, subprocess.SubprocessError):
+        emit({"ev": "done", "op": op, "ok": False})
+    disk_start(force=True)
 
 state = {"interval": float(os.environ.get("ACTIVITY_INTERVAL", "2"))}
 
