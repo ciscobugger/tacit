@@ -72,7 +72,8 @@ Singleton {
         onLoaded: {
             const fileContents = notesFileView.text()
             try {
-                const parsed = JSON.parse(fileContents)
+                // An empty file holds nothing to protect
+                const parsed = fileContents.trim() === "" ? [] : JSON.parse(fileContents)
                 if (Array.isArray(parsed)) {
                     root.list = parsed
                     root.broken = false
