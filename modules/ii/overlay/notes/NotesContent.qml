@@ -159,16 +159,19 @@ OverlayBackground {
             id: editorScrollView
             Layout.fillWidth: true
             Layout.fillHeight: true
+            // Vertical only: the content is the viewport's width, so typing never scrolls sideways.
+            contentWidth: availableWidth
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
             onWidthChanged: root.scheduleCopylistUpdate(true)
 
             StyledTextArea { // This has to be a direct child of ScrollView for proper scrolling
                 id: textInput
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                }
+                // The width is the viewport's, never the ScrollView's content width: that one is
+                // taken from this item's own implicit width, which is measured while the widget is
+                // still being built, and the first characters typed wrapped at that narrow width
+                // until the widget was reopened.
+                width: editorScrollView.availableWidth
                 wrapMode: TextEdit.Wrap
                 placeholderText: Translation.tr("Notes")
                 selectByMouse: true
