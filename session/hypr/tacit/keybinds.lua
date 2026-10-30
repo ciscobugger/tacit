@@ -94,10 +94,22 @@ end)
 
 -- Alt + Tab -> the window switcher: the workspace overview with a ring on the window you were in before; Tab and
 -- Shift + Tab move it, letting go of Alt focuses it (modules/ii/overview/Overview.qml). Hyprland sees the keys before
--- any window, so the open overview does not need to hold them; the Alt release binds are the same kind as Super's above
--- (release, any modifier state, passed on) and do nothing in the shell unless a switch is going.
+-- any window, so the open overview does not need to hold them.
 hl.bind("ALT + Tab", hl.dsp.global("quickshell:altTabNext"), { description = "Shell: Switch windows" })
 hl.bind("ALT + SHIFT + Tab", hl.dsp.global("quickshell:altTabPrev"), { description = "Shell: Switch windows, back" })
 hl.bind("ALT + Escape", hl.dsp.global("quickshell:altTabCancel"), { description = "Shell: Leave the window switcher" })
-hl.bind("ALT_L", hl.dsp.global("quickshell:altTabRelease"), { ignore_mods = true, transparent = true, release = true })
-hl.bind("ALT_R", hl.dsp.global("quickshell:altTabRelease"), { ignore_mods = true, transparent = true, release = true })
+
+-- Letting go of Alt ends the switch. Release binds on ALT_L and ALT_R never fired when Alt came up before Tab, as on a
+-- quick tap: the switcher stayed open on the next window (Discord, 2026-10-30). The keyboard is watched instead, as for
+-- Super above; the shell does nothing with it unless a switch is going.
+if not TACIT_ALT_RELEASE_WATCH then
+    TACIT_ALT_RELEASE_WATCH = true
+
+    local ALT_KEYCODES = { [64] = true, [108] = true } -- xkb keycodes, not evdev: Alt_L, Alt_R
+
+    hl.on("input.keyboard.key", function(keycode, _time, state)
+        if ALT_KEYCODES[keycode] and state == 0 then
+            hl.dispatch(hl.dsp.global("quickshell:altTabEnd"))
+        end
+    end)
+end

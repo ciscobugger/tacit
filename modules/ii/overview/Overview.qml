@@ -615,10 +615,11 @@ Scope {
         }
     }
     CompositorGlobalShortcut {
-        name: "altTabRelease"
+        // sent by the session's keyboard watch (session/hypr/tacit/keybinds.lua), which arrives as a press
+        name: "altTabEnd"
         description: "Alt let go: focus the chosen window"
 
-        onReleased: {
+        onPressed: {
             overviewScope.switcherCommit();
         }
     }
