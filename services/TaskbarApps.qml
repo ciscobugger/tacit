@@ -50,7 +50,13 @@ Singleton {
 
         // Ignored apps
         const ignoredRegexStrings = Config.options?.dock.ignoredAppRegexes ?? [];
-        const ignoredRegexes = ignoredRegexStrings.map(pattern => new RegExp(pattern, "i"));
+        const ignoredRegexes = ignoredRegexStrings.flatMap(pattern => {
+            try {
+                return [new RegExp(pattern, "i")];
+            } catch (e) {
+                return [];
+            }
+        });
         // Open windows
         for (const toplevel of ToplevelManager.toplevels.values) {
             if (ignoredRegexes.some(re => re.test(toplevel.appId))) continue;
