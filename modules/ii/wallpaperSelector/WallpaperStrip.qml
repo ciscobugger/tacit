@@ -80,7 +80,10 @@ Item {
         command: ["bash", "-c", 'find "$1" -maxdepth 3 -type f \\( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \\) -not -path "*/.*" -not -path "$1/Screenshots/*" -not -path "$1/Martida/*" -printf "%T@\\t%p\\n" | sort -rn | head -150 | cut -f2-', "scan",
             FileUtils.trimFileProtocol(Directories.pictures)]
         stdout: StdioCollector {
-            onStreamFinished: root.picturesList = text.split("\n").filter(l => l.length > 0)
+            onStreamFinished: {
+                root.picturesList = text.split("\n").filter(l => l.length > 0);
+                root.picturesLoaded = true;
+            }
         }
     }
     Process {
@@ -88,7 +91,10 @@ Item {
         command: ["bash", "-c", 'find "$1" -maxdepth 1 -type f \\( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \\) -printf "%T@\\t%p\\n" | sort -rn | head -150 | cut -f2-', "scan",
             FileUtils.trimFileProtocol(Directories.downloads)]
         stdout: StdioCollector {
-            onStreamFinished: root.downloadsList = text.split("\n").filter(l => l.length > 0)
+            onStreamFinished: {
+                root.downloadsList = text.split("\n").filter(l => l.length > 0);
+                root.downloadsLoaded = true;
+            }
         }
     }
     // the folders are only walked once their tab is first shown
@@ -103,6 +109,10 @@ Item {
     }
     property bool picturesScanned: false
     property bool downloadsScanned: false
+    property bool picturesLoaded: false
+    property bool downloadsLoaded: false
+    // the empty message waits for the first scan of the tab being shown
+    readonly property bool scanning: (root.source === "pictures" && !root.picturesLoaded) || (root.source === "downloads" && !root.downloadsLoaded)
     Component.onCompleted: {
         root.scanSource();
         root.pointed = Math.max(0, Wallpapers.used.indexOf(root.wallpaperNow));
@@ -582,7 +592,7 @@ Item {
 
         // nothing to show
         StyledText {
-            visible: root.items.length === 0
+            visible: root.items.length === 0 && !root.scanning
             anchors.centerIn: list
             text: root.source === "online"
                 ? (root.onlineState === "looking" || OnlineWallpapers.loading ? "Looking…" : root.onlineState || "Nothing found")
