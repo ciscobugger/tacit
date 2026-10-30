@@ -14,9 +14,11 @@ fi
 
 on_mains=0 battery=""
 for d in /sys/class/power_supply/*; do
+    # a wireless mouse's battery is not the computer's
+    [ "$(cat "$d/scope" 2>/dev/null)" = Device ] && continue
     case "$(cat "$d/type" 2>/dev/null)" in
-        Mains) [ "$(cat "$d/online" 2>/dev/null)" = 1 ] && on_mains=1 ;;
-        Battery) c=$(cat "$d/capacity" 2>/dev/null) && [ -n "$c" ] && battery=$c ;;
+        Mains|USB|USB_C|USB_PD*) [ "$(cat "$d/online" 2>/dev/null)" = 1 ] && on_mains=1 ;;
+        Battery) c=$(cat "$d/capacity" 2>/dev/null) && [ -n "$c" ] && { [ -z "$battery" ] || [ "$c" -lt "$battery" ]; } && battery=$c ;;
     esac
 done
 # asked for in Settings (tacit-fetch-updates-now.service): the person wants it, whatever the battery says
