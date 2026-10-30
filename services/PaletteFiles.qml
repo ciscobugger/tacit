@@ -195,7 +195,8 @@ Singleton {
                 return;
             }
             fdProc.word = longest;
-            const argv = ["fd", "--type", "f", "--type", "d", "--color", "never", "--ignore-case", "--full-path",
+            // idle priority and two threads: the walk is background work and must not compete with typing and animation
+            const argv = ["nice", "-n", "19", "ionice", "-c", "3", "fd", "--threads", "2", "--type", "f", "--type", "d", "--color", "never", "--ignore-case", "--full-path",
                           "--max-depth", String(root.maxDepth), "--max-results", String(root.fdCap)];
             for (const dir of root.excludeDirs) argv.push("--exclude", dir);
             // anchored past the root: "ho" must be in what is below /home/abdul, not in /home itself
