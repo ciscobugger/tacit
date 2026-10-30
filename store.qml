@@ -192,7 +192,7 @@ ApplicationWindow {
     Process { id: appProc; property string pkg: ""; property bool again: false; command: ["python3", "-I", root.backend, "app", pkg]
         stdout: StdioCollector { onStreamFinished: { try { const j = JSON.parse(text); if (root.appInfo && j.pkg === root.appInfo.pkg) root.appInfo = j; } catch (e) { console.warn("store: app", e); } } }
         onExited: if (again) { again = false; running = true; } }
-    Process { id: heroProc; property string pkg: ""; command: ["python3", "-I", root.backend, "app", pkg]
+    Process { id: heroProc; property string pkg: ""; command: ["python3", "-I", root.backend, "app", pkg, "--hero"]
         stdout: StdioCollector { onStreamFinished: { try {
             const a = JSON.parse(text);
             const h = Object.assign({}, root.jobHero); h[a.pkg] = a.hero || (a.shots?.[0]?.path ?? ""); root.jobHero = h;

@@ -130,11 +130,53 @@ def load_host():
     return host, provides
 
 
-_vc = {}
+def rpmvercmp(a, b):
+    """pacman's own version comparison for one part (epoch, version or release), as alpm does it"""
+    if a == b:
+        return 0
+    i = j = 0
+    while i < len(a) and j < len(b):
+        si, sj = i, j
+        while i < len(a) and not (a[i].isascii() and a[i].isalnum()):
+            i += 1
+        while j < len(b) and not (b[j].isascii() and b[j].isalnum()):
+            j += 1
+        if i >= len(a) or j >= len(b):
+            break
+        if i - si != j - sj:
+            return -1 if i - si < j - sj else 1
+        si, sj = i, j
+        num = a[i].isdigit()
+        test = str.isdigit if num else str.isalpha
+        while i < len(a) and a[i].isascii() and test(a[i]):
+            i += 1
+        while j < len(b) and b[j].isascii() and test(b[j]):
+            j += 1
+        x, y = a[si:i], b[sj:j]
+        if not y:
+            return 1 if num else -1
+        if num:
+            x, y = x.lstrip("0"), y.lstrip("0")
+            if len(x) != len(y):
+                return -1 if len(x) < len(y) else 1
+        if x != y:
+            return -1 if x < y else 1
+    if i >= len(a) and j >= len(b):
+        return 0
+    return -1 if (i >= len(a) and not (j < len(b) and b[j].isalpha())) or (i < len(a) and a[i].isalpha()) else 1
+
+
+def evr(v):
+    epoch, _, rest = v.partition(":") if v.partition(":")[0].isdigit() and ":" in v else ("0", "", v)
+    ver, _, rel = rest.rpartition("-") if "-" in rest else (rest, "", "")
+    return epoch, ver, rel
+
+
 def vercmp(a, b):
-    if (a, b) not in _vc:
-        _vc[(a, b)] = int(subprocess.run(["vercmp", a, b], capture_output=True, text=True).stdout.strip() or 0)
-    return _vc[(a, b)]
+    if a == b:
+        return 0
+    (ea, va, ra), (eb, vb, rb) = evr(a), evr(b)
+    return rpmvercmp(ea, eb) or rpmvercmp(va, vb) or (rpmvercmp(ra, rb) if ra and rb else 0)
 
 
 DEP = re.compile(r"^([^<>=]+)(<=|>=|=|<|>)?(.*)$")

@@ -679,7 +679,7 @@ def system_plan(pkg, inst, ask=True):
     return {"can": True, "count": len(t), "download": sum(s for _, s, _ in t), "need": need}
 
 
-def app(pkg):
+def app(pkg, with_plan=True):
     ed, cat, avail, inst = editorial(), load_index(), available(), installed()
     f = facts([pkg]) if pkg in avail else {}
     a = info(pkg, cat, ed, avail, inst, f.get(pkg))
@@ -699,7 +699,8 @@ def app(pkg):
     # "what's new" only for the version this computer would get: the catalogue can lag the repos
     a["whatsNew"] = [n for n in rel["notes"] if len(n) > 24][:2] if rel and a["version"] and rel["version"] and a["version"].startswith(rel["version"]) else []
     a["homepage"] = c.get("homepage", "")
-    a["plan"] = {"can": False, "why": "installed"} if a["installed"] else (plan(pkg, inst) if a["available"] else {"can": False, "why": "unavailable"})
+    # a job's hero picture needs no plan, which parses the repo lists
+    a["plan"] = {} if not with_plan else {"can": False, "why": "installed"} if a["installed"] else (plan(pkg, inst) if a["available"] else {"can": False, "why": "unavailable"})
     out(a)
 
 
@@ -794,7 +795,7 @@ def remove(pkg):
 
 if __name__ == "__main__":
     cmd, args = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
-    commands = {"home": lambda: home(), "search": lambda: search(args), "serve": lambda: serve(), "app": lambda: app(args[0]),
+    commands = {"home": lambda: home(), "search": lambda: search(args), "serve": lambda: serve(), "app": lambda: app(args[0], "--hero" not in args[1:]),
                 "install": lambda: install(args[0], "--everything" in args[1:]), "remove": lambda: remove(args[0])}
     if cmd not in commands or (cmd in ("app", "install", "remove") and not args):
         print(__doc__, file=sys.stderr)
