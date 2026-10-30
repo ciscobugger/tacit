@@ -5,6 +5,18 @@ Singleton {
     id: root
 
     /**
+     * A file: url for a path, each segment encoded so '#', '?' and '%' in a name survive. A string that
+     * already has a scheme is returned as it is.
+     * @param {string} path
+     * @returns {string}
+     */
+    function fileUrl(path) {
+        const s = String(path ?? "");
+        if (s === "" || /^[a-z][a-z0-9+.-]*:/i.test(s)) return s;
+        return "file://" + s.split("/").map(encodeURIComponent).join("/");
+    }
+
+    /**
      * Trims the File protocol off the input string
      * @param {string} str
      * @returns {string}

@@ -68,7 +68,7 @@ Singleton {
 
     function copyAll() {
         if (root.items.length === 0) return
-        const uriList = root.items.map(p => "file://" + p).join("\n")
+        const uriList = root.items.map(p => FileUtils.fileUrl(p)).join("\r\n")
         copyProc.payload = uriList
         copyProc.running = true
     }

@@ -51,7 +51,7 @@ Item {
     }
     readonly property var current: root.items[root.pointed] ?? null
     readonly property string previewSource: !root.current ? ""
-        : root.current.path ? "file://" + root.current.path : (root.current.thumb ?? "")
+        : root.current.path ? FileUtils.fileUrl(root.current.path) : (root.current.thumb ?? "")
     readonly property string pointedName: {
         const c = root.current;
         if (!c)
@@ -518,7 +518,7 @@ Item {
                         visible: false
                         // decoded at card size, straight from the picture (JPEG decodes scaled)
                         sourceComponent: Image {
-                            source: cell.modelData.path ? "file://" + cell.modelData.path : (cell.modelData.thumb ?? "")
+                            source: cell.modelData.path ? FileUtils.fileUrl(cell.modelData.path) : (cell.modelData.thumb ?? "")
                             asynchronous: true
                             sourceSize: Qt.size(368, 208)
                             fillMode: Image.PreserveAspectCrop

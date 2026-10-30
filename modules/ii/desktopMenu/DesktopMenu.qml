@@ -43,7 +43,7 @@ Scope {
             const wallPath = Config.options.background.wallpaperPath
             if (!wallPath || wallPath.length === 0) return ""
             const lastSlash = wallPath.lastIndexOf("/")
-            return "file://" + wallPath.substring(0, lastSlash)
+            return FileUtils.fileUrl(wallPath.substring(0, lastSlash))
         }
         showDirs: false
         nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp"]

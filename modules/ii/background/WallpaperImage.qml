@@ -20,6 +20,7 @@ StyledImage {
     // the picture in `source` is the one asked for in `target` (until the probe is back, `status` still speaks of the last one)
     property string shown: ""
     readonly property bool loaded: root.status === Image.Ready && root.shown === root.target
+    readonly property string targetUrl: FileUtils.fileUrl(root.target)
     readonly property point focusAt: Wallpapers.focusFor(root.target)
 
     fillMode: Image.Stretch
@@ -44,18 +45,18 @@ StyledImage {
         visible: false
         asynchronous: true
         cache: true
-        source: root.target
+        source: root.targetUrl
         sourceSize: Qt.size(64, 64)
         onStatusChanged: {
             if (status === Image.Ready && implicitHeight > 0) {
                 root.aspect = implicitWidth / implicitHeight;
                 root.shown = root.target;
-                root.source = root.target;
+                root.source = root.targetUrl;
             } else if (status === Image.Error) {
                 // let the real load fail too, so the caller's own error path (Status Error) runs
                 root.aspect = 0;
                 root.shown = root.target;
-                root.source = root.target;
+                root.source = root.targetUrl;
             }
         }
     }

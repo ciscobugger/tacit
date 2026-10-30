@@ -69,7 +69,7 @@ Item {
                 id: picture
                 anchors.fill: parent
                 visible: false
-                source: cell.modelData ? "file://" + FileUtils.trimFileProtocol(cell.modelData) : ""
+                source: cell.modelData ? FileUtils.fileUrl(FileUtils.trimFileProtocol(cell.modelData)) : ""
                 asynchronous: true
                 sourceSize: Qt.size(368, 208)
                 fillMode: Image.PreserveAspectCrop

@@ -109,7 +109,7 @@ PanelWindow {
                             StyledImage {
                                 id: shelfImg
                                 anchors.fill: parent
-                                source: "file://" + shelfItemLoader.entryPath
+                                source: FileUtils.fileUrl(shelfItemLoader.entryPath)
                                 fillMode: Image.PreserveAspectCrop
                                 cache: true
                                 asynchronous: true
@@ -118,7 +118,7 @@ PanelWindow {
 
                                 Drag.active: dragArea.drag.active
                                 Drag.dragType: Drag.Automatic
-                                Drag.mimeData: { "text/uri-list": "file://" + shelfItemLoader.entryPath }
+                                Drag.mimeData: { "text/uri-list": FileUtils.fileUrl(shelfItemLoader.entryPath) }
                                 Drag.supportedActions: Qt.CopyAction
 
                                 MouseArea {
@@ -150,7 +150,7 @@ PanelWindow {
 
                                 Drag.active: fileDragArea.drag.active
                                 Drag.dragType: Drag.Automatic
-                                Drag.mimeData: { "text/uri-list": "file://" + shelfItemLoader.entryPath }
+                                Drag.mimeData: { "text/uri-list": FileUtils.fileUrl(shelfItemLoader.entryPath) }
                                 Drag.supportedActions: Qt.CopyAction
 
                                 ColumnLayout {

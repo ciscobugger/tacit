@@ -148,7 +148,7 @@ Item {
                                 id: thumb
                                 anchors.fill: parent
                                 visible: tile.isImage && status === Image.Ready
-                                source: tile.isImage ? "file://" + tile.path : ""
+                                source: tile.isImage ? FileUtils.fileUrl(tile.path) : ""
                                 fillMode: Image.PreserveAspectCrop
                                 asynchronous: true
                                 cache: true
@@ -213,7 +213,7 @@ Item {
                             if (!root.dragProxy || tile.more)
                                 return;
                             if (cardArea.drag.active) {
-                                root.dragProxy.Drag.mimeData = { "text/uri-list": "file://" + tile.path };
+                                root.dragProxy.Drag.mimeData = { "text/uri-list": FileUtils.fileUrl(tile.path) };
                                 root.dragProxy.Drag.active = true;
                             } else {
                                 root.dragProxy.Drag.active = false;
