@@ -167,9 +167,9 @@ def resolve(target):
                any(pr.partition("=")[0] == name and satisfies(pr.partition("=")[2] or p["version"], op, want) for pr in p["provides"])
                for p in bundle.values()):
             continue
-        # the system has it, unchanged since today's lists: share it
+        # the system has it, as new as today's lists or newer: share it
         cands = ([(name, host[name])] if name in host else []) + [(h, v or host[h]) for h, v in hprov.get(name, [])]
-        hit = next((h for h, v in cands if satisfies(v, op, want) and (h not in pkgs or pkgs[h]["version"] == host[h])), None)
+        hit = next((h for h, v in cands if satisfies(v, op, want) and (h not in pkgs or vercmp(host[h], pkgs[h]["version"]) >= 0)), None)
         if hit:
             used.add(hit); continue
         # otherwise the bundle carries it, at today's version
