@@ -128,6 +128,17 @@ Singleton {
         const a = (address ?? "").replace(/^0x/, "");
         return Hyprland.toplevels.values.find(t => (t.address ?? "").replace(/^0x/, "") === a) ?? null;
     }
+    // The dock's id for a window's class. TaskbarApps lower-cases and aliases ("browser-cef" -> "thyris"), while the
+    // plugin's window says the raw id; the button that takes a window is looked up by the dock's id, so the band must
+    // send it too (before, an X11 window sent "" and Thyris sent "browser-cef", and no button ever lit).
+    function dockId(cls) {
+        const c = String(cls ?? "").toLowerCase();
+        return TaskbarApps.aliases[c] ?? c;
+    }
+    function appIdOf(address) {
+        const t = root.toplevelAt(address);
+        return root.dockId(t?.wayland?.appId ?? t?.lastIpcObject?.class ?? "");
+    }
     function screenOf(address) {
         const name = root.toplevelAt(address)?.monitor?.name ?? Hyprland.focusedMonitor?.name ?? "";
         return Quickshell.screens.find(s => s.name === name) ?? Quickshell.screens[0];
@@ -246,7 +257,7 @@ Singleton {
                 dockRetreat.stop();
                 foldWatchdog.stop();
                 root.dragAddress = f[1];
-                root.dragApp = root.toplevelAt(f[1])?.wayland?.appId ?? "";
+                root.dragApp = root.appIdOf(f[1]);
                 root.zone = "none";
                 break;
             case "zone":
@@ -279,7 +290,7 @@ Singleton {
                     dockRetreat.stop();
                     foldWatchdog.restart();
                     root.dragAddress = f[1];
-                    root.dragApp = root.toplevelAt(f[1])?.wayland?.appId ?? "";
+                    root.dragApp = root.appIdOf(f[1]);
                     root.dropInto = root.dragApp;
                     root.holdDock = true;
                 } else if (f[2] === "close") {
