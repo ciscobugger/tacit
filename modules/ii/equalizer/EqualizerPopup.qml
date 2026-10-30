@@ -11,6 +11,7 @@ import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
 
@@ -101,6 +102,7 @@ Scope {
         sourceComponent: PanelWindow {
             id: panelWindow
             visible: true
+            screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
 
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: 0

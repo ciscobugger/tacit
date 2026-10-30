@@ -23,6 +23,10 @@ Scope {
         readonly property bool animatedEntrance: WM.compositor !== "hyprland"
         property bool reallyVisible: false
         visible: reallyVisible
+        // The monitor in use when the panel was opened; fixed until the next open so a
+        // focus change does not carry the open panel to another screen.
+        property var openScreen: null
+        screen: openScreen
 
         Component.onCompleted: reallyVisible = GlobalStates.sidebarRightOpen
 
@@ -30,6 +34,7 @@ Scope {
             target: GlobalStates
             function onSidebarRightOpenChanged() {
                 if (GlobalStates.sidebarRightOpen) {
+                    panelWindow.openScreen = Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null;
                     closeAnimTimer.stop();
                     panelWindow.reallyVisible = true;
                 } else {

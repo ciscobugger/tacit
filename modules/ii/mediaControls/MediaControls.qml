@@ -110,6 +110,7 @@ Scope {
         sourceComponent: PanelWindow {
             id: panelWindow
             visible: true
+            screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
 
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: 0
