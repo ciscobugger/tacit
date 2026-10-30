@@ -61,7 +61,6 @@ PanelWindow {
         return a.floating ? -1 : 1;
     })
     readonly property var layers: HyprlandData.layers
-    Component.onCompleted: HyprlandData.updateLayers()
     readonly property real falsePositivePreventionRatio: 0.5
 
     // Screen & interaction vars

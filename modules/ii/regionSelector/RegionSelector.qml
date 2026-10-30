@@ -42,6 +42,15 @@ Scope {
         }
     }
     
+    // Layer boxes are read once per open; fetching before the Loaders create the windows gives
+    // the fetch a head start and keeps the previous open's boxes from showing.
+    Connections {
+        target: GlobalStates
+        function onRegionSelectorOpenChanged() {
+            if (GlobalStates.regionSelectorOpen) HyprlandData.updateLayers();
+        }
+    }
+
     Variants {
         model: Quickshell.screens
         delegate: Loader {
