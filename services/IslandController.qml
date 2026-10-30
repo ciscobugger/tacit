@@ -1543,17 +1543,14 @@ Singleton {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            memProc.running = false;
-            memProc.running = true;
+            memPressure.reload();
+            memInfo.reload();
+            root.onMemory(memPressure.text() + "\n" + memInfo.text());
         }
     }
-    Process {
-        id: memProc
-        command: ["sh", "-c", "head -1 /proc/pressure/memory; grep -E '^Mem(Total|Available):' /proc/meminfo"]
-        stdout: StdioCollector {
-            onStreamFinished: root.onMemory(text)
-        }
-    }
+    // read in place, no sh/head/grep every tick; onMemory takes the first avg10 (the "some" line)
+    FileView { id: memPressure; path: "/proc/pressure/memory"; blockLoading: true }
+    FileView { id: memInfo; path: "/proc/meminfo"; blockLoading: true }
     function onMemory(text) {
         const num = re => parseFloat((re.exec(text) ?? [])[1] ?? "0");
         const total = num(/MemTotal:\s+(\d+)/);
