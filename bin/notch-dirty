@@ -23,7 +23,6 @@ for repo in "$@"; do
 	while read -r mt; do
 		[ "$mt" -lt "$oldest" ] && oldest=$mt
 	done < <(cd "$repo" && printf '%s\0' "${paths[@]}" | xargs -0 stat -c %Y -- 2>/dev/null)
-	[ "$count" -gt 0 ] || continue
 	printf '%s\t%d\t%d\n' "$repo" "$count" $(( (now - oldest) / 60 ))
 done
 exit 0
