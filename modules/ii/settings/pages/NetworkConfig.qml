@@ -433,7 +433,7 @@ ContentPage {
                     }
                     StyledText {
                         Layout.fillWidth: true
-                        text: hotspotSwitch.pending ? Translation.tr("Waiting for NetworkManager…") : (Network.hotspotActive ? Translation.tr("Hotspot on · %1").arg(Persistent.states.network.hotspotName) : (hotspotGroup.ready ? Translation.tr("Hotspot off · shares the wired link; the Wi-Fi radio serves the hotspot") : Translation.tr("Set a name and a password first")))
+                        text: hotspotSwitch.pending ? Translation.tr("Waiting for NetworkManager…") : (Network.hotspotError.length > 0 ? Network.hotspotError : Network.hotspotActive ? Translation.tr("Hotspot on · %1").arg(Persistent.states.network.hotspotName) : (hotspotGroup.ready ? Translation.tr("Hotspot off · shares the wired link; the Wi-Fi radio serves the hotspot") : Translation.tr("Set a name and a password first")))
                         font.pixelSize: Appearance.font.pixelSize.small
                         color: Appearance.colors.colOnSecondaryContainer
                     }
@@ -463,6 +463,10 @@ ContentPage {
                             target: Network
                             function onHotspotActiveChanged() {
                                 hotspotSwitch.settle();
+                            }
+                            function onHotspotErrorChanged() {
+                                if (Network.hotspotError.length > 0)
+                                    hotspotSwitch.settle();
                             }
                         }
 

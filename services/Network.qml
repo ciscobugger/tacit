@@ -356,8 +356,16 @@ Singleton {
 
     // ---- hotspot: share this connection. NetworkManager names the profile "Hotspot".
     property bool hotspotActive: false
+    property string hotspotError: ""
     function hotspotOn(ssid: string, password: string): void {
-        root.run(["bash", "-c", 'dev=$(nmcli -t -f DEVICE,TYPE device status | awk -F: \'$2=="wifi"{print $1; exit}\'); nmcli device wifi hotspot ifname "$dev" ssid "$SSID" password "$PASSWORD"'], r => root.update(), { "SSID": ssid, "PASSWORD": password });
+        root.hotspotError = "";
+        root.run(["bash", "-c", 'dev=$(nmcli -t -f DEVICE,TYPE device status | awk -F: \'$2=="wifi"{print $1; exit}\'); [ -n "$dev" ] || { echo "no wifi device" >&2; exit 1; }; nmcli device wifi hotspot ifname "$dev" ssid "$SSID" password "$PASSWORD"'],
+            r => {
+                if (!r.success)
+                    root.hotspotError = root.failureText(Translation.tr("Hotspot did not start"), r.error);
+                root.update();
+            },
+            { "SSID": ssid, "PASSWORD": password });
     }
     function hotspotOff(): void {
         root.run(["nmcli", "connection", "down", "Hotspot"], r => root.update());
@@ -366,7 +374,11 @@ Singleton {
         id: hotspotCheck
         command: ["bash", "-c", "nmcli -t -f NAME connection show --active | grep -qx Hotspot && echo on || echo off"]
         stdout: StdioCollector {
-            onStreamFinished: root.hotspotActive = text.trim() === "on"
+            onStreamFinished: {
+                root.hotspotActive = text.trim() === "on";
+                if (root.hotspotActive)
+                    root.hotspotError = "";
+            }
         }
     }
 
