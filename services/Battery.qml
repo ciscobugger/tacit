@@ -86,6 +86,10 @@ Singleton {
         triggeredOnStart: true
         onTriggered: {
             root.sample();
+            // Timers stand still while suspended, the wall clock does not: a long gap since the last tick is a resume
+            const now = Date.now();
+            if (root.lastTickAt > 0 && now - root.lastTickAt > 60000) root.resumedAt = now;
+            root.lastTickAt = now;
             root.maybeSuspend();
         }
     }
@@ -122,12 +126,14 @@ Singleton {
     // The low, critical, full and charger notices and their chimes are sent by the shell
     // (IslandController.qml, "notices"): the login lock loads this file too, and sent each twice.
     // Also asked every 20 s: after a resume that is still below the threshold the condition does not change, so only
-    // the change handler would never suspend again. The gap keeps one low stretch from suspending twice in a row.
-    property double lastSuspendAt: 0
+    // the change handler would never suspend again. Two minutes after a resume it holds off, enough to save a file.
+    // Only the shell suspends (shell.qml sets suspends): the lock, settings and activity load this file too.
+    property bool suspends: false
+    property double lastTickAt: 0
+    property double resumedAt: 0
     function maybeSuspend() {
-        if (!root.available || !isSuspendingAndNotCharging) return;
-        if (Date.now() - lastSuspendAt < 120000) return;
-        lastSuspendAt = Date.now();
+        if (!root.suspends || !root.available || !isSuspendingAndNotCharging) return;
+        if (Date.now() - resumedAt < 120000) return;
         Quickshell.execDetached(["bash", "-c", `systemctl suspend || loginctl suspend`]);
     }
     onIsSuspendingAndNotChargingChanged: root.maybeSuspend()

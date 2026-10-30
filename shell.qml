@@ -53,6 +53,7 @@ ShellRoot {
     Component.onCompleted: {
         // the desktop is the one Tacit program that says config.json cannot be read (Config.reportsProblems)
         Config.reportsProblems = true
+        Battery.suspends = true // the desktop alone suspends on a low battery; the lock and apps load Battery too
         MaterialThemeLoader.reapplyTheme()
         Hyprsunset.load()
         FirstRunExperience.load()
