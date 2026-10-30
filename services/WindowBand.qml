@@ -58,6 +58,23 @@ Singleton {
             delete h[root.norm(address)];
         root.held = h;
     }
+    // A window can go away without a "restored" (closed for good, quit while hidden, crashed). Clearing only on
+    // "restored" left its address in `held`; a later window reusing that address was then drawn as hidden/closed and
+    // the dock could not focus or reopen it.
+    function forget(address) {
+        if (!address || address.length === 0)
+            return;
+        const a = root.norm(address);
+        if ((root.held[a] ?? "").length > 0)
+            root.setHeld(a, "");
+        if (root.norm(root.dragAddress) === a) {
+            root.dragAddress = "";
+            root.holdDock = false;
+            root.dropInto = "";
+            root.zone = "none";
+            foldWatchdog.stop();
+        }
+    }
     function norm(a) {
         return (a ?? "").replace(/^0x/, "");
     }
@@ -67,6 +84,7 @@ Singleton {
     }
     Process {
         id: heldQuery
+        property int tries: 0
         running: true
         command: ["hyprctl", "tacitgrip", "held"]
         stdout: StdioCollector {
@@ -76,9 +94,30 @@ Singleton {
                     for (const w of JSON.parse(this.text))
                         h[root.norm(w.address)] = w.kind;
                     root.held = h;
-                } catch (e) {}   // no plugin: nothing held
+                    heldQuery.tries = 0;
+                } catch (e) {
+                    // The plugin was not answering yet (or not loaded). Ask again rather than starting with an empty
+                    // set: a hidden window it already holds would otherwise be lost until the next event.
+                    if (heldQuery.tries < 3) {
+                        heldQuery.tries++;
+                        heldRetry.restart();
+                    }
+                }
             }
         }
+    }
+    Timer {
+        id: heldRetry
+        interval: 2000
+        onTriggered: if (!heldQuery.running) heldQuery.running = true
+    }
+    // One more ask after the first events have settled: a window caught mid-fold is not in "held" the instant the
+    // shell starts, and this is the only start-up source (events keep it current afterwards).
+    Timer {
+        id: heldRefresh
+        interval: 3000
+        running: true
+        onTriggered: if (!heldQuery.running) heldQuery.running = true
     }
     function addressOf(toplevel) {
         const a = Hyprland.toplevels.values.find(x => x.wayland === toplevel)?.address ?? "";
@@ -129,6 +168,24 @@ Singleton {
             root.dropInto = "";
         }
     }
+    // A fold that never reports "hidden" (the client died, the plugin lost the window) used to leave the dock up and
+    // its button in the "taking" state forever. Armed only after the window has been let go (fold), never while the
+    // hand is still carrying it.
+    Timer {
+        id: foldWatchdog
+        interval: 6000
+        onTriggered: {
+            if (!root.holdDock)
+                return;
+            root.holdDock = false;
+            root.dropInto = "";
+            root.dragAddress = "";
+            root.zone = "none";
+        }
+    }
+    function watchFold() {
+        foldWatchdog.restart();
+    }
 
     // the names the dock gives Tacit's own programs (PaletteDock.known), so the notch and the dock say the same
     readonly property var known: ({ "org.quickshell": "Pinax", "praxis": "Praxis", "browser": "Thyris", "browser-cef": "Thyris",
@@ -175,12 +232,19 @@ Singleton {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
+            // A window destroyed or closed for good: forget anything the shell still held for its address (the plugin
+            // sends no "restored" for these, and addresses are reused).
+            if (event.name === "closewindow" || event.name === "destroywindow") {
+                root.forget((event.data ?? "").trim());
+                return;
+            }
             if (event.name !== "tacitgrip")
                 return;
             const f = event.data.split(",");
             switch (f[0]) {
             case "lift":
                 dockRetreat.stop();
+                foldWatchdog.stop();
                 root.dragAddress = f[1];
                 root.dragApp = root.toplevelAt(f[1])?.wayland?.appId ?? "";
                 root.zone = "none";
@@ -213,6 +277,7 @@ Singleton {
             case "fold":
                 if (f[2] === "hide") {
                     dockRetreat.stop();
+                    foldWatchdog.restart();
                     root.dragAddress = f[1];
                     root.dragApp = root.toplevelAt(f[1])?.wayland?.appId ?? "";
                     root.dropInto = root.dragApp;
@@ -222,6 +287,7 @@ Singleton {
                 }
                 break;
             case "drop":
+                foldWatchdog.stop();
                 // a window let go over the bottom flies into its button: the dock stays to take it (hidden, below)
                 if (root.zone !== "hide") {
                     root.holdDock = false;
@@ -235,11 +301,13 @@ Singleton {
                 root.dragAddress = "";
                 break;
             case "closed":
+                foldWatchdog.stop();
                 root.setHeld(f[1], "closed");
                 root.mark("close");
                 root.say(`${root.nameFor(f[2] ?? "")} closed`, "close", "Reopen", "reopen", f[1], 7000);
                 break;
             case "hidden":
+                foldWatchdog.stop();
                 root.setHeld(f[1], "hidden");
                 root.landed(root.dropInto);
                 root.dragAddress = "";
@@ -248,11 +316,13 @@ Singleton {
                 root.say(`${root.nameFor(f[2] ?? "")} hidden`, "minimize", "Show", "reopen", f[1], 3500);
                 break;
             case "side":
+                foldWatchdog.stop();
                 root.mark("side");
                 root.say(`${root.nameFor(f[3] ?? "")} on the ${f[2]}`, f[2] === "left" ? "splitscreen_left" : "splitscreen_right",
                          "Undo", "unside", f[1], 6000);
                 break;
             case "restored":
+                foldWatchdog.stop();
                 root.setHeld(f[1], "");
                 if (IslandController.transientState === "window" && IslandController.payload?.address === f[1])
                     IslandController.dismiss();
