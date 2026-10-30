@@ -27,6 +27,8 @@ case "${1:-}" in
 now)
 	# a download that failed restarts nothing: the install at the start has no network and would fail
 	ready || exit 1
+	# Restart now replaces Tonight: the enabled timer would fire again at the next 03:00
+	systemctl disable --now tacit-update-night.timer 2>/dev/null
 	ln -sfn /var/cache/pacman/pkg /system-update
 	;;
 cancel)
@@ -82,6 +84,8 @@ install)
 		"$(pacman -Q tacit 2>/dev/null | awk '{print $2}')" > "$state/update-result.new"
 	chmod 644 "$state/update-result.new"
 	mv "$state/update-result.new" "$state/update-result"
+	# the updates are in, however they were started: a Tonight chosen earlier must not come back after this start
+	systemctl disable --now tacit-update-night.timer 2>/dev/null
 	systemctl reboot
 	;;
 *)
