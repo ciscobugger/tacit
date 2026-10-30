@@ -264,7 +264,7 @@ Singleton {
         n.conversation = !!r.conversation;
         n.quiet = !!r.silent;
         root.settlePopup(n);
-        notifFileView.setText(stringifyList(root.list));
+        root.save();
     }
     Process {
         id: phoneLookup
@@ -310,7 +310,7 @@ Singleton {
                 }
                 root.phoneGlyphs = glyphs;
                 if (changed)
-                    notifFileView.setText(stringifyList(root.list));
+                    root.save();
                 const keep = root.list.map(n => n.image).concat(Object.values(glyphs)).filter(i => i.startsWith(root.iconCache + "/"));
                 phonePrune.command = ["python3", "-I", root.phoneScript, "--prune", root.iconCache].concat(keep);
                 phonePrune.running = true;
@@ -436,7 +436,7 @@ Singleton {
             if (fromPhone && newNotifObject.iconKind === "")
                 root.lookPhone(newNotifObject.notificationId, 0);
             // console.log(notifToString(newNotifObject));
-            notifFileView.setText(stringifyList(root.list));
+            root.save();
         }
     }
 
@@ -577,7 +577,7 @@ Singleton {
             root.list.splice(index, 1);
             // a handled one is no longer waiting to be read: the dot and count never outnumber what is left
             root.unread = Math.min(root.unread, root.list.length);
-            notifFileView.setText(stringifyList(root.list));
+            root.save();
             triggerListChange()
             root.dropNotif(dropped);
         }
@@ -602,7 +602,7 @@ Singleton {
         root.unread = 0;
         dropped.forEach(n => root.dropNotif(n));
         triggerListChange()
-        notifFileView.setText(stringifyList(root.list));
+        root.save();
         notifServer.trackedNotifications.values.forEach((notif) => {
             notif.dismiss()
         })
@@ -671,6 +671,17 @@ Singleton {
         root.list = root.list.slice(0)
     }
 
+    // A file that did not parse may still hold history: it is never written over.
+    property bool broken: false
+
+    function save() {
+        if (root.broken) {
+            console.log("[Notifications] Not saving: " + root.filePath + " did not parse")
+            return
+        }
+        notifFileView.setText(stringifyList(root.list));
+    }
+
     function refresh() {
         notifFileView.reload()
     }
@@ -682,26 +693,35 @@ Singleton {
     FileView {
         id: notifFileView
         path: Qt.resolvedUrl(filePath)
+        // Messages are in here: owner-only, whatever the umask made it
+        onSaved: Quickshell.execDetached(["bash", "-c", "chmod 700 \"$(dirname \"$1\")\"; chmod 600 \"$1\"", "_", root.filePath])
         onLoaded: {
             const fileContents = notifFileView.text()
-            root.list = JSON.parse(fileContents).map((notif) => {
-                return notifComponent.createObject(root, {
-                    "notificationId": notif.notificationId,
-                    "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
-                    "appIcon": notif.appIcon,
-                    // saved before the phone's battery warning was named after the phone (onNotification)
-                    "appName": /^(.+?):\s*low battery$/i.exec(notif.appName ?? "")?.[1] ?? notif.appName,
-                    "body": notif.body,
-                    "image": notif.image,
-                    "summary": /^.+?:\s*low battery$/i.test(notif.summary ?? "") ? "Low battery" : notif.summary,
-                    "category": notif.category ?? "",
-                    "time": notif.time,
-                    "urgency": notif.urgency,
-                    "iconKind": notif.iconKind ?? "",
-                    "conversation": notif.conversation ?? false,
-                    "quiet": notif.quiet ?? false,
+            try {
+                root.list = JSON.parse(fileContents).map((notif) => {
+                    return notifComponent.createObject(root, {
+                        "notificationId": notif.notificationId,
+                        "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
+                        "appIcon": notif.appIcon,
+                        // saved before the phone's battery warning was named after the phone (onNotification)
+                        "appName": /^(.+?):\s*low battery$/i.exec(notif.appName ?? "")?.[1] ?? notif.appName,
+                        "body": notif.body,
+                        "image": notif.image,
+                        "summary": /^.+?:\s*low battery$/i.test(notif.summary ?? "") ? "Low battery" : notif.summary,
+                        "category": notif.category ?? "",
+                        "time": notif.time,
+                        "urgency": notif.urgency,
+                        "iconKind": notif.iconKind ?? "",
+                        "conversation": notif.conversation ?? false,
+                        "quiet": notif.quiet ?? false,
+                    });
                 });
-            });
+                root.broken = false
+            } catch (e) {
+                root.broken = true
+                root.list = []
+                console.log("[Notifications] Cannot read the file, history is kept as it is: " + e)
+            }
             // Find largest notificationId
             let maxId = 0
             root.list.forEach((notif) => {
