@@ -173,7 +173,7 @@ def all_disks():
     src = run("findmnt", "-nro", "SOURCE", "/run/archiso/bootmnt").strip()
     stick = run("lsblk", "-nrso", "NAME", src).split()[-1:] if src else []
     return [describe(b) for b in d.get("blockdevices", [])
-            if b.get("type") == "disk" and not b.get("rm") and b.get("tran") != "usb" and not b["name"].startswith(("zram", "loop"))
+            if b.get("type") == "disk" and not b.get("rm") and b.get("tran") != "usb" and not b["name"].startswith(("zram", "loop")) and not re.fullmatch(r"mmcblk\d+(boot\d+|rpmb)", b["name"])
             and b["name"] not in stick]
 
 def disks():
