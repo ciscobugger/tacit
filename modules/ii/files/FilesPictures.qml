@@ -98,7 +98,10 @@ Item {
         id: shapeProbe
         property var paths: []
         property bool more: false
-        onRunningChanged: if (!running && more) rebuildSoon.restart()   // the rest, once this batch has exited
+        onRunningChanged: if (!running) {
+            shapeWait.stop();   // the first look ends with the first batch; the rest loads behind a visible grid
+            if (more) rebuildSoon.restart();   // the rest, once this batch has exited
+        }
         command: ["magick", "identify", "-ping", "-format", "%w %h %i\n"].concat(shapeProbe.paths)
         stdout: StdioCollector {
             onStreamFinished: {
