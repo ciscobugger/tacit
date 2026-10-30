@@ -36,7 +36,11 @@ getactivemonitor() {
 
 # The second call: wf-recorder finishes the file on SIGINT, and the call that started it writes the state once it has.
 if [[ "$1" == --stop ]] && ! pgrep -x wf-recorder > /dev/null; then
-    [[ "$(jq -r '.record.enable' "$STATE_FILE" 2>/dev/null)" == "true" ]] && set_state '.record.enable = false | .record.file = ""'   # no file: a cut-off recording is no "saved" card
+    # --stale (shell start after a crash): no file either, a cut-off recording is no "saved" card. A plain --stop keeps it:
+    # the starting call may still be making the thumbnail of a finished recording.
+    if [[ "$(jq -r '.record.enable' "$STATE_FILE" 2>/dev/null)" == "true" ]]; then
+        if [[ "$2" == --stale ]]; then set_state '.record.enable = false | .record.file = ""'; else set_state '.record.enable = false'; fi
+    fi
     exit 0
 fi
 if pgrep -x wf-recorder > /dev/null; then
