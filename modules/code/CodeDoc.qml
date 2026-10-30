@@ -637,6 +637,8 @@ Item {
         // save would write that over the file; a huge one hangs the window in the highlighter.
         if (raw.length > 2000000) { doc.problem = `Too large to open here — ${Voice.size(raw.length)}.`; doc.loaded = true; return; }
         if (raw.substring(0, 8000).includes("\u0000")) { doc.problem = "Not a text file."; doc.loaded = true; return; }
+        // Latin-1 and the like decode with U+FFFD for each bad byte; a save would write those over the file.
+        if (raw.includes("\ufffd")) { doc.problem = "Not a UTF-8 text file."; doc.loaded = true; return; }
         const after = doc.fromDisk(raw);
         doc.kind = doc.kindOf(after);
         doc.indentUnit = doc.detectIndent(after);
