@@ -29,7 +29,7 @@ Item {
     property string when: ""         // the time, as the list writes it
     property url picture: ""         // a picture shows itself instead of its kind
     property bool flash: false
-    property bool editing: false     // the name is a field (F2)
+    property bool editing: false     // the name is a field (F2); the window's binding sets it, never assign it here (that drops the binding for good)
     property bool hidden: false      // the filter keeps the row in the model, off the screen
     property bool cut: false         // waiting to be pasted elsewhere: drawn faint
     property bool taken: false       // the edited name is already here
@@ -261,16 +261,14 @@ Item {
                     const n = text.trim();
                     if (n.length > 0 && n !== "." && n !== ".." && !n.includes("/") && n !== row.fileName && !row.taken)
                         row.renamed(row.index, n);
-                    row.editing = false;
                     row.editDone();
                 }
                 Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Escape) { row.editing = false; row.editDone(); event.accepted = true; }
+                    if (event.key === Qt.Key_Escape) { row.editDone(); event.accepted = true; }
                     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Tab) {
                         const n = text.trim();
                         if (n.length > 0 && n !== "." && n !== ".." && !n.includes("/") && n !== row.fileName && !row.taken)
                             row.renamed(row.index, n);
-                        row.editing = false;
                         if (event.key === Qt.Key_Tab) row.ListView.view.editNext(row.index); else row.editDone();
                         event.accepted = true;
                     }
