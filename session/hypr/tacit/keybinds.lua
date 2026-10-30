@@ -29,6 +29,31 @@ if REBIND_SUPER_PALETTE then
     hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease")) -- # [hidden]
 end
 
+-- Super alone raises the dock when it is let go; Super with another key must not.
+--
+-- Quickshell's GlobalShortcut.onReleased fires whether or not another key was pressed while Super was
+-- held, so Super + W opened the browser and the dock as well. The shell takes
+-- quickshell:searchToggleReleaseInterrupt for exactly this, to cancel the release that would raise the
+-- dock, but nothing sent it: it was written for a catch-all bind, which Hyprland 0.57 only allows inside
+-- a submap, and a submap would have to repeat every Super bind to keep those keys working. So the keyboard
+-- is watched here instead: this event fires for every key before its own bind runs, and an interrupt sent
+-- on that press reaches the shell well before Super is released.
+if not TACIT_SUPER_RELEASE_WATCH then
+    TACIT_SUPER_RELEASE_WATCH = true
+
+    local SUPER_KEYCODES = { [133] = true, [134] = true } -- xkb keycodes, not evdev: Super_L, Super_R
+    local superHeld = false
+
+    hl.on("input.keyboard.key", function(keycode, _time, state)
+        local pressed = state == 1 -- wl_keyboard_key_state: 1 pressed, 0 released
+        if SUPER_KEYCODES[keycode] then
+            superHeld = pressed
+        elseif pressed and superHeld then
+            hl.dispatch(hl.dsp.global("quickshell:searchToggleReleaseInterrupt"))
+        end
+    end)
+end
+
 -- Escape -> collapse the Dynamic Island.
 --
 -- Bound NON-CONSUMING, which is the only form that is safe here: Hyprland still
