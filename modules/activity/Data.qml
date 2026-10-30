@@ -301,7 +301,9 @@ Item {
                 d.send({ op: "close", id: s.id });
     }
     function windowless() {
-        return d.apps().filter(a => a.kind === "app" && a.windows.length === 0 && a.id !== "activity");
+        return d.apps().filter(a => a.kind === "app" && a.windows.length === 0 && a.id !== "activity"
+            // Tacit's own apps hide instead of closing, so no window does not mean idle; they may hold a draft or unsaved buffer
+            && !["praxis", "graphis", "viewer", "settings", "welcome"].includes(a.id));
     }
 
     // ------------------------------------------------------------------ words
