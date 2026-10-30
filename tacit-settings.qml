@@ -4662,9 +4662,19 @@ ApplicationWindow {
                     }
                 }
             }
+            // Picks made while one is still applying wait here; running them together would race on the files.
+            property var queuedDefaults: []
             Process {
                 id: setDefault
-                onExited: listDefaults.running = true
+                onExited: {
+                    if (ap.queuedDefaults.length > 0) {
+                        setDefault.command = ap.queuedDefaults[0];
+                        ap.queuedDefaults = ap.queuedDefaults.slice(1);
+                        setDefault.running = true;
+                    } else {
+                        listDefaults.running = true;
+                    }
+                }
             }
 
             Group {
@@ -4733,8 +4743,13 @@ ApplicationWindow {
                                 if (o)
                                     Config.options.apps.terminal = o.exec;
                             }
-                            setDefault.command = ["python3", ap.defaultsScript, "set", da.modelData.role, value];
-                            setDefault.running = true;
+                            const cmd = ["python3", ap.defaultsScript, "set", da.modelData.role, value];
+                            if (setDefault.running) {
+                                ap.queuedDefaults = [...ap.queuedDefaults, cmd];
+                            } else {
+                                setDefault.command = cmd;
+                                setDefault.running = true;
+                            }
                         }
                     }
                 }
