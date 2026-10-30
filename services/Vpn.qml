@@ -118,6 +118,7 @@ Singleton {
         target: Network
         function onActiveChanged() { ruleLater.restart(); }
         function onEthernetChanged() { ruleLater.restart(); }
+        function onChanged() { refreshLater.restart(); }
     }
     Timer {
         id: ruleLater
@@ -145,14 +146,6 @@ Singleton {
                 }
                 root.connections = list;
             }
-        }
-    }
-    Process {
-        id: monitor
-        running: true
-        command: ["nmcli", "monitor"]
-        stdout: SplitParser {
-            onRead: refreshLater.restart()
         }
     }
     Timer {

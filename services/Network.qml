@@ -553,10 +553,13 @@ Singleton {
     function update(): void {
         updateDebounce.restart();
     }
+    // One `nmcli monitor` for the shell: others (Vpn) listen here instead of starting their own.
+    signal changed()
     Timer {
         id: updateDebounce
         interval: 150
         onTriggered: {
+            root.changed();
             savedProfilesProc.running = true;
             hotspotCheck.running = true;
             updateConnectionType.running = true;
@@ -573,8 +576,14 @@ Singleton {
         running: true
         command: ["nmcli", "monitor"]
         stdout: SplitParser {
-            onRead: root.update()
+            // it prints the current state once at start, and everything is read at load anyway
+            onRead: if (!settling.running) root.update()
         }
+    }
+    Timer {
+        id: settling
+        interval: 1000
+        running: true
     }
 
     Process {
