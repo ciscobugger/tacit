@@ -33,7 +33,15 @@ Singleton {
     // qs by path (execs.lua: qs -p $TACIT_SHELL; the packaged supervisor repeats it), which is
     // this file. `qs -c tacit` resolves through /etc/xdg/quickshell/tacit to a different path, so
     // on an installed system it reaches no instance at all.
-    property string shellFile: FileUtils.trimFileProtocol(Quickshell.shellPath("shell.qml"))
+    // It has to be $TACIT_SHELL's: a process's own shellPath is the root it was started with, and
+    // the apps are not started with the shell's - scripts/settings/open.sh resolves its link, so
+    // Settings' path and the shell's were two spellings of one file, `qs -p` matched neither, and
+    // every call Settings makes to the shell (a folder, a wallpaper, night light) answered
+    // "No running instances". A shell run by hand has no $TACIT_SHELL and its own root answers.
+    property string shellFile: {
+        const root = Quickshell.env("TACIT_SHELL") ?? "";
+        return FileUtils.trimFileProtocol(root.length > 0 ? `${root}/shell.qml` : Quickshell.shellPath("shell.qml"));
+    }
 
     // Other dirs used by the shell, without "file://"
     property string assetsPath: Quickshell.shellPath("assets")
