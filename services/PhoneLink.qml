@@ -84,7 +84,8 @@ Singleton {
     }
     Timer {
         interval: root.watching > 0 ? 2000 : 60000
-        running: true
+        // Without the phone part there is nothing to see: a page that watches, a send or the setup reads on its own.
+        running: !root.loaded || root.installed || root.watching > 0
         repeat: true
         triggeredOnStart: true
         onTriggered: root.read()
