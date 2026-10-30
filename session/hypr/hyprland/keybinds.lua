@@ -86,7 +86,7 @@ hl.bind("SUPER + SHIFT + X", hl.dsp.global("quickshell:regionOcr"),
 -- ran d (tesseract | wl-copy) on every press and emptied the clipboard.
 hl.bind("SUPER + SHIFT + X", hl.dsp.exec_cmd(
     qsIsAlive ..
-    " || pidof slurp || { grim -g \"$(slurp $SLURP_ARGS)\" \"/tmp/ocr_image.png\" && tesseract \"/tmp/ocr_image.png\" stdout -l $(tesseract --list-langs | awk 'NR>1{print $1}' | tr '\\\\n' '+' | sed 's/\\\\+$/\\\\n/') | wl-copy && rm \"/tmp/ocr_image.png\"; }"
+    " || pidof slurp || { grim -g \"$(slurp $SLURP_ARGS)\" \"/tmp/ocr_image.png\" && tesseract \"/tmp/ocr_image.png\" stdout -l $(tesseract --list-langs | awk 'NR>1{print $1}' | tr '\\n' '+' | sed 's/+$//') | wl-copy && rm \"/tmp/ocr_image.png\"; }"
 ))
 --# Color picker
 hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a"),
@@ -105,8 +105,8 @@ local grimhyprctl = "grim -o \"$(hyprctl activeworkspace -j | jq -r '.monitor')\
 hl.bind("Print", hl.dsp.exec_cmd(grimhyprctl .. " - | wl-copy"),
     { description = "Utilities: Screenshot >> clipboard" })
 hl.bind("CTRL + Print", hl.dsp.exec_cmd(
-    "mkdir -p $(xdg-user-dir PICTURES)/Screenshots && " ..
-    grimhyprctl .. " $(xdg-user-dir PICTURES)/Screenshots/Screenshot_\"$(date '+%Y-%m-%d_%H.%M.%S')\".png"
+    "d=\"$(xdg-user-dir PICTURES)/Screenshots\"; mkdir -p \"$d\" && " ..
+    grimhyprctl .. " \"$d/Screenshot_$(date '+%Y-%m-%d_%H.%M.%S').png\""
 ), { non_consuming = true, description = "Utilities: Screenshot >> clipboard & file" })
 hl.bind("CTRL + Print", hl.dsp.exec_cmd(grimhyprctl .. " - | wl-copy"), { non_consuming = true })
 --# AI
