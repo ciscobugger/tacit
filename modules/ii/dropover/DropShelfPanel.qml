@@ -10,6 +10,7 @@ import Quickshell.Wayland
 
 PanelWindow {
     id: shelfRoot
+    screen: GlobalStates.dropShelfScreen ?? Quickshell.screens[0]
     visible: GlobalStates.dropShelfOpen
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay

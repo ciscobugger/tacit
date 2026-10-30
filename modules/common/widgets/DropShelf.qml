@@ -59,10 +59,11 @@ Singleton {
             root.items = arr
     }
 
-    function show(urls, x, y) {
+    function show(urls, x, y, screen) {
         root.addItems(urls)
         GlobalStates.dropShelfX = x
         GlobalStates.dropShelfY = y
+        GlobalStates.dropShelfScreen = screen ?? null
         GlobalStates.dropShelfOpen = true
     }
 

@@ -267,6 +267,7 @@ Scope {
                             GlobalStates.desktopMenuOpen = false
                             GlobalStates.dropShelfX = GlobalStates.desktopMenuX
                             GlobalStates.dropShelfY = GlobalStates.desktopMenuY
+                            GlobalStates.dropShelfScreen = GlobalStates.desktopMenuScreen
                             GlobalStates.dropShelfOpen = true
                         }
                     }

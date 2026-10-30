@@ -49,6 +49,8 @@ Singleton {
     property bool dropShelfOpen: false
     property real dropShelfX: 0
     property real dropShelfY: 0
+    // the monitor dropShelfX/Y are local to
+    property var dropShelfScreen: null
     // the notch's recording choice for the area picker: "area" or "window", a pulse RegionSelector clears
     property string recordPick: ""
 

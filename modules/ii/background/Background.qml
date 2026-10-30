@@ -561,7 +561,7 @@ Variants {
                         DesktopIcons.put(drop.urls, drop.keyboardModifiers, drop.source !== null)
                     } else {
                         const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y)
-                        DropShelf.show(drop.urls, globalPos.x, globalPos.y)
+                        DropShelf.show(drop.urls, globalPos.x, globalPos.y, bgRoot.screen)
                     }
                     drop.accept()
                     wallpaperDropArea.settle()
