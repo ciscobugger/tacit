@@ -74,6 +74,7 @@ ApplicationWindow {
     property var work: null               // { pkg, kind: "install"|"remove", progress, phase }
     property var outcome: ({})
     property string justGot: ""
+    property string opening: ""      // an app asked to start and not shown yet: its button says so (some take 10 s)
     property var askUpdate: null          // { pkg, name, updates, updatesMB, appMB }: an app that needs the waiting updates with it
     readonly property var issue: (home?.issue ?? []).filter(sp => !sp.pkg || appOf(sp.pkg)?.available !== false)
     readonly property real gutter: width >= 1400 ? 96 : 64
@@ -111,6 +112,8 @@ ApplicationWindow {
     function loadApp(pkg) { appProc.pkg = pkg; if (appProc.running) appProc.again = true; else appProc.running = true; }
     function openJob(j) { job = j; go("job"); wantHeroes(j.pkgs); }
     function launch(a) {
+        if (opening === a?.pkg) return;
+        opening = a?.pkg ?? ""; openingTimer.restart();
         const id = (a?.desktop || "").replace(/\.desktop$/, "");
         const entry = id ? DesktopEntries.byId(id) : null;
         if (entry) entry.execute(); else if (id) Quickshell.execDetached(["gtk-launch", id]);
@@ -231,6 +234,7 @@ ApplicationWindow {
             }
             root.work = null; root.refresh();
         } }
+    Timer { id: openingTimer; interval: 15000; onTriggered: root.opening = "" }
     Timer { id: tickTimer; interval: 2600; onTriggered: root.justGot = "" }
 
     // ---- colour: the ground, the inks measured on it (APCA, as Appearance.inkFor), the raised tones, the page's own colour
@@ -328,7 +332,7 @@ ApplicationWindow {
         property real fill: prog
         Behavior on fill { SmoothedAnimation { velocity: 0.35 } }
         readonly property string word: st === "getting" ? (prog < 0.04 ? "Waiting" : `${Math.round(prog * 100)} %`) : st === "removing" ? "Removing"
-                                        : st === "installed" ? "Open" : st === "unavailable" ? "Not here" : "Get"
+                                        : st === "installed" ? (root.opening === a?.pkg ? "Opening" : "Open") : st === "unavailable" ? "Not here" : "Get"
         visible: st !== "none"
         height: solid ? (large ? 48 : 40) : large ? 44 : 32
         // one width through the whole install, so nothing jumps while the numbers change
