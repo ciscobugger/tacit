@@ -21,6 +21,10 @@ mkdir -p "$LOCAL_PRESETS_DIR" "$ONLINE_PRESETS_DIR" "$IMPORTED_PRESETS_DIR"
 # Keep: appearance/background/bar(non-weather)/dock/lock/overview/panelFamily etc. + hyprland.decoration/gaps/animations
 # Note: profile/wallpaperSelector are NOT blacklisted here (would make preset look empty) - only General+Services per Settings tabs
 # apps IS blacklisted: its values are run with bash -c, so a shared preset must not carry them
+# Audit of modules/ + services/ (2026-10-30): the only Config.options strings that reach bash -c are apps.terminal/
+# taskManager/changePassword (Session.qml, PaletteSearch.qml), search.prefix.shellCommand and
+# hyprland.autostartApps.apps, all removed by this filter. profile.*, wallpaperSelector.*, lock.*, background.*
+# paths are passed as arguments or read as files, never as a shell string, so they stay.
 # The bar switches, the dock switch and the panel family are left out too: a preset made for stock
 # end4-pC would otherwise bring back surfaces Tacit removed.
 # The notch, the command palette and the Bluetooth filter are function, not a look: --apply is a
