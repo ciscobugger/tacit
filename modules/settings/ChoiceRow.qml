@@ -109,7 +109,7 @@ SettingRow {
             id: dropButton
             visible: !root.inline
             implicitHeight: 32
-            implicitWidth: Math.min(260, dropRow.implicitWidth + 20)
+            implicitWidth: Math.min(340, dropRow.implicitWidth + 20)
             radius: 8
             color: dropArea.containsMouse || menu.opened
                 ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.95)
@@ -124,7 +124,7 @@ SettingRow {
                 spacing: 2
                 StyledText {
                     Layout.fillWidth: true
-                    Layout.maximumWidth: 210
+                    Layout.maximumWidth: 300
                     // a value not in the list (a font since removed) is still named, not hidden
                     text: root.currentOption?.label ?? (String(root.current ?? "").length > 0 ? String(root.current) : "Choose")
                     font.pixelSize: 15
