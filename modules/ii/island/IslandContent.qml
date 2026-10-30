@@ -659,6 +659,10 @@ Item {
             root.open = false;
         }
 
+        function onFoldRequested() {
+            root.fold();
+        }
+
         // the browser's Ctrl+L: the sheet as its address, with the keyboard
         function onAddressRequested() {
             if (!root.keyScreen)

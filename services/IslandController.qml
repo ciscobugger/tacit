@@ -1808,6 +1808,7 @@ Singleton {
     // pinned until the pointer comes and goes (or 6s), exactly like a desktop drop.
     signal openRequested()
     signal closeRequested()
+    signal foldRequested()      // like the pointer leaving: only a sheet a hover opened closes
 
     // ------------------------------------------------------------------ ask (quick chat)
     // Super+Shift+Space, `island ask`, the palette's Claude row, a capture: the sheet opens as
