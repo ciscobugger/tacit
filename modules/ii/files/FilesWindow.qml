@@ -1476,7 +1476,17 @@ FloatingWindow {
     property var dismissed: ({})
     Process {
         id: twinProc
-        command: ["bash", "-c", `cd '${StringUtils.shellSingleQuoteEscape(win.folder)}' 2>/dev/null || exit 0; find . -maxdepth 1 -type f -size +0 -printf '%s\\t%T@\\t%p\\n' 2>/dev/null | sort -n | awk -F'\\t' '{ if ($1 == prev) { if (!dup[prev]) { print prevline; dup[prev]=1 }; print } prev=$1; prevline=$0 }' | while IFS=$'\\t' read -r size at path; do h=$( { head -c 65536 -- "$path"; tail -c 65536 -- "$path"; } | md5sum | cut -c1-16); printf '%s\\t%s\\t%s\\n' "$size:$h" "$at" "$path"; done | sort -t$'\\t' -k1,1 -k2,2n | awk -F'\\t' 'function flush() { if (n > 1) { o=1; for (i=2;i<=n;i++) if (at[i] < at[o] || (at[i] == at[o] && length(nm[i]) < length(nm[o]))) o=i; for (i=1;i<=n;i++) if (i != o) print nm[o] "\\t" nm[i] } n=0 } { if ($1 != key) { flush(); key=$1 } n++; at[n]=$2; nm[n]=$3 } END { flush() }'`]
+        command: ["nice", "-n", "19", "bash", "-c", `cd '${StringUtils.shellSingleQuoteEscape(win.folder)}' 2>/dev/null || exit 0; find . -maxdepth 1 -type f -size +0 -printf '%s\\t%T@\\t%p\\n' 2>/dev/null | sort -n | awk -F'\\t' '{ if ($1 == prev) { if (!dup[prev]) { print prevline; dup[prev]=1 }; print } prev=$1; prevline=$0 }' | python3 -I -c 'import sys, hashlib
+for l in sys.stdin.read().splitlines():
+    size, at, path = l.split("\\t", 2)
+    try:
+        with open(path, "rb") as f:
+            h = hashlib.md5(f.read(65536))
+            f.seek(max(0, int(size) - 65536))
+            h.update(f.read(65536))
+    except OSError:
+        continue
+    print(size + ":" + h.hexdigest()[:16] + "\\t" + at + "\\t" + path)' | sort -t$'\\t' -k1,1 -k2,2n | awk -F'\\t' 'function flush() { if (n > 1) { o=1; for (i=2;i<=n;i++) if (at[i] < at[o] || (at[i] == at[o] && length(nm[i]) < length(nm[o]))) o=i; for (i=1;i<=n;i++) if (i != o) print nm[o] "\\t" nm[i] } n=0 } { if ($1 != key) { flush(); key=$1 } n++; at[n]=$2; nm[n]=$3 } END { flush() }'`]
         stdout: StdioCollector {
             onStreamFinished: {
                 let t = ({});
