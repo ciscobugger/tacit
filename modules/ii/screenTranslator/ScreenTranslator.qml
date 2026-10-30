@@ -47,8 +47,6 @@ Scope {
     }
 
     function translate() {
-        // Reset first so a press that left the flag set without a visible panel still reopens it.
-        GlobalStates.screenTranslatorOpen = false
         GlobalStates.screenTranslatorOpen = true
     }
 
