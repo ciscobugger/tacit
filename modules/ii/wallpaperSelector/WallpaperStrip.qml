@@ -91,9 +91,20 @@ Item {
             onStreamFinished: root.downloadsList = text.split("\n").filter(l => l.length > 0)
         }
     }
+    // the folders are only walked once their tab is first shown
+    function scanSource() {
+        if (root.source === "pictures" && !picturesScan.running && !root.picturesScanned) {
+            root.picturesScanned = true;
+            picturesScan.running = true;
+        } else if (root.source === "downloads" && !downloadsScan.running && !root.downloadsScanned) {
+            root.downloadsScanned = true;
+            downloadsScan.running = true;
+        }
+    }
+    property bool picturesScanned: false
+    property bool downloadsScanned: false
     Component.onCompleted: {
-        picturesScan.running = true;
-        downloadsScan.running = true;
+        root.scanSource();
         root.pointed = Math.max(0, Wallpapers.used.indexOf(root.wallpaperNow));
         strip.forceActiveFocus();
     }
@@ -108,6 +119,7 @@ Item {
         }
     }
     onSourceChanged: {
+        root.scanSource();
         root.pointed = 0;
         root.filter = "";
         root.searching = false;
