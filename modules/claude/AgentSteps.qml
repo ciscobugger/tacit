@@ -226,7 +226,7 @@ Item {
             return { spin: true, lineMono: true, line: m.install?.step === "running" && m.install.line || `Installing ${name}…`,
                      actions: [{ word: "Cancel", run: () => { steps.pending = ""; m.cancelInstall(steps.agent); } }] };
         case "needsNode":
-            return { line: `${name} needs Node.js first. Installing it asks for your password.`,
+            return { line: `${name} needs one more install first. Installing both asks for your password.`,
                      sub: instFail !== null ? "The install didn't finish" : "", mono: instFail ?? "",
                      actions: [{ word: "Install both", run: () => steps.install(true) }] };
         case "done": {

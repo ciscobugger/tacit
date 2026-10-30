@@ -846,7 +846,7 @@ ApplicationWindow {
         const name = root.agentNames[agent] ?? agent;
         switch (step) {
         case "notInstalled": return `${name} is not installed`;
-        case "needsNode": return `${name} needs Node.js`;
+        case "needsNode": return `${name} needs one more install first`;
         case "installing": return `Installing ${name}`;
         case "signedOut": return agent === "pi" || agent === "opencode" ? `${name} needs a provider` : `${name} needs a sign-in`;
         case "noProvider": return `${name} needs a provider connected here`;
@@ -3251,7 +3251,7 @@ ApplicationWindow {
                 const why = accPage.installRefusals[agent] ?? (i?.step === "failed" ? (i.line ?? "") : null);
                 const failed = why !== null ? "The install didn't finish" + (why ? `: ${why}` : "") : "";
                 if (step === "needsNode")
-                    return failed || `${accPage.name(agent)} needs Node.js first. Installing it asks for your password.`;
+                    return failed || `${accPage.name(agent)} needs one more install first. Installing both asks for your password.`;
                 return failed;
             }
 
@@ -3612,7 +3612,7 @@ ApplicationWindow {
                         visible: ag.step.length > 0
                         clickable: false
                         label: ag.step === "installing" ? `Installing ${accPage.name(ag.agent)}…`
-                            : ag.step === "needsNode" ? "Needs Node.js" : "Not installed"
+                            : ag.step === "needsNode" ? "Needs one more install" : "Not installed"
                         description: accPage.installFacts(ag.agent, ag.step)
                         control: TextButton {
                             label: ag.step === "installing" ? "Cancel" : ag.step === "needsNode" ? "Install both" : "Install"

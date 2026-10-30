@@ -159,7 +159,7 @@ Item {
         case "expired": return `Your ${n} sign-in has expired`;
         case "noProvider": return `${n} needs a provider`;
         case "notInstalled": return `${n} isn't installed`;
-        case "needsNode": return `${n} needs Node.js`;
+        case "needsNode": return `${n} needs one more install first`;
         case "locked": return "The keyring is locked";
         case "noKey": return `${n} has no key`;
         case "keyRefused": return `${n}'s key was refused`;

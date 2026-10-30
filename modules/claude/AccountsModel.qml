@@ -180,7 +180,7 @@ Item {
         case "checking": return "Checking…";
         case "signingIn": return "Signing in…";
         case "notInstalled": return "Not installed";
-        case "needsNode": return "Needs Node.js";
+        case "needsNode": return "Needs one more install";
         case "installing": return "Installing…";
         }
         return "";

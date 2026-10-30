@@ -259,7 +259,7 @@ FocusScope {
         const multi = n.agent === "pi" || n.agent === "opencode";
         const what = ({ signedOut: multi ? `${name} has no provider` : `${name} isn't signed in`,
                         expired: `${name}'s sign-in has expired`, noProvider: `${name} has no provider`,
-                        notInstalled: `${name} isn't installed`, needsNode: `${name} needs Node.js`,
+                        notInstalled: `${name} isn't installed`, needsNode: `${name} needs one more install first`,
                         noKey: `${name} has no key`, keyRefused: `${name}'s key was refused`,
                         locked: "The keyring is locked" })[n.step] ?? "";
         return what + (sheet.needs.length > 1 ? ` and ${sheet.needs.length - 1} more` : "");
