@@ -308,6 +308,14 @@ PanelWindow {
         root.visible = true;
     }
 
+    // record.sh exits without setting enable when the folder cannot be made or the state cannot be written;
+    // without this every selector would stay up
+    Timer {
+        id: recordStartWatch
+        interval: 3000
+        onTriggered: if (!Persistent.states.record.enable) root.dismiss()
+    }
+
     Connections {
         target: Persistent.states.record
         function onEnableChanged() {
@@ -413,6 +421,7 @@ PanelWindow {
         root.regionHeight = h;
         IslandController.startRecording(["--region", `${Math.round(root.monitorOffsetX + x)},${Math.round(root.monitorOffsetY + y)} ${w}x${h}`]);
         root.recordReady = false;
+        recordStartWatch.restart();
         root.phase = RegionSelection.Phase.Post;
         root.selectionMode = RegionSelection.SelectionMode.RectCorners;
     }
