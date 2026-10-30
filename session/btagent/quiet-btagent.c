@@ -347,6 +347,7 @@ static void bluez_appeared(GDBusConnection *conn, const gchar *name, const gchar
         G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
     if (!r) {
         g_printerr("btagent: BlueZ refused the agent: %s\n", err->message);
+        g_clear_error(&err);
         return;
     }
     g_variant_unref(r);
@@ -357,7 +358,10 @@ static void bluez_appeared(GDBusConnection *conn, const gchar *name, const gchar
                                     "RequestDefaultAgent", g_variant_new("(o)", AGENT_PATH), NULL,
                                     G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
     if (r) g_variant_unref(r);
-    else g_printerr("btagent: not the default agent: %s\n", err->message);
+    else {
+        g_printerr("btagent: not the default agent: %s\n", err->message);
+        g_clear_error(&err);
+    }
 }
 
 static void quit(int sig) { if (loop) g_main_loop_quit(loop); }
@@ -417,7 +421,7 @@ int main(void) {
 
     /* BlueZ forgets its agents when bluetoothd exits, and may start after this process, so the
      * agent registers whenever the name appears, not once. */
-    g_bus_watch_name_on_connection(bus, "org.bluez", G_BUS_NAME_WATCHER_FLAGS_NONE,
+    g_bus_watch_name_on_connection(bus, "org.bluez", G_BUS_NAME_WATCHER_FLAGS_AUTO_START,
                                    bluez_appeared, NULL, NULL, NULL);
 
     loop = g_main_loop_new(NULL, FALSE);
