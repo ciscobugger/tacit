@@ -27,6 +27,7 @@ Scope {
             readonly property var top: WindowBand.toplevelAt(address)
             readonly property var win: top?.lastIpcObject ?? null
             readonly property string appId: top?.wayland?.appId ?? (win?.class ?? "")
+            readonly property string dockAppId: WindowBand.dockId(appId)
             readonly property string name: WindowBand.nameFor(win?.class ?? appId)
             readonly property bool filled: (win?.fullscreen ?? 0) === 1
             readonly property color light: Qt.rgba(1, 226 / 255, 200 / 255, 1)
@@ -66,10 +67,10 @@ Scope {
                     IslandController.dismiss();
                 if (menuWindow.place === "hide") {
                     WindowBand.dragAddress = menuWindow.address;
-                    WindowBand.dragApp = menuWindow.appId;
-                    WindowBand.dropInto = menuWindow.appId;
+                    WindowBand.dragApp = menuWindow.dockAppId;
+                    WindowBand.dropInto = menuWindow.dockAppId;
                     WindowBand.holdDock = true;
-                } else if (WindowBand.holdDock && WindowBand.dropInto === menuWindow.appId) {
+                } else if (WindowBand.holdDock && WindowBand.dropInto === menuWindow.dockAppId) {
                     WindowBand.holdDock = false;
                     WindowBand.dropInto = "";
                     WindowBand.dragAddress = "";
