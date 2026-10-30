@@ -649,6 +649,8 @@ Singleton {
         running: root.enabled
         onTriggered: {
             root.warmedUp = true;
+            diskProc.running = false;
+            diskProc.running = true;
             root.lastWifiConnected = Network.wifiStatus === "connected";
             if (root.afterReload && !root.suppressed) {
                 root.request("reload", {}, 100);
@@ -1522,7 +1524,9 @@ Singleton {
                     root.request("disk", { "icon": "hard_drive", "text": `Disk ${pct}% full · ${m[2]}`, "tone": "error" }, 80);
                     Journal.log("fault.disk", { "pct": pct, "mount": m[2] });
                 }
-                root.diskWarned = pct >= 90;
+                // before warm-up the peek is dropped, so the flag stays down and the check after warm-up warns
+                if (root.warmedUp)
+                    root.diskWarned = pct >= 90;
                 root.diskPct = pct;
             }
         }
