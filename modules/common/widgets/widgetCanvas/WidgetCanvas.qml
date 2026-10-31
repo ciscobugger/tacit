@@ -88,25 +88,28 @@ MouseArea {
         root.groupDragMemberStarts = []
     }
 
-    onPressed: (mouse) => {
+    function beginSelection(x, y, modifiers) {
         if (Config.options.background.widgetsLocked) return
         root.selecting = true
-        root.selectionStartPoint = Qt.point(mouse.x, mouse.y)
-        root.selectionRect = Qt.rect(mouse.x, mouse.y, 0, 0)
-        if (!(mouse.modifiers & Qt.ControlModifier)) root.clearSelection()
+        root.selectionStartPoint = Qt.point(x, y)
+        root.selectionRect = Qt.rect(x, y, 0, 0)
+        if (!(modifiers & Qt.ControlModifier)) root.clearSelection()
     }
 
-    onPositionChanged: (mouse) => {
+    function updateSelection(x, y) {
         if (!root.selecting) return
         const startX = root.selectionStartPoint.x
         const startY = root.selectionStartPoint.y
-        const rectX = Math.min(startX, mouse.x)
-        const rectY = Math.min(startY, mouse.y)
-        const rectW = Math.abs(mouse.x - startX)
-        const rectH = Math.abs(mouse.y - startY)
+        const rectX = Math.min(startX, x)
+        const rectY = Math.min(startY, y)
+        const rectW = Math.abs(x - startX)
+        const rectH = Math.abs(y - startY)
         root.selectionRect = Qt.rect(rectX, rectY, rectW, rectH)
         root.selectWithinRect(root.selectionRect)
     }
+
+    onPressed: mouse => root.beginSelection(mouse.x, mouse.y, mouse.modifiers)
+    onPositionChanged: mouse => root.updateSelection(mouse.x, mouse.y)
 
     onReleased: {
         root.selecting = false
