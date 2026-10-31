@@ -50,13 +50,14 @@ Singleton {
 
         // Ignored apps
         const ignoredRegexStrings = Config.options?.dock.ignoredAppRegexes ?? [];
-        const ignoredRegexes = ignoredRegexStrings.flatMap(pattern => {
+        // a config list is a Qt sequence: it has map and filter, not flatMap (which threw and emptied the dock)
+        const ignoredRegexes = ignoredRegexStrings.map(pattern => {
             try {
-                return [new RegExp(pattern, "i")];
+                return new RegExp(pattern, "i");
             } catch (e) {
-                return [];
+                return null;
             }
-        });
+        }).filter(re => re !== null);
         // Open windows
         for (const toplevel of ToplevelManager.toplevels.values) {
             if (ignoredRegexes.some(re => re.test(toplevel.appId))) continue;
