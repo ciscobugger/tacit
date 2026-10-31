@@ -142,6 +142,10 @@ FloatingWindow {
         if (win.forPick || Date.now() < win.settleUntil)
             return;
         const c = win.client();
+        // hidden or closed by the window band: held on special:tacit-hidden/-closed, where the compositor gives it
+        // Files' minimum (640 x 400); kept, every later Files window opened that small
+        if ((c?.workspace?.name ?? "").startsWith("special:tacit-"))
+            return;
         if (win.dock?.tiled && c && c.floating)   // un-tiled by the keyboard (Super+Alt+Space)
             win.dock = null;
         if (win.dock?.tiled) {   // left as a tile: comes back as one (where there are tiles)
