@@ -31,6 +31,9 @@ mkdir -p "$HOME/.cache" 2>/dev/null || true
 # was hidden and redrawn each frame and the compositor never went idle: 350 % CPU on a 4-core test computer after a
 # lock and unlock, 0 % with 2 s (2026-10-31). Qt's default is 100 ms.
 export QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=${QT_WAYLAND_FRAME_CALLBACK_TIMEOUT:-2000}
+# This loop restarts a shell that died. Quickshell's own crash handler instead put up its "Quickshell has crashed,
+# report it on Quickshell's tracker" window and left a ~90 MB process behind per crash (7 on the test computer).
+export QS_DISABLE_CRASH_HANDLER=1
 
 # --- take over from a previous supervisor -----------------------------------
 # Makes this script safe to invoke again (e.g. the restart keybind) without
