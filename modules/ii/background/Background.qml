@@ -136,6 +136,8 @@ Variants {
 
         property bool wallpaperIsVideo: bgRoot.effectiveWallpaperPath.endsWith(".mp4") || bgRoot.effectiveWallpaperPath.endsWith(".webm") || bgRoot.effectiveWallpaperPath.endsWith(".mkv") || bgRoot.effectiveWallpaperPath.endsWith(".avi") || bgRoot.effectiveWallpaperPath.endsWith(".mov")
         property string wallpaperPath: wallpaperIsVideo ? Config.options.background.thumbnailPath : bgRoot.effectiveWallpaperPath
+        readonly property bool widgetsAboveVideo: bgRoot.wallpaperIsVideo && !GlobalStates.screenLocked
+        readonly property Item widgetWallpaper: bgRoot.widgetsAboveVideo ? videoWidgetWallpaper : wallpaper
         property bool wallpaperSafetyTriggered: {
             const enabled = Config.options.workSafety.enable.wallpaper;
             const sensitiveWallpaper = (CF.StringUtils.stringListContainsSubstring(wallpaperPath.toLowerCase(), Config.options.workSafety.triggerCondition.fileKeywords));
@@ -290,6 +292,7 @@ Variants {
         }
 
         Item {
+            id: backgroundContent
             anchors.fill: parent
             opacity: bgRoot.hiddenForFullscreen ? 0 : 1
             enabled: !bgRoot.hiddenForFullscreen
@@ -624,8 +627,56 @@ Variants {
                 }
             }
 
+            // The video is a separate Background surface. Only the widgets go above it: raising
+            // the whole wallpaper would cover the desktop tags and take their pointer input.
+            PanelWindow {
+                id: videoWidgets
+                screen: bgRoot.screen
+                visible: bgRoot.widgetsAboveVideo
+                color: "transparent"
+                exclusionMode: ExclusionMode.Ignore
+                anchors { top: true; bottom: true; left: true; right: true }
+                WlrLayershell.layer: WlrLayer.Bottom
+                WlrLayershell.namespace: "quickshell:desktopWidgets"
+                WlrLayershell.keyboardFocus: GlobalStates.desktopWidgetKeyboardFocus
+                    ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+                contentItem.opacity: backgroundContent.opacity
+                contentItem.enabled: backgroundContent.enabled
+                mask: Region { regions: widgetMasks.instances }
+
+                Variants {
+                    id: widgetMasks
+                    model: widgetCanvas.registeredWidgets
+                    Region {
+                        required property var modelData
+                        item: modelData.visible ? modelData : null
+                    }
+                }
+
+                // Shader sources cannot cross windows. Sample the video's still in this window
+                // for widgets that frost the wallpaper, without drawing it over the live frames.
+                WallpaperImage {
+                    id: videoWidgetWallpaper
+                    anchors.fill: parent
+                    target: bgRoot.widgetsAboveVideo ? bgRoot.wallpaperPath : ""
+                    visible: false
+                    view: wallpaper.view
+                }
+            }
+
+            // Empty-desktop selection still starts on the background, outside the widget mask.
+            MouseArea {
+                anchors.fill: parent
+                enabled: bgRoot.widgetsAboveVideo
+                onPressed: mouse => widgetCanvas.beginSelection(mouse.x, mouse.y, mouse.modifiers)
+                onPositionChanged: mouse => widgetCanvas.updateSelection(mouse.x, mouse.y)
+                onReleased: widgetCanvas.selecting = false
+                onCanceled: widgetCanvas.selecting = false
+            }
+
             WidgetCanvas {
                 id: widgetCanvas
+                parent: bgRoot.widgetsAboveVideo ? videoWidgets.contentItem : backgroundContent
                 anchors.fill: parent
 
                 transitions: Transition {
@@ -663,7 +714,7 @@ Variants {
                         scaledScreenWidth:  bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale:     1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -676,7 +727,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -689,7 +740,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -704,7 +755,7 @@ Variants {
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
                         wallpaperSafetyTriggered: bgRoot.wallpaperSafetyTriggered
-                        wallpaperItem: wallpaper
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -717,7 +768,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -732,7 +783,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                     onLoaded: {
                         if (item && item.requestReset) {
@@ -752,7 +803,7 @@ Variants {
                         scaledScreenWidth:  bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale:     1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -765,7 +816,7 @@ Variants {
                         scaledScreenWidth:  bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale:     1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -778,7 +829,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -791,7 +842,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -804,7 +855,7 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
                 FadeLoader {
@@ -817,7 +868,7 @@ Variants {
                         scaledScreenWidth:  bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale:     1
-                        wallpaperItem: wallpaper 
+                        wallpaperItem: bgRoot.widgetWallpaper
                     }
                 }
             }
