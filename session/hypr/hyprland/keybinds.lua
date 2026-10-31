@@ -46,8 +46,10 @@ hl.bind("CTRL + SUPER + T", hl.dsp.global("quickshell:wallpaperSelectorToggle"),
     { description = "Shell: Change wallpaper" })
 hl.bind("CTRL + SUPER + ALT + T", hl.dsp.global("quickshell:wallpaperSelectorRandom"),
     { description = "Shell: Random wallpaper" })
-hl.bind("CTRL + SUPER + SHIFT + D", hl.dsp.exec_cmd("$HOME/.local/bin/book4-toggle-mode.sh"),
-    { description = "Shell: Toggle light/dark mode" })
+-- Unbound: Tacit is dark only (CONTRIBUTING, "Design rules"), and book4-toggle-mode.sh is in no
+-- package, so on an install this key did nothing and the cheatsheet promised a mode there is not.
+-- hl.bind("CTRL + SUPER + SHIFT + D", hl.dsp.exec_cmd("$HOME/.local/bin/book4-toggle-mode.sh"),
+--     { description = "Shell: Toggle light/dark mode" })
 hl.bind("CTRL + SUPER + T", hl.dsp.exec_cmd(qsIsAlive .. " || " .. qsScripts .. "/colors/switchwall.sh"))
 -- qs-supervise restarts the shell itself, and only the shell: the old fallback here ran
 -- `killall qs quickshell`, which also killed the boot lock (a separate `qs -p` instance), and
