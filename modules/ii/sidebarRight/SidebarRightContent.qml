@@ -710,10 +710,10 @@ Item {
                             glyph: "brightness_6"
                             label: Translation.tr("Brightness")
                             value: root.brightnessMonitor?.brightness ?? 0
-                            onMoved: {
+                            onMoved: v => {
                                 if (Hyprsunset.gamma !== 100 && (root.brightnessMonitor?.brightness ?? 1) < 0.01)
                                     Hyprsunset.setGamma(100);
-                                root.brightnessMonitor?.setBrightness(Math.max(0.02, value));
+                                root.brightnessMonitor?.setBrightness(Math.max(0.02, v));
                             }
                         }
                         LineSlider {
@@ -722,9 +722,9 @@ Item {
                                 : ((Audio.sink?.audio?.volume ?? 0) < 0.34 ? "volume_down" : "volume_up")
                             label: Translation.tr("Volume")
                             value: Audio.sink?.audio?.volume ?? 0
-                            onMoved: {
+                            onMoved: v => {
                                 if (Audio.sink?.audio)
-                                    Audio.sink.audio.volume = value;
+                                    Audio.sink.audio.volume = v;
                             }
                         }
                     }
@@ -1061,7 +1061,8 @@ Item {
         property string glyph: "tune"
         property string label: ""
         property alias value: slider.value
-        signal moved()
+        // the kit's Slider does not move itself: it says where it was moved to, and the value follows the setting
+        signal moved(real value)
         spacing: Kit.tokens.space.s
 
         Symbol {
@@ -1074,7 +1075,7 @@ Item {
             Layout.fillWidth: true
             label: line.label
             word: `${Math.round(value * 100)}%`
-            onMoved: line.moved()
+            onMoved: v => line.moved(v)
         }
     }
 
