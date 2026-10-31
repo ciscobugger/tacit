@@ -38,6 +38,13 @@ Scope {
             Region { required property var modelData; item: modelData }
         }
 
+        Connections {
+            target: DesktopIcons
+            // Region watches the tag, not the parent that moves when its saved place changes.
+            // Rebuild after the position bindings have followed the new places.
+            function onPlacesChanged() { Qt.callLater(win.mask.changed); }
+        }
+
         FocusScope {
             id: board
             anchors.fill: parent
