@@ -7,37 +7,16 @@ if [[ -o interactive ]]; then
     setopt no_flow_control
     setopt interactive_comments
 
-    # oh-my-zsh, where installed (a person's own ~/.oh-my-zsh first): its compinit and the git plugin. No theme,
-    # so the prompt stays Tacit's Starship below, and no auto-update (that belongs to the packages)
-    for tacit_omz in "$HOME/.oh-my-zsh" /usr/share/oh-my-zsh; do
-        if [[ -r "$tacit_omz/oh-my-zsh.sh" ]]; then
-            export ZSH="$tacit_omz"
-            ZSH_THEME=""
-            DISABLE_AUTO_UPDATE=true
-            plugins=(git)
-            source "$ZSH/oh-my-zsh.sh"
-            break
-        fi
-    done
-    unset tacit_omz
-
-    # a completion system even without oh-my-zsh (grml normally brings one); -i keeps a first start from asking
-    # about directories compaudit dislikes
+    # a completion system (grml normally brings one); -i keeps a first start from asking about directories compaudit
+    # dislikes. oh-my-zsh is not loaded here: a person who has it loads it from their own ~/.zshrc, after this
     if (( ! $+functions[compdef] )); then
         autoload -Uz compinit && compinit -i
     fi
 
-    # suggestions from history as you type, as fish has; oh-my-zsh does not ship it
-    for tacit_suggestions in \
-        /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh \
-        "${ZSH_CUSTOM:-$ZSH/custom}/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" \
-        "$ZSH/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"; do
-        if [[ -r "$tacit_suggestions" ]]; then
-            source "$tacit_suggestions"
-            break
-        fi
-    done
-    unset tacit_suggestions
+    # suggestions from history as you type, as fish has
+    if [[ -r /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+        source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+    fi
 
     # the prompt: Tacit's Starship (design D, /usr/share/tacit/starship.toml) unless the person has their own
     if [[ "$TERM" != "linux" ]] && (( $+commands[starship] )); then
