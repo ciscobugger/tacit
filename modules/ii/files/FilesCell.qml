@@ -104,11 +104,19 @@ Item {
                     id: again
                     interval: 1500
                     onTriggered: {
-                        const p = parent.thumbnailPath;
                         parent.looks++;
                         parent.source = "";
-                        Qt.callLater(() => parent.source = p);
+                        // Not Qt.callLater: the deferred closure outlives the cell (the grid
+                        // scrolled, the Loader deactivated) and evaluating it against a
+                        // destroyed context is "a function in an invalid context". A timer
+                        // inside the cell dies with the cell, so it can never fire late.
+                        restore.start();
                     }
+                }
+                Timer {
+                    id: restore
+                    interval: 16
+                    onTriggered: parent.source = parent.thumbnailPath
                 }
             }
         }
