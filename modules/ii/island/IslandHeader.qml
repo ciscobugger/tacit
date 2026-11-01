@@ -84,6 +84,8 @@ Item {
     // 14 px off, and with the glyph hanging beside it the pair read right-heavy); the status glyph sits at the right edge.
     // While a screen recording runs, its time takes the clock's place: the red dot, the time, and Stop under the hand
     // (mock ~/dev/tacit-site/mocks/record/); a click on the notch at rest, or on the time, stops it (liveArea below).
+    // The hand is the notch's own hover (IslandController.notchHovered), which also widens the notch for the word, so
+    // at rest the time keeps the middle.
     Item {
         id: centre
         readonly property bool live: IslandController.recording
@@ -109,7 +111,11 @@ Item {
             id: liveRow
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
+            // No Row spacing: each gap is the padding of the item after it. A revealed Stop is a child whose width
+            // goes to 0, and a Row's spacing before a zero-width child is still laid out (and dropped only when the
+            // child finally hides), which shifted the dot and time by 4 px as the word went. With the gap inside the
+            // animated width, the row's width is the dot and the time exactly whenever the hand leaves.
+            spacing: 0
             opacity: centre.live ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
@@ -144,29 +150,43 @@ Item {
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
                 text: IslandController.recordElapsed
+                // the gap after the dot (liveRow has no spacing: see there)
+                leftPadding: 8
                 font.family: Appearance.font.family.numbers
                 font.pixelSize: 16
                 font.variableAxes: ({ "wght": 500 })
                 font.features: ({ "tnum": 1 })
                 color: Tacit.inkMain
             }
+            // "Stop" under the hand, as the mock has it, brought out by the notch's own hover (IslandController's
+            // notchHovered, from IslandContent's HoverHandler) rather than the stop area's own: a MouseArea's
+            // containsMouse missed the pointer arriving in the notch - the notch sits on the screen's edge, so arriving
+            // is all a pointer does - and the one way out of a recording stayed hidden until the pointer was moved
+            // around inside it (2026-11-01). The notch makes room for it while the hand is there, and sits at the
+            // clock's box otherwise, so at rest the time keeps the middle.
+            // Its width carries the gap before it and runs on the notch's own fold curve at the notch's own 450 ms
+            // (IslandContent's geometry for a closed state): the expressive spatial curves overshoot, and on the way
+            // out the box dipped below zero, was clamped and came back above it, so the row widened and narrowed again
+            // after the word had gone - the recording's time bounced twice (2026-11-01).
             Item {
                 anchors.verticalCenter: parent.verticalCenter
-                width: liveArea.containsMouse ? stopWord.implicitWidth : 0
+                width: IslandController.notchHovered ? stopWord.implicitWidth : 0
                 height: stopWord.implicitHeight
                 clip: true
                 visible: width > 0
                 Behavior on width {
-                    NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveFastSpatial }
+                    NumberAnimation { duration: 450; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.emphasizedDecel }
                 }
                 StripWords {
                     id: stopWord
                     text: "Stop"
+                    // the gap after the time (liveRow has no spacing: see there), inside the width this fades with
+                    leftPadding: 8
                     point: true
                     color: Tacit.accent
-                    opacity: liveArea.containsMouse ? 1 : 0
+                    opacity: IslandController.notchHovered ? 1 : 0
                     Behavior on opacity {
-                        NumberAnimation { duration: 200 }
+                        NumberAnimation { duration: 450; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.emphasizedDecel }
                     }
                 }
             }
@@ -228,8 +248,8 @@ Item {
         }
     }
 
-    // a recording's stop: the whole notch at rest, the time alone when a peek or the sheet has wings beside it. Under
-    // the wings, so their own controls keep their clicks.
+    // a recording's stop: the whole notch at rest, the time and its Stop when a peek or the sheet has wings beside it.
+    // Under the wings, so their own controls keep their clicks.
     MouseArea {
         id: liveArea
         readonly property bool whole: root.loadedState === "idle"
@@ -237,7 +257,6 @@ Item {
         x: liveArea.whole ? 0 : centre.x - 6
         width: liveArea.whole ? root.width : centre.width + 12
         height: root.height
-        hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: IslandController.stopRecording()
     }

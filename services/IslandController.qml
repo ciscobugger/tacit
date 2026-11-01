@@ -336,8 +336,10 @@ Singleton {
     // container morphs to these numbers the moment the state changes; content lands into the
     // shape afterwards, so nothing here may depend on the loaded content's size.
     // 116 fits the clock's "00:00"; a 12-hour format ("10:33 AM") widens the middle by what its time needs more, or
-    // the wings land on it (Discord 2026-10-21: "AM" over the volume bar)
-    readonly property real centreWidth: 116 + Math.max(0, root.clockWidth - Math.ceil(clock24.advanceWidth)) + (root.ambientGlyph !== "" ? 30 : 0)
+    // the wings land on it (Discord 2026-10-21: "AM" over the volume bar). A recording keeps room for the Stop its row
+    // brings out under the hand - and the gap before it (IslandHeader's liveRow): 34 for the word, 8 for the spacing.
+    // Only under the hand: at rest the notch is the clock's box again, so the recording's time keeps the middle.
+    readonly property real centreWidth: 116 + Math.max(0, root.clockWidth - Math.ceil(clock24.advanceWidth)) + (root.ambientGlyph !== "" ? 30 : 0) + (root.recording && root.notchHovered ? 42 : 0)
     // The clock's box (StripClock): the widest time the format shows, digits as 0 (tabular), so nothing moves as the
     // minutes change. 10:58 gives two hour digits in every format, and AM, the wider of AM and PM.
     readonly property string clockSample: Qt.locale().toString(new Date(2000, 0, 1, 10, 58), Config.options?.time.format ?? "hh:mm").replace(/[0-9]/g, "0")
@@ -418,6 +420,10 @@ Singleton {
 
     // Set by IslandContent while text (a sentence, a link) is dragged over the notch.
     property bool textDragOver: false
+
+    // Set by IslandContent: the pointer is on the notch (its own HoverHandler, the one that opens the sheet). A
+    // recording's Stop comes out only while it is true, and the notch widens for it then (centreWidth).
+    property bool notchHovered: false
 
     // the sand layer is up (IslandContent): Flow takes the film's notch, the sand behind the time, no words
     property bool sandReady: false
