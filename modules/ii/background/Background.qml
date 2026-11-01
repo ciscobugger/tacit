@@ -304,9 +304,18 @@ Variants {
             // The picture is decoded at the size that covers the panel's own pixels and cut to them
             // (WallpaperImage): a high-megapixel picture never decodes at native size, and during a
             // crossfade both copies are resident at once.
+            // "Fit" shows the whole picture with the palette's ground beside it, not the compositor's black
+            Rectangle {
+                anchors.fill: parent
+                visible: wallpaper.fit === "fit" && !bgRoot.wallpaperIsVideo
+                color: Appearance.colors.colLayer0
+            }
+
             WallpaperImage {
                 id: previousWallpaper
                 anchors.fill: parent
+                fit: Config.options.background.wallpaperFit
+                exact: true
                 cache: true
                 mipmap: true
                 smooth: true
@@ -319,11 +328,15 @@ Variants {
             WallpaperImage {
                 id: wallpaper
                 anchors.fill: parent
+                fit: Config.options.background.wallpaperFit
+                exact: true
                 cache: true
                 smooth: true
                 mipmap: true
                 asynchronous: true
-                layer.enabled: blurLoader.active
+                // the transition and the blurs read this item's picture; a whole picture inside the box
+                // ("fit") is only the box's shape as drawn, so they read the drawing then
+                layer.enabled: blurLoader.active || fit === "fit"
                 visible: !blurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                 view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
@@ -658,6 +671,8 @@ Variants {
                 WallpaperImage {
                     id: videoWidgetWallpaper
                     anchors.fill: parent
+                    fit: Config.options.background.wallpaperFit
+                    exact: true
                     target: bgRoot.widgetsAboveVideo ? bgRoot.wallpaperPath : ""
                     visible: false
                     view: wallpaper.view

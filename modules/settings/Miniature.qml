@@ -23,6 +23,13 @@ Item {
         anchors.fill: parent
         visible: false
 
+        // the person's fit, as the desktop draws it (Background.qml): the palette's ground beside a whole picture
+        readonly property string fit: Config.options.background.wallpaperFit
+        Rectangle {
+            anchors.fill: parent
+            visible: desk.fit === "fit"
+            color: Appearance.colors.colLayer0
+        }
         Image {
             id: wall
             anchors.fill: parent
@@ -30,7 +37,9 @@ Item {
             // preview stayed empty
             source: mini.wallpaper.length > 0 ? "file://" + mini.wallpaper.split("/").map(encodeURIComponent).join("/") : ""
             sourceSize.width: 960
-            fillMode: Image.PreserveAspectCrop
+            fillMode: desk.fit === "fit" ? Image.PreserveAspectFit : desk.fit === "stretch" ? Image.Stretch : Image.PreserveAspectCrop
+            // the blur under the window reads this picture; a whole picture is the box's shape only as drawn
+            layer.enabled: desk.fit === "fit"
             asynchronous: true
             cache: false
         }

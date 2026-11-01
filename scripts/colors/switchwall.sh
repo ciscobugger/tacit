@@ -137,6 +137,12 @@ BLUR_SIGMA=16
 
 video_opts() { # screen height in logical pixels
     local opts="$VIDEO_OPTS"
+    # the person's fit (Settings > Appearance > Wallpaper), as mpv says it: panscan=1 covers the
+    # screen and cuts the rest (the default), 0 shows the whole frame, keepaspect=no stretches it
+    case "$(jq -r '.background.wallpaperFit // "fill"' "$SHELL_CONFIG_FILE" 2>/dev/null)" in
+        fit) opts="${opts/panscan=1.0/panscan=0.0}" ;;
+        stretch) opts="${opts/panscan=1.0/panscan=0.0} keepaspect=no" ;;
+    esac
     if [[ "$(jq -r '.background.showBlur // false' "$SHELL_CONFIG_FILE" 2>/dev/null)" == "true" ]]; then
         # Filters read the frames from system memory. With hwdec=auto mpv keeps them on the GPU and
         # throws the filter away ("Disabling filter ... because it has failed"), which is why the

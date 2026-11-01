@@ -1056,6 +1056,20 @@ ApplicationWindow {
                             label: look.showAll ? "Fewer" : `All ${look.pictures.length}`
                             onPressed: look.showAll = !look.showAll
                         }
+                        // how a picture of another shape meets the screen; a video's too (switchwall.sh hands it to mpv)
+                        Column {
+                            spacing: 8
+                            StyledText {
+                                text: "Fit"
+                                font.pixelSize: 15
+                                color: Tacit.inkSec
+                            }
+                            Words {
+                                options: [{ value: "fill", label: "Fill" }, { value: "fit", label: "Whole picture" }, { value: "stretch", label: "Stretch" }]
+                                current: Config.options.background.wallpaperFit
+                                onPicked: value => Config.options.background.wallpaperFit = value
+                            }
+                        }
                         // Wallpapers.qml's timer; the other intervals are under Advanced
                         Column {
                             spacing: 8
