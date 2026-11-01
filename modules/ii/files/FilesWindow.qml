@@ -1429,7 +1429,14 @@ FloatingWindow {
                     revealEdit.path = job.results[0];
                 else if (here.length > 0 && ["rename", "renames", "compress", "copy", "move", "moveback"].includes(job.op))
                     revealEdit.select = here;
-                win.tryRevealEdit();
+                // A compress or a copy writes the file here a piece at a time, so the model read the row
+                // when it was empty, and nothing in the folder changes again while it fills: the row
+                // would say 0 B for as long as this folder stays open. The job is whole now: read the
+                // folder again, and leave the reveal to the read that follows (onStatusChanged).
+                if (here.length > 0 && ["compress", "copy"].includes(job.op))
+                    win.reload();
+                else
+                    win.tryRevealEdit();
             }
         }
     }
