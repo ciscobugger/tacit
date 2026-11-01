@@ -4350,24 +4350,50 @@ ApplicationWindow {
                 return ratio < 0.6 ? "Slowest" : ratio < 0.9 ? "Slower" : ratio <= 1.12 ? "Normal" : ratio <= 1.6 ? "Faster" : "Fastest";
             }
             // Hyprland gives a speed to every pointer, or to one device by its name, not to touchpads as such: the
-            // touchpads are the devices named so ("...-touchpad", Apple's "...-trackpad"), each given the touchpad's
-            // curve. Both are written together, so the mouse's speed never moves the touchpad's (Discord 2026-10-22: one
-            // touchpad too slow, another too fast, one speed for both).
-            property var touchpads: []
+            // touchpads are the devices named so ("...-touchpad", Apple's "...-trackpad"). Every pointer is written
+            // here as its own, mouse and touchpad alike, per Hyprland 0.57, which refuses a curve on
+            // input:accel_profile but takes one per device - and so a mouse plugged in later has its class's
+            // Settings (the hotplug layer in tacit/general.lua reads the resolutions the configurator keeps).
+            property var pointers: []
+            readonly property var touchpads: pointers.filter(p => p.touch).map(p => p.name)
+            // resampled while the page is open: a mouse plugged in after it is one of the
+            // pointers, not the ones a setting already named
             Process {
+                id: devicesProcess
                 running: true
                 command: ["hyprctl", "devices", "-j"]
                 stdout: StdioCollector {
                     onStreamFinished: {
-                        try { inputCol.touchpads = JSON.parse(text).mice.map(m => m.name).filter(n => /touchpad|trackpad/i.test(n)); } catch (e) {}
+                        try { inputCol.pointers = JSON.parse(text).mice.map(m => ({ name: m.name, touch: /touchpad|trackpad/i.test(m.name) })); } catch (e) {}
                     }
+                }
+            }
+            Timer {
+                interval: 5000
+                running: true
+                repeat: true
+                onTriggered: {
+                    devicesProcess.running = false;
+                    devicesProcess.running = true;
                 }
             }
             function writeSpeeds() {
                 const input = Config.options.hyprland.input;
-                const entries = { "input:sensitivity": input.sensitivity, "input:accel_profile": inputCol.curve(input.sensitivity) };
-                for (const name of inputCol.touchpads)
-                    entries[`device:${name}:accel_profile`] = inputCol.curve(input.touchpad.speed);
+                // input:sensitivity is the mouse's own; the compositor refuses a curve on the global
+                // input:accel_profile (0.57), so every pointer is said as its device instead - the reset
+                // takes the one the old generator left in a main.lua the GUI already owns the feel through
+                const entries = {
+                    "input:sensitivity": input.sensitivity,
+                    "input:accel_profile": "[[EMPTY]]"
+                };
+                for (const pointer of inputCol.pointers) {
+                    const profile = pointer.touch ? input.touchpad.profile : input.mouseProfile;
+                    const speed = pointer.touch ? input.touchpad.speed : input.sensitivity;
+                    entries[`device:${pointer.name}:accel_profile`] = profile === "tacit" ? inputCol.curve(speed) : profile;
+                    // the curve carries the speed itself; flat and adaptive read the device's sensitivity, and a
+                    // curve can take an old one back
+                    entries[`device:${pointer.name}:sensitivity`] = profile === "tacit" ? "[[EMPTY]]" : speed;
+                }
                 HyprlandConfig.setMany(entries);
             }
             Group {
@@ -4426,6 +4452,44 @@ ApplicationWindow {
             Group {
                 visible: inputCol.viewing === ""
                 title: "Touchpad"
+                // the profile: Tacit's curve (slow moves land precisely, quick moves travel far), flat sends
+                // each movement 1:1, adaptive is libinput's usual acceleration
+                ChoiceRow {
+                    label: "Acceleration"
+                    options: [
+                        { value: "tacit", label: "Tacit curve" },
+                        { value: "flat", label: "Flat" },
+                        { value: "adaptive", label: "Adaptive" }
+                    ]
+                    current: Config.options.hyprland.input.touchpad.profile
+                    onPicked: value => {
+                        Config.options.hyprland.input.touchpad.profile = value;
+                        inputCol.writeSpeeds();
+                    }
+                }
+                SettingRow {
+                    visible: inputCol.touchpads.length > 0
+                    clickable: false
+                    label: "Speed"
+                    // written on release: every write reloads Hyprland
+                    stacked: true
+                    control: Ruler {
+                        fill: true
+                        id: touchpadSpeedSlider
+                        implicitWidth: 260
+                        label: inputCol.speedWord(Math.pow(2, touchpadSpeedSlider.value))
+                        from: -1
+                        to: 1
+                        onPressedChanged: if (!pressed) {
+                            Config.options.hyprland.input.touchpad.speed = Math.round(touchpadSpeedSlider.value * 20) / 20;
+                            inputCol.writeSpeeds();
+                        }
+                        Binding on value {
+                            value: Config.options.hyprland.input.touchpad.speed
+                            when: !touchpadSpeedSlider.pressed
+                        }
+                    }
+                }
                 ChoiceRow {
                     label: "Scrolling"
                     description: Config.options.hyprland.input.touchpad.naturalScroll ? "Natural: the page follows your fingers" : "Traditional: the page moves against your fingers"
@@ -4434,6 +4498,29 @@ ApplicationWindow {
                     onPicked: value => {
                         Config.options.hyprland.input.touchpad.naturalScroll = value;
                         HyprlandConfig.set("input:touchpad:natural_scroll", value ? 1 : 0);
+                    }
+                }
+                SettingRow {
+                    clickable: false
+                    label: "Scroll speed"
+                    stacked: true
+                    control: Ruler {
+                        fill: true
+                        id: scrollSlider
+                        implicitWidth: 260
+                        label: inputCol.speedWord(scrollSlider.value / 0.7)   // 0.7: Tacit's usual scroll
+                        from: 0.1
+                        to: 3
+                        stepSize: 0.1
+                        onPressedChanged: if (!pressed) {
+                            const v = Math.round(scrollSlider.value * 10) / 10;
+                            Config.options.hyprland.input.touchpad.scrollFactor = v;
+                            HyprlandConfig.set("input:touchpad:scroll_factor", v);
+                        }
+                        Binding on value {
+                            value: Config.options.hyprland.input.touchpad.scrollFactor
+                            when: !scrollSlider.pressed
+                        }
                     }
                 }
                 SwitchRow {
@@ -4460,27 +4547,55 @@ ApplicationWindow {
                         HyprlandConfig.set("input:touchpad:tap_to_click", value ? 1 : 0);
                     }
                 }
+            }
+            Group {
+                visible: inputCol.viewing === ""
+                title: "Mouse"
+                ChoiceRow {
+                    label: "Acceleration"
+                    options: [
+                        { value: "tacit", label: "Tacit curve" },
+                        { value: "flat", label: "Flat" },
+                        { value: "adaptive", label: "Adaptive" }
+                    ]
+                    current: Config.options.hyprland.input.mouseProfile
+                    onPicked: value => {
+                        Config.options.hyprland.input.mouseProfile = value;
+                        inputCol.writeSpeeds();
+                    }
+                }
                 SettingRow {
-                    visible: inputCol.touchpads.length > 0
                     clickable: false
                     label: "Speed"
                     // written on release: every write reloads Hyprland
                     stacked: true
                     control: Ruler {
                         fill: true
-                        id: touchpadSpeedSlider
+                        id: speedSlider
                         implicitWidth: 260
-                        label: inputCol.speedWord(Math.pow(2, touchpadSpeedSlider.value))
+                        label: inputCol.speedWord(Math.pow(2, speedSlider.value))   // the curve is scaled by 2^value
                         from: -1
                         to: 1
                         onPressedChanged: if (!pressed) {
-                            Config.options.hyprland.input.touchpad.speed = Math.round(touchpadSpeedSlider.value * 20) / 20;
+                            Config.options.hyprland.input.sensitivity = Math.round(speedSlider.value * 20) / 20;
                             inputCol.writeSpeeds();
                         }
                         Binding on value {
-                            value: Config.options.hyprland.input.touchpad.speed
-                            when: !touchpadSpeedSlider.pressed
+                            value: Config.options.hyprland.input.sensitivity
+                            when: !speedSlider.pressed
                         }
+                    }
+                }
+                // the mouse scrolls like the touchpad does: the same choices, said globally, where the
+                // touchpad's own touchpad-scoped keys keep winning for it
+                ChoiceRow {
+                    label: "Scrolling"
+                    description: Config.options.hyprland.input.naturalScroll ? "Natural: the page follows your fingers" : "Traditional: the page moves against your fingers"
+                    options: [{ value: true, label: "Natural" }, { value: false, label: "Traditional" }]
+                    current: Config.options.hyprland.input.naturalScroll
+                    onPicked: value => {
+                        Config.options.hyprland.input.naturalScroll = value;
+                        HyprlandConfig.set("input:natural_scroll", value ? 1 : 0);
                     }
                 }
                 SettingRow {
@@ -4489,27 +4604,23 @@ ApplicationWindow {
                     stacked: true
                     control: Ruler {
                         fill: true
-                        id: scrollSlider
+                        id: mouseScrollSlider
                         implicitWidth: 260
-                        label: inputCol.speedWord(scrollSlider.value / 0.7)   // 0.7: Tacit's usual scroll
+                        label: inputCol.speedWord(mouseScrollSlider.value)   // the pointer's usual scroll is 1
                         from: 0.1
                         to: 3
                         stepSize: 0.1
                         onPressedChanged: if (!pressed) {
-                            const v = Math.round(scrollSlider.value * 10) / 10;
-                            Config.options.hyprland.input.touchpad.scrollFactor = v;
-                            HyprlandConfig.set("input:touchpad:scroll_factor", v);
+                            const v = Math.round(mouseScrollSlider.value * 10) / 10;
+                            Config.options.hyprland.input.scrollFactor = v;
+                            HyprlandConfig.set("input:scroll_factor", v);
                         }
                         Binding on value {
-                            value: Config.options.hyprland.input.touchpad.scrollFactor
-                            when: !scrollSlider.pressed
+                            value: Config.options.hyprland.input.scrollFactor
+                            when: !mouseScrollSlider.pressed
                         }
                     }
                 }
-            }
-            Group {
-                visible: inputCol.viewing === ""
-                title: "Pointer"
                 // Hyprland's follow_mouse 0-3, each said by what it does (3 was "Only on click", the
                 // opposite of what it is: a click does not move the typing)
                 ChoiceRow {
@@ -4530,28 +4641,6 @@ ApplicationWindow {
                     onPicked: value => {
                         Config.options.hyprland.input.followMouse = value;
                         HyprlandConfig.set("input:follow_mouse", value);
-                    }
-                }
-                SettingRow {
-                    clickable: false
-                    label: "Mouse speed"
-                    // written on release: every write reloads Hyprland
-                    stacked: true
-                    control: Ruler {
-                        fill: true
-                        id: speedSlider
-                        implicitWidth: 260
-                        label: inputCol.speedWord(Math.pow(2, speedSlider.value))   // the curve is scaled by 2^value
-                        from: -1
-                        to: 1
-                        onPressedChanged: if (!pressed) {
-                            Config.options.hyprland.input.sensitivity = Math.round(speedSlider.value * 20) / 20;
-                            inputCol.writeSpeeds();
-                        }
-                        Binding on value {
-                            value: Config.options.hyprland.input.sensitivity
-                            when: !speedSlider.pressed
-                        }
                     }
                 }
             }

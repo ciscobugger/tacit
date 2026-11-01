@@ -312,8 +312,17 @@ Singleton {
                     property int repeatDelay: 250
                     property int repeatRate: 35
                     property int followMouse: 1
-                    property real sensitivity: 0 // pointer speed, -1..1
+                    property real sensitivity: 0 // the mouse's pointer speed, -1..1
+                    // the mouse's acceleration profile: "tacit" (the curve), "flat" or "adaptive";
+                    // every mouse takes it, one plugged in later gets it from the hotplug layer
+                    property string mouseProfile: "tacit"
+                    // the mouse's own scrolling: belongs to any pointer, and the touchpad's touchpad-scoped
+                    // keys below win over them where both are set
+                    property bool naturalScroll: false
+                    property real scrollFactor: 1.0
                     property JsonObject touchpad: JsonObject {
+                        // its acceleration profile, the same words as the mouse's
+                        property string profile: "tacit"
                         property real speed: 0 // the touchpad's own speed, -1..1 (Settings writes it per touchpad)
                         property bool naturalScroll: true
                         property bool disableWhileTyping: true
