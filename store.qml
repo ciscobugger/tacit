@@ -796,7 +796,7 @@ ApplicationWindow {
             visible: root.page !== "app"
             x: root.gutter; anchors.verticalCenter: parent.verticalCenter; width: nameText.implicitWidth; height: 30
             inset: 8; rounding: 12; lit: false
-            onPicked: { field.text = ""; field.focus = false; root.history = []; root.page = "discover"; }
+            onPicked: { field.text = ""; root.leaveSearch(); root.history = []; root.page = "discover"; }
             Body { id: nameText; anchors.verticalCenter: parent.verticalCenter; text: "Apps"; font.family: Appearance.font.family.display
                 font.pixelSize: 21; font.weight: Font.DemiBold; color: "#f6f1ea" }
         }
@@ -809,7 +809,7 @@ ApplicationWindow {
                 color: yoursArea.containsMouse || root.page === "yours" ? "#f6f1ea" : root.inkMain }
             Rectangle { y: 28; height: 3; radius: 1.5; color: Tacit.accent; width: root.page === "yours" ? 22 : 0; Behavior on width { Spring {} } }
             MouseArea { id: yoursArea; anchors.fill: parent; anchors.margins: -8; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onClicked: { field.text = ""; field.focus = false; if (root.page !== "yours") root.go("yours"); } }
+                onClicked: { field.text = ""; root.leaveSearch(); if (root.page !== "yours") root.go("yours"); } }
         }
         // the search: frosted from what passes under it, darker over bright pictures
         Item {
@@ -839,7 +839,7 @@ ApplicationWindow {
                 cursorDelegate: Rectangle { width: 2; color: Tacit.accent; visible: field.activeFocus }
                 onTextChanged: searchDelay.restart()
                 Keys.onReturnPressed: { searchDelay.stop(); root.runSearch(text); }
-                Keys.onEscapePressed: { if (text) text = ""; else { focus = false; if (root.page !== "discover") root.back(); } }
+                Keys.onEscapePressed: { if (text) text = ""; else { root.leaveSearch(); if (root.page !== "discover") root.back(); } }
             }
             Body { x: 62; anchors.verticalCenter: parent.verticalCenter; visible: !field.text; text: "What do you want to do?"; color: root.inkSec; font.pixelSize: 20 }
             MouseArea { anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton; cursorShape: Qt.IBeamCursor }
@@ -915,7 +915,7 @@ ApplicationWindow {
 
     // ---- what you can do: when the search opens with nothing typed, the page steps back and these stand in its light
     MouseArea {    // a click anywhere else closes it
-        parent: canvas; z: 2; anchors.fill: parent; visible: root.asking; onClicked: field.focus = false
+        parent: canvas; z: 2; anchors.fill: parent; visible: root.asking; onClicked: root.leaveSearch()
     }
     Item {
         id: jobsLayer
@@ -939,8 +939,24 @@ ApplicationWindow {
                     }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: root.inkMain; opacity: 0.07 }
                     MouseArea { id: jobArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: { field.focus = false; root.openJob(modelData); } }
+                        onClicked: { root.leaveSearch(); root.openJob(modelData); } }
                 }
+            }
+        }
+    }
+    // ---- the keyboard: the search takes what you type with no click first. Between searches the window keeps the keys, so
+    // a letter always starts the next one: leaveSearch puts them back, since field.focus = false alone leaves them nowhere
+    function leaveSearch() { field.focus = false; keys.forceActiveFocus(); }
+    Item {
+        id: keys
+        anchors.fill: parent
+        focus: true
+        Keys.onPressed: e => {
+            if (field.activeFocus || root.askUpdate) return;      // the sheet in front is asked about, not searched past
+            if (e.text.length === 1 && e.text.charCodeAt(0) >= 32 && !(e.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+                field.forceActiveFocus();
+                field.insert(field.cursorPosition, e.text);
+                e.accepted = true;
             }
         }
     }
@@ -1274,7 +1290,7 @@ ApplicationWindow {
                 () => { issueView.contentY = 3 * root.height; },
                 () => { issueView.contentY = 4 * root.height; },
                 () => { issueView.contentY = 0; field.forceActiveFocus(); },
-                () => { field.focus = false; root.openJob(root.home.jobs[0]); },
+                () => { root.leaveSearch(); root.openJob(root.home.jobs[0]); },
                 () => { field.text = "call family"; root.runSearch("call family"); },
                 () => root.openApp("krita"),
                 () => root.get("krita"),
