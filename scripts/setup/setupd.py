@@ -126,8 +126,11 @@ def layout(name, parts):
         t = json.loads(r.stdout)["partitiontable"]
     except (AttributeError, ValueError, KeyError):
         return {}
-    out = {"gpt": t.get("label") == "gpt", "esp": any(p["type"].lower() == ESP for p in t["partitions"]),
-           "free": max([(b - a + 1) * t["sectorsize"] for a, b in gaps(t)] or [0])}
+    gpt = t.get("label") == "gpt"
+    # the free room only on GPT, the one table "next to" goes on: an MBR table (an older office PC's) has no first and
+    # last usable sector in sfdisk's answer, gaps() failed on it and the whole disk list with it (Reddit, 2026-11-01)
+    out = {"gpt": gpt, "esp": any(p["type"].lower() == ESP for p in t.get("partitions", [])),
+           "free": max([(b - a + 1) * t["sectorsize"] for a, b in gaps(t)] or [0]) if gpt else 0}
     # the partitions tacit-install checks: Windows data (Recovery and OEM are NTFS too)
     data = {p["node"].rsplit("/", 1)[-1] for p in t["partitions"] if p["type"].lower() == WINDOWS_DATA}
     ntfs = [p for p in parts if p.get("fstype") == "ntfs" and p["name"] in data]
@@ -183,9 +186,25 @@ def all_disks():
     # the stick itself, however it is attached (a card reader, a VM's disk): the disk under the live system's boot files
     src = run("findmnt", "-nro", "SOURCE", "/run/archiso/bootmnt").strip()
     stick = run("lsblk", "-nrso", "NAME", src).split()[-1:] if src else []
-    return [describe(b) for b in d.get("blockdevices", [])
+    return [described(b) for b in d.get("blockdevices", [])
             if b.get("type") == "disk" and not b.get("rm") and b.get("tran") != "usb" and not b["name"].startswith(("zram", "loop")) and not re.fullmatch(r"mmcblk\d+(boot\d+|rpmb)", b["name"])
             and b["name"] not in stick]
+
+def described(b):
+    """describe(), and a disk it cannot read is still offered, as one whose contents Setup does not know (erasing it is
+    still possible): one unreadable disk took the whole list down, and Setup said there was no disk at all. What failed
+    goes to /tmp/tacit-setup-disks.log."""
+    try:
+        return describe(b)
+    except Exception:
+        import traceback
+        try:
+            with open("/tmp/tacit-setup-disks.log", "a") as f:
+                f.write(f"{b.get('name')}: " + traceback.format_exc() + "\n")
+        except OSError:
+            pass
+        return {"name": "/dev/" + b["name"], "model": (b.get("model") or "").strip() or "this disk", "size": b.get("size") or 0,
+                "case": "other"}
 
 def disks():
     """The disk Tacit would go on: the one picked, else an empty one (nothing to lose), else the biggest. It was always
