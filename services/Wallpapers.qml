@@ -120,52 +120,6 @@ Singleton {
         const f = Config.options.background.wallpaperFocus?.[FileUtils.trimFileProtocol(String(path ?? ""))];
         return f && f.length === 2 ? Qt.point(f[0], f[1]) : Qt.point(0.5, 0.5);
     }
-    // A picture's own size in pixels, read from its header (Pillow is a dependency) once per picture
-    // and kept: Qt never scales a decode up, so the desktop takes a picture smaller than the screen
-    // from its own pixels (WallpaperImage). -1 while it is being read, 0 when it cannot be read.
-    property var sizes: ({})
-    property var sizeQueue: []
-    function sizeFor(path) {
-        const key = FileUtils.trimFileProtocol(String(path ?? ""));
-        if (key === "") return Qt.size(0, 0);
-        const s = root.sizes[key];
-        if (s === undefined) {
-            Qt.callLater(root.askSize, key);
-            return Qt.size(-1, -1);
-        }
-        return Qt.size(s[0], s[1]);
-    }
-    function askSize(key) {
-        if (root.sizes[key] !== undefined || root.sizeQueue.includes(key) || sizeProc.asking === key) return;
-        root.sizeQueue.push(key);
-        sizeProc.next();
-    }
-    Process {
-        id: sizeProc
-        property string asking: ""
-        function next() {
-            if (sizeProc.running || root.sizeQueue.length === 0) return;
-            sizeProc.asking = root.sizeQueue.shift();
-            // the path is an argument, never part of the script
-            sizeProc.exec(["python3", "-c",
-                "import sys\nfrom PIL import Image\ntry:\n    print(*Image.open(sys.argv[1]).size)\nexcept Exception:\n    print(0, 0)",
-                sizeProc.asking]);
-        }
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const n = text.trim().split(/\s+/).map(Number);
-                const size = n.length === 2 && n.every(v => v >= 0) ? n : [0, 0];
-                root.sizes = Object.assign({}, root.sizes, { [sizeProc.asking]: size });
-            }
-        }
-        onExited: {
-            if (root.sizes[sizeProc.asking] === undefined)
-                root.sizes = Object.assign({}, root.sizes, { [sizeProc.asking]: [0, 0] });
-            sizeProc.asking = "";
-            sizeProc.next();
-        }
-    }
-
     function setFocus(path, x, y) {
         const key = FileUtils.trimFileProtocol(String(path));
         const next = Object.assign({}, Config.options.background.wallpaperFocus ?? {});
@@ -432,11 +386,6 @@ Singleton {
         // mpv takes its options when it starts: the player is started again, which is also the only
         // way to take the filter off.
         function onShowBlurChanged() {
-            if (!root.isVideo(Config.options.background.wallpaperPath)) return;
-            Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--video"]);
-        }
-        // the fit reaches a video the same way: mpv's own scaling options, taken when it starts
-        function onWallpaperFitChanged() {
             if (!root.isVideo(Config.options.background.wallpaperPath)) return;
             Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--video"]);
         }

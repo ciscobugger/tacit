@@ -497,8 +497,6 @@ Singleton {
                 property string wallpaperPath: ""
                 // which part of a picture the desktop shows, per picture: { "/path.jpg": [x, y] }, 0..1 (0.5 = the middle)
                 property var wallpaperFocus: ({})
-                // how a picture of another shape meets the screen: "fill" covers it (cut at the focus above), "fit" shows it whole, "stretch" pulls it to the screen
-                property string wallpaperFit: "fill"
                 property bool centeredWallpaper: false
                 property string centeredWallpaperShape: "Cookie7Sided"
                 property int centeredWallpaperSize: 400
