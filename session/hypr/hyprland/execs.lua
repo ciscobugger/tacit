@@ -43,7 +43,9 @@ hl.on("hyprland.start", function ()
     -- Documents, Pictures, Downloads, Music, Videos in the person's language, made if missing: xdg-user-dirs.service
     -- waits on graphical-session-pre.target, which this session never starts, so a new account had none of them
     hl.exec_cmd("xdg-user-dirs-update")
-    hl.exec_cmd("/usr/bin/kdeconnectd") -- phone bridge, daemon only; the shell shows its notifications
+    -- phone bridge, daemon only; the shell shows its notifications. kdeconnect is not a dependency (Tacit runs without
+    -- a phone), so only start it when it is installed: an unguarded exec is a failed command at every login.
+    hl.exec_cmd("bash -c 'command -v kdeconnectd >/dev/null && exec kdeconnectd'")
     hl.exec_cmd("dbus-update-activation-environment --all")
     -- Hyprland is not started by a systemd session generator, so nothing ever reaches
     -- graphical-session.target, which refuses a manual start. Three of this desktop's own
