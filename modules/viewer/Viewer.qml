@@ -130,11 +130,7 @@ Item {
     // the framed file's width over height; set by handlers, so the layout does not read what its own frames report
     property real pdfAspect: 0.707
     property bool pdfMulti: false
-    onPdfPagesChanged: {
-        Qt.callLater(() => pdfMulti = pdfPages > 1)   // after the reader that reports it has finished laying out
-        // a reopen goes back to its page once the reader reports its pages
-        if (resumePage >= 0 && pdfPages > 0) Qt.callLater(() => { if (reader && resumePage >= 0) { reader.goTo(resumePage, false); resumePage = -1; } })
-    }
+    onPdfPagesChanged: Qt.callLater(() => pdfMulti = pdfPages > 1)   // after the reader that reports it has finished laying out
     function syncAspect() { if (landed >= 0) pdfAspect = aspectOf(landed); }
     onAspectVerChanged: syncAspect()
     onLandedChanged: syncAspect()
@@ -477,6 +473,7 @@ Item {
         resumeMs = r.ms;      // the player takes it once the file has loaded
         resumePage = r.page;  // the reader takes it once it reports its pages
     }
+    onPdfPagesChanged: if (resumePage >= 0 && pdfPages > 0) Qt.callLater(() => { if (reader && resumePage >= 0) { reader.goTo(resumePage, false); resumePage = -1; } })
     function seekTo(f) { player.position = Math.max(0, Math.min(1, f)) * duration; showChrome(); }
     function seekBy(ms) { player.position = Math.max(0, Math.min(duration, player.position + ms)); toast(Info.clock(player.position)); }
     function setVolume(x) { volume = Math.max(0, Math.min(1, x)); muted = false; toast("Volume " + Math.round(volume * 100)); }
