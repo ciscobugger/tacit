@@ -122,11 +122,29 @@ hl.config({ decoration = { blur = { noise = 0.015 } } })     -- minimal grain, n
 local POINTER_CURVE = "custom 0.5 0 0.341 0.786 1.355 2.056 2.899 3.889 5.033 6.334 7.798 9.428 11.228 13.2"
 if hl.get_devices then
     local curved = {}
+    -- the pointers' profiles (Settings > Touchpad and > Mouse), written by the shell's generator:
+    -- ["name"] = { accel = "...", speed = 0.5 }, the device's accel_profile as it was written
+    local function profileOverrides()
+        local file = loadfile(HOME .. "/.config/hypr/hyprland/shellOverrides/devices.lua")
+        if not file then return nil end
+        local ok, t = pcall(file)
+        if ok and type(t) == "table" then return t end
+        return nil
+    end
     local function curvePointers()
+        local on = profileOverrides()
         for _, d in ipairs(hl.get_devices()) do
             if d.type == "pointer" and d.name and not curved[d.name] then
                 curved[d.name] = true
-                hl.device({ name = d.name, accel_profile = POINTER_CURVE })
+                local o = on and on[d.name]
+                if o and type(o.accel) == "string" then
+                    local a = { name = d.name, accel_profile = o.accel }
+                    -- flat and adaptive read the device's sensitivity; a curve carries its own
+                    if type(o.speed) == "number" then a.sensitivity = o.speed end
+                    hl.device(a)
+                else
+                    hl.device({ name = d.name, accel_profile = POINTER_CURVE })
+                end
             end
         end
     end
