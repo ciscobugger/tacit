@@ -56,6 +56,7 @@ ApplicationWindow {
         property var power: ({ ac: true })
         property string scenario: ""
         property bool ready: false
+        property bool disksRead: false      // the disks come in their own answer, once read (it can take a minute)
         property bool practice: true        // false on Tacit's live system: the install is real
         function send(o) { proc.write(JSON.stringify(o) + "\n"); }
     }
@@ -71,14 +72,14 @@ ApplicationWindow {
         try { m = JSON.parse(line); } catch (e) { return; }
         if (m.ev === "hello") {
             backend.languages = m.languages; backend.layouts = m.layouts; backend.wifi = m.wifi; backend.wired = m.wired === true;
-            backend.disk = m.disk; backend.plan = m.plan; backend.power = m.power; backend.scenario = m.scenario;
-            backend.disks = m.disks ?? [];
+            backend.power = m.power; backend.scenario = m.scenario;
             backend.practice = m.practice !== false;
             backend.ready = true;
             if (setup.language === "") { setup.language = m.languages[0].code; setup.layout = m.languages[0].layout; }
             const here = m.wifi.find(w => w.inUse);
             if (here) setup.network = here.ssid;
-        } else if (m.ev === "wifi") { backend.wifi = m.wifi; backend.wired = m.wired === true; }
+        } else if (m.ev === "disks") { backend.disk = m.disk; backend.plan = m.plan; backend.disks = m.disks ?? []; backend.disksRead = true; }
+        else if (m.ev === "wifi") { backend.wifi = m.wifi; backend.wired = m.wired === true; }
         else if (m.ev === "disk") { backend.disk = m.disk; backend.plan = m.plan; setup.place = "next"; }
         else if (m.ev === "power") backend.power = m.power;
         else if (m.ev === "join") {
@@ -316,12 +317,15 @@ ApplicationWindow {
                 Item {
                     visible: root.shownPage === "where"
                     anchors.fill: parent
-                    readonly property string c: backend.disk.case ?? "none"
+                    // "looking" until the disks have been read: it said "no disk" while they were still being read
+                    readonly property string c: backend.disksRead ? (backend.disk.case ?? "none") : "looking"
                     readonly property bool room: backend.plan?.room ?? false
                     readonly property bool locked: c === "bitlocker" || c === "asleep"
                     readonly property string size: `${Math.round((backend.disk.size ?? 0) / 1e9)} GB`
                     Headline {
-                        text: parent.c === "bitlocker" ? "Windows is locked."
+                        text: parent.c === "looking" ? "Looking at the disks…"
+                            : parent.c === "choose" ? "Which disk should Tacit go on?"
+                            : parent.c === "bitlocker" ? "Windows is locked."
                             : parent.c === "asleep" && backend.disk.why === "check" ? "Windows has a disk check waiting."
                             : parent.c === "asleep" && backend.disk.why === "other" ? "Tacit can't read the Windows disk yet."
                             : parent.c === "asleep" ? "Windows didn't shut down fully."
@@ -331,7 +335,9 @@ ApplicationWindow {
                             : "Where should Tacit go?"
                     }
                     Sentence {
-                        text: parent.c === "bitlocker" ? "This disk is locked with BitLocker, so Tacit can't make room next to Windows. Start Windows, turn BitLocker off in Settings, then start from this USB stick again."
+                        text: parent.c === "looking" ? "Tacit is reading what is on each disk inside this computer. With several drives this can take a minute. Nothing on them is changed."
+                            : parent.c === "choose" ? "This computer has more than one disk with files on it. Choose the one for Tacit. The others stay as they are."
+                            : parent.c === "bitlocker" ? "This disk is locked with BitLocker, so Tacit can't make room next to Windows. Start Windows, turn BitLocker off in Settings, then start from this USB stick again."
                             : parent.c === "asleep" && backend.disk.why === "check" ? "Windows marked its disk to be checked, so Tacit can't make room next to it yet. Start Windows and restart it twice so the check runs, then shut it down and start from this USB stick again."
                             : parent.c === "asleep" && backend.disk.why === "other" ? `Tacit can't make room next to Windows until it can read the disk safely. Start Windows, restart it, shut it down, then start from this USB stick again. The disk said: “${backend.disk.says}”`
                             : parent.c === "asleep" ? "Windows is paused rather than shut down, so Tacit can't make room next to it yet. Start Windows, hold Shift while you choose Shut down, then start from this USB stick again."
@@ -359,7 +365,7 @@ ApplicationWindow {
                         }
                         // one way only (an empty disk) is no choice: the headline says it
                         Choice {
-                            visible: parent.parent.c !== "none" && !parent.parent.locked && parent.parent.c !== "empty"
+                            visible: !["none", "looking", "choose", "empty"].includes(parent.parent.c) && !parent.parent.locked
                             width: Look.px(600)
                             name: parent.parent.c === "windows" ? "Instead of Windows" : parent.parent.c === "empty" ? "Use the whole disk" : "Instead of what is on it"
                             on: setup.place === "instead" || !parent.parent.room
@@ -367,7 +373,7 @@ ApplicationWindow {
                             onPicked: setup.place = "instead"
                         }
                         T {
-                            visible: !(backend.power.ac ?? true) && parent.parent.c !== "none" && !parent.parent.locked
+                            visible: !(backend.power.ac ?? true) && !["none", "looking", "choose"].includes(parent.parent.c) && !parent.parent.locked
                             width: Look.px(600); wrapMode: Text.Wrap
                             horizontalAlignment: parent.parent.c === "empty" ? Text.AlignHCenter : Text.AlignLeft
                             text: "Plug in the charger. Installing takes about 10 minutes."
@@ -376,7 +382,7 @@ ApplicationWindow {
                     }
 
                     // with more than one disk inside: which one, as the first page names the keyboard
-                    Link { visible: backend.disks.length > 1; x: (parent.width - width) / 2; y: Look.px(646); bright: true
+                    Link { visible: backend.disks.length > 1 && parent.c !== "choose"; x: (parent.width - width) / 2; y: Look.px(646); bright: true
                         text: `Disk: ${root.diskName(backend.disk)}  ›`; onClicked: setup.go("disks") }
                 }
 
@@ -596,12 +602,14 @@ ApplicationWindow {
     readonly property string other: backend.disk.case === "windows" ? "Windows" : backend.disk.case === "linux" ? "Linux" : "it"
     readonly property string primaryText: ({
         welcome: "Continue", wifi: "Continue", erase: "Erase and install", you: "Continue", ready: "Restart", failed: "Try again"
-    })[shownPage] ?? (shownPage === "where" ? (["bitlocker", "asleep"].includes(backend.disk.case) ? "Restart into Windows"
+    })[shownPage] ?? (shownPage === "where" ? (!backend.disksRead ? "Continue"
+                                                : backend.disk.case === "choose" ? "Choose a disk"
+                                                : ["bitlocker", "asleep"].includes(backend.disk.case) ? "Restart into Windows"
                                                 : backend.disk.case === "none" ? "Turn off"
                                                 : (backend.plan?.room ?? false) && setup.place === "next" ? (root.other === "it" ? "Install" : `Install next to ${root.other}`)
                                                 : backend.disk.case === "empty" ? "Install" : "Continue") : "Continue")
     readonly property bool primaryLater: shownPage === "you" ? (nameField.text.trim() === "" || passField.text === "" || againField.text !== passField.text)
-                                       : shownPage === "wifi" ? setup.joining : false
+                                       : shownPage === "wifi" ? setup.joining : shownPage === "where" ? !backend.disksRead : false
     function pickLanguage(l) { setup.language = l.code; setup.layout = l.layout; }
     function pickFrom(item) {
         if (shownPage === "languages") { setup.language = item.code; setup.layout = item.layout; }
@@ -631,7 +639,9 @@ ApplicationWindow {
             break;
         }
         case "where": {
+            if (!backend.disksRead) break;      // the disks are still being read
             const c = backend.disk.case ?? "none";
+            if (c === "choose") { setup.go("disks"); break; }
             // "Restart into Windows" and "Turn off" do that on the stick (they only closed Setup there)
             if (c === "bitlocker" || c === "asleep" || c === "none") {
                 if (backend.practice) root.endPractice();
@@ -669,7 +679,7 @@ ApplicationWindow {
     Timer {
         interval: 700
         repeat: true
-        running: root.walk && backend.ready
+        running: root.walk && backend.ready && backend.disksRead
         onTriggered: {
             const steps = [
                 () => root.forward(),                                                        // welcome -> wifi

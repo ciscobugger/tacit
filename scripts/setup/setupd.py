@@ -131,6 +131,11 @@ def layout(name, parts):
     # last usable sector in sfdisk's answer, gaps() failed on it and the whole disk list with it (Reddit, 2026-11-01)
     out = {"gpt": gpt, "esp": any(p["type"].lower() == ESP for p in t.get("partitions", [])),
            "free": max([(b - a + 1) * t["sectorsize"] for a, b in gaps(t)] or [0]) if gpt else 0}
+    # Windows is looked at (how small it can go, whether it shut down fully) only where Tacit could go next to it: a GPT
+    # disk with an EFI partition. A drive of games or files gets the quick look; reading every NTFS volume on it took
+    # most of the time on a PC with several big drives (Discord 2026-11-01)
+    if not (gpt and out["esp"]):
+        return out
     # the partitions tacit-install checks: Windows data (Recovery and OEM are NTFS too)
     data = {p["node"].rsplit("/", 1)[-1] for p in t["partitions"] if p["type"].lower() == WINDOWS_DATA}
     ntfs = [p for p in parts if p.get("fstype") == "ntfs" and p["name"] in data]
@@ -186,9 +191,15 @@ def all_disks():
     # the stick itself, however it is attached (a card reader, a VM's disk): the disk under the live system's boot files
     src = run("findmnt", "-nro", "SOURCE", "/run/archiso/bootmnt").strip()
     stick = run("lsblk", "-nrso", "NAME", src).split()[-1:] if src else []
-    return [described(b) for b in d.get("blockdevices", [])
+    inside = [b for b in d.get("blockdevices", [])
             if b.get("type") == "disk" and not b.get("rm") and b.get("tran") != "usb" and not b["name"].startswith(("zram", "loop")) and not re.fullmatch(r"mmcblk\d+(boot\d+|rpmb)", b["name"])
             and b["name"] not in stick]
+    # each disk read on its own thread: the reads wait on different drives, so the slowest one sets the time, not the sum
+    if len(inside) < 2:
+        return [described(b) for b in inside]
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(inside)) as pool:
+        return list(pool.map(described, inside))
 
 def described(b):
     """describe(), and a disk it cannot read is still offered, as one whose contents Setup does not know (erasing it is
@@ -206,16 +217,25 @@ def described(b):
         return {"name": "/dev/" + b["name"], "model": (b.get("model") or "").strip() or "this disk", "size": b.get("size") or 0,
                 "case": "other"}
 
-def disks():
-    """The disk Tacit would go on: the one picked, else an empty one (nothing to lose), else the biggest. It was always
-    the biggest, with no choice: with Windows on a big disk and an empty one beside it, Tacit went next to Windows or
-    erased it (a Reddit reader, 2026-10-18)."""
-    ds = all_disks()
+def disks(ds=None):
+    """The disk Tacit would go on: the one picked, else an empty one (nothing to lose), else the only one; with several
+    disks that hold something, none until the person chooses ({"case": "choose"}). It was always the biggest, with no
+    choice: with Windows on a big disk and an empty one beside it, Tacit went next to Windows or erased it (a Reddit
+    reader, 2026-10-18)."""
+    ds = all_disks() if ds is None else ds
     if not ds:
         return {"case": "none"}
     picked = next((d for d in ds if d["name"] == chosen["name"]), None)
+    if picked:
+        return picked
     empty = [d for d in ds if d["case"] == "empty" and d["size"] >= MIN_TACIT]
-    return picked or max(empty or ds, key=lambda d: d["size"])
+    if empty:
+        return max(empty, key=lambda d: d["size"])
+    if len(ds) == 1:
+        return ds[0]
+    # several disks with something on them: the person chooses. It was the biggest, which on a PC with a 2 TB game drive
+    # was the game drive (Discord 2026-11-01)
+    return {"case": "choose"}
 
 def describe(best):
     parts = best.get("children", [])
@@ -225,7 +245,9 @@ def describe(best):
         return dict(disk, case="bitlocker")
     # what Windows uses and the free room need root: a practice run says so rather than guess
     room = layout(disk["name"], parts) if parts else {}
-    if "ntfs" in fs:
+    # Windows is a disk Windows starts from (NTFS and an EFI partition); NTFS alone is a drive of files ("Other files"),
+    # which Setup called Windows ("Instead of Windows") on a PC with a game drive
+    if "ntfs" in fs and room.get("esp"):
         return dict(disk, case="asleep", why=room.get("why", "asleep"), says=room.get("says", "")) if room.get("asleep") \
             else dict(disk, case="windows", **{"used": None, **room})
     if any(f in ("ext4", "btrfs", "xfs", "f2fs") for f in fs):
@@ -371,17 +393,35 @@ def send_answers():
         p.stdin.flush()
 
 # ------------------------------------------------------------------ requests
+# Setup asks "hello" every 0.3 s until it is answered, and the first screen needs only the languages, keyboards and
+# Wi-Fi. The disks came in the same answer: reading every disk takes a while on a PC with several big NTFS drives,
+# each ask started another full read, they piled up by the hundred, and for minutes Setup showed no languages and said
+# there was no disk (Discord 2026-11-01, three game drives). Now hello answers at once, the disks follow in their own
+# message ("disks"), and one read runs at a time.
+surveying = threading.Lock()
+zone_asked = threading.Event()
+
+def survey():
+    if not surveying.acquire(blocking=False):
+        return
+    try:
+        many = all_disks()          # every disk read once (it was read twice: once for the disk, once for the list)
+        d = disks(many)
+        # the disk list only where there is a choice to make
+        listed = [dict(x, plan=show(x)) for x in many] if len(many) > 1 else []
+        emit({"ev": "disks", "disks": listed, "disk": d, "plan": show(d)})
+    finally:
+        surveying.release()
+
 def act(req):
     op = req.get("op")
     if op == "hello":
-        if REAL:
+        if REAL and not zone_asked.is_set():
+            zone_asked.set()
             threading.Thread(target=find_zone, daemon=True).start()
-        d = disks()
-        # the disk list only where there is a choice to make
-        many = all_disks()
-        listed = [dict(x, plan=show(x)) for x in many] if len(many) > 1 else []
-        emit({"ev": "hello", "practice": not REAL, "disks": listed, "languages": [{"code": c, "name": n, "layout": k, "rtl": c in RTL} for c, n, k in LANGUAGES],
-              "layouts": layouts(), "wifi": wifi(), "wired": wired(), "disk": d, "plan": show(d), "power": power(), "scenario": SCENARIO})
+        emit({"ev": "hello", "practice": not REAL, "languages": [{"code": c, "name": n, "layout": k, "rtl": c in RTL} for c, n, k in LANGUAGES],
+              "layouts": layouts(), "wifi": wifi(), "wired": wired(), "power": power(), "scenario": SCENARIO})
+        survey()
     elif op == "wifi":
         emit({"ev": "wifi", "wifi": wifi(), "wired": wired()})
     elif op == "disk":
