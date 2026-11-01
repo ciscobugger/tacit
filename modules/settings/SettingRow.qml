@@ -47,19 +47,20 @@ Item {
     Keys.onReturnPressed: if (row.clickable) row.activated()
     Keys.onEnterPressed: if (row.clickable) row.activated()
     Keys.onSpacePressed: if (row.clickable) row.activated()
-    // An inset wash on hover, a deeper one on press, inside the group's surface
+    // hover and press read as a 1 px outline, never as a fill change (design §7.8); the keyboard
+    // focus ring below is the outline for focus
+    // (the chosen row is told by its check and the label's weight, not a bar)
     Rectangle {
         anchors.fill: parent
         anchors.leftMargin: 4
         anchors.rightMargin: 4
         anchors.topMargin: 1
         anchors.bottomMargin: 1
-        radius: 10
+        radius: 6
         // (the chosen row is told by its check and the label's weight, not a bar)
-        color: ColorUtils.transparentize(Appearance.m3colors.m3onSurface,
-            row.clickable && area.pressed && row.enabled ? 0.88
-            : row.clickable && area.containsMouse && row.enabled ? 0.95 : 1)
-        Behavior on color { enabled: !area.pressed; ColorAnimation { duration: 110 } }
+        color: "transparent"
+        border.width: row.clickable && row.enabled && (area.containsMouse || area.pressed) ? 1 : 0
+        border.color: ColorUtils.transparentize(Appearance.colors.colPrimary, area.pressed ? 0.45 : 0.65)
     }
     // keyboard focus: a soft 2 px ring of the accent around the same inset
     Rectangle {
