@@ -74,11 +74,13 @@ Scope {
                 color: "transparent"
 
                 // Window-aware means honest: the reserve is exactly the resting header (34px)
-                // plus a 4px breath, always. Peeks and the hover strip change width only, and
-                // the clicked sheet OVERLAYS windows like a menu does - so nothing on the
-                // desktop ever reflows because of the notch, and nothing moves under the pointer.
+                // plus a 4px breath, plus the margin the notch is nudged down by, so the
+                // reserve always ends where the notch does. Peeks and the hover strip change
+                // width only, and the clicked sheet OVERLAYS windows like a menu does - so
+                // nothing on the desktop ever reflows because of the notch, and nothing moves
+                // under the pointer.
                 exclusionMode: ExclusionMode.Normal
-                exclusiveZone: Config.options.island.reservedHeight
+                exclusiveZone: Config.options.island.reservedHeight + Config.options.island.topMargin
 
                 // Top-anchored only (the compositor centres it), at a FIXED size that never
                 // changes: 860 x 540 since the browser's address sheet (820 wide with its shadow,
