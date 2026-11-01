@@ -128,6 +128,15 @@ Variants {
 
         property HyprlandMonitor monitor: Hyprland.monitorFor(modelData)
 
+        // The panel's own pixels: its logical size at the scale the compositor gives it. Qt's
+        // devicePixelRatio is not that number - at 125% it says 2 - and the picture, decoded at that
+        // size, came out at 62.5% of the panel in its top-left corner over the boot still (2026-11-01,
+        // at 125, 150 and 175%; 100 and 200% were right).
+        readonly property size panelPixels: {
+            const scale = WM.monitorGeometry(bgRoot.screen).scale;
+            return Qt.size(Math.round(bgRoot.screen.width * scale), Math.round(bgRoot.screen.height * scale));
+        }
+
         property string effectiveWallpaperPath: {
             if (GlobalStates.screenLocked && Config.options.background.lockWall !== "")
                 return Config.options.background.lockWall;
@@ -313,7 +322,7 @@ Variants {
                 layer.enabled: true
                 opacity: 1
                 visible: false
-                view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
+                view: bgRoot.panelPixels
             }
 
             WallpaperImage {
@@ -326,7 +335,7 @@ Variants {
                 layer.enabled: blurLoader.active
                 visible: !blurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
-                view: Qt.size(bgRoot.screen.width * bgRoot.screen.devicePixelRatio, bgRoot.screen.height * bgRoot.screen.devicePixelRatio)
+                view: bgRoot.panelPixels
                 onStatusChanged: {
                     if (status === Image.Ready && bgRoot.transitionProgress === 0.0) {
                         transitionAnim.restart()
