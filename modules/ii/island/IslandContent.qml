@@ -551,6 +551,9 @@ Item {
     HoverHandler {
         id: islandHover
         onHoveredChanged: {
+            // a recording widens the notch for its Stop only while the hand is on it, so at rest the time keeps the
+            // middle (IslandController.centreWidth)
+            IslandController.notchHovered = islandHover.hovered;
             if (islandHover.hovered) {
                 leaveTimer.stop();
                 if (root.pinnedUntilVisit) {
