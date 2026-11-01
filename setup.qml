@@ -57,6 +57,8 @@ ApplicationWindow {
         property string scenario: ""
         property bool ready: false
         property bool disksRead: false      // the disks come in their own answer, once read (it can take a minute)
+        property var parts: []              // every partition inside, for "Choose partitions myself"
+        property bool editing: false        // the partition editor is open
         property bool practice: true        // false on Tacit's live system: the install is real
         function send(o) { proc.write(JSON.stringify(o) + "\n"); }
     }
@@ -78,7 +80,8 @@ ApplicationWindow {
             if (setup.language === "") { setup.language = m.languages[0].code; setup.layout = m.languages[0].layout; }
             const here = m.wifi.find(w => w.inUse);
             if (here) setup.network = here.ssid;
-        } else if (m.ev === "disks") { backend.disk = m.disk; backend.plan = m.plan; backend.disks = m.disks ?? []; backend.disksRead = true; }
+        } else if (m.ev === "disks") { backend.disk = m.disk; backend.plan = m.plan; backend.disks = m.disks ?? []; backend.parts = m.parts ?? []; backend.disksRead = true; root.keepParts(); }
+        else if (m.ev === "editorClosed") backend.editing = false;
         else if (m.ev === "wifi") { backend.wifi = m.wifi; backend.wired = m.wired === true; }
         else if (m.ev === "disk") { backend.disk = m.disk; backend.plan = m.plan; setup.place = "next"; }
         else if (m.ev === "power") backend.power = m.power;
@@ -113,7 +116,11 @@ ApplicationWindow {
         property string joined: ""
         property bool joining: false
         property string joinError: ""
-        property string place: "next"          // next | instead
+        property string place: "next"          // next | instead | manual
+        // "Choose partitions myself": Tacit's partition (erased), the EFI partition (kept), a boot partition (erased) or ""
+        property string partRoot: ""
+        property string partEfi: ""
+        property string partBoot: ""
         property string otherSystem: ""        // Windows on another disk, still chosen with Space (tacit-install)
         property string picture: "dune"
         property bool reports: false
@@ -128,10 +135,15 @@ ApplicationWindow {
             const t = trail.slice(); page = t.pop(); trail = t;
         }
         function startInstall() { backend.send({ op: "install", place: place }); installState = "running"; trail = []; go("you"); }
+        function startManual() {
+            place = "manual";
+            backend.send({ op: "install", place: "manual", root: partRoot, efi: partEfi, boot: partBoot || null });
+            installState = "running"; trail = []; go("you");
+        }
         readonly property var lang: backend.languages.find(l => l.code === language) ?? null
         readonly property var layoutName: (backend.layouts.find(l => l.code === layout) ?? { name: layout }).name
     }
-    readonly property int step: ({ welcome: 1, languages: 1, keyboards: 1, wifi: 2, where: 3, disks: 3, erase: 3, you: 4, privacy: 5, almost: 6, ready: 7, failed: 3 })[setup.page] ?? 1
+    readonly property int step: ({ welcome: 1, languages: 1, keyboards: 1, wifi: 2, where: 3, disks: 3, erase: 3, parts: 3, eraseparts: 3, you: 4, privacy: 5, almost: 6, ready: 7, failed: 3 })[setup.page] ?? 1
 
     // a page switch: the new words come in where the old ones were, rising a little
     property string shownPage: "welcome"
@@ -382,8 +394,16 @@ ApplicationWindow {
                     }
 
                     // with more than one disk inside: which one, as the first page names the keyboard
-                    Link { visible: backend.disks.length > 1 && parent.c !== "choose"; x: (parent.width - width) / 2; y: Look.px(646); bright: true
-                        text: `Disk: ${root.diskName(backend.disk)}  ›`; onClicked: setup.go("disks") }
+                    // with more than one disk inside: which one, as the first page names the keyboard; and for people who set up
+                    // their own partitions, their own way
+                    Row {
+                        x: (parent.width - width) / 2; y: Look.px(646)
+                        spacing: Look.px(40)
+                        visible: backend.disksRead
+                        Link { visible: backend.disks.length > 1 && parent.parent.c !== "choose"; bright: true
+                            text: `Disk: ${root.diskName(backend.disk)}  ›`; onClicked: setup.go("disks") }
+                        Link { visible: backend.parts.length > 0; text: "Choose partitions myself  ›"; onClicked: setup.go("parts") }
+                    }
                 }
 
                 // ── the disks inside, to choose from (Setup took the biggest until 2026-10-18)
@@ -411,6 +431,70 @@ ApplicationWindow {
                                 MouseArea { id: dma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.pickDisk(dr.modelData) }
                             }
                         }
+                    }
+                }
+
+                // ── "Choose partitions myself": for people who set up their own. Tacit's partition is erased, the EFI one is shared,
+                // a boot partition (when the EFI one is small) is erased; the installer checks each again before anything changes
+                Item {
+                    visible: root.shownPage === "parts"
+                    anchors.fill: parent
+                    Headline { text: "Choose partitions." }
+                    Sentence { text: "Tacit is copied onto the partition you choose for it, and that partition is erased. The others stay as they are." }
+                    Flickable {
+                        id: partFlick
+                        x: (parent.width - width) / 2; y: Look.px(345); width: Look.px(720)
+                        height: Math.min(contentHeight, Look.px(328))
+                        contentHeight: partCol.height
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        // more partitions than fit: the bar says there is more below
+                        ScrollBar.vertical: ScrollBar { policy: partFlick.contentHeight > partFlick.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
+                        Column {
+                            id: partCol
+                            width: parent.width
+                            spacing: Look.px(4)
+                            PartHead { text: "Tacit goes on (erased)" }
+                            Repeater {
+                                model: backend.parts.filter(p => !p.esp && p.size >= 32e9 && p.name !== setup.partBoot)
+                                delegate: PartRow { required property var modelData; part: modelData; on: setup.partRoot === modelData.name; onPicked: root.pickRoot(modelData) }
+                            }
+                            PartNone { visible: !backend.parts.some(p => !p.esp && p.size >= 32e9); text: "No partition of 32 GB or more. Make one with the partition editor below." }
+                            PartHead { text: "EFI partition (kept)" }
+                            Repeater {
+                                model: backend.parts.filter(p => p.esp)
+                                delegate: PartRow { required property var modelData; part: modelData; on: setup.partEfi === modelData.name; onPicked: setup.partEfi = modelData.name }
+                            }
+                            PartNone { visible: !backend.parts.some(p => p.esp); text: "No EFI partition. Make one of 300 MB or more (FAT32, the esp flag) with the partition editor." }
+                            // Tacit's start-up files need about 250 MB on the EFI partition: a smaller one needs a boot partition too
+                            PartHead { visible: root.efiSmall; text: "Boot partition (erased)" }
+                            PartNone { visible: root.efiSmall; text: "This EFI partition is small, so Tacit's start-up files need a partition of their own, 500 MB or more, on the same disk."
+                                + (root.bootChoices.length ? "" : " Make one with the partition editor below.") }
+                            Repeater {
+                                model: root.efiSmall ? root.bootChoices : []
+                                delegate: PartRow { required property var modelData; part: modelData; on: setup.partBoot === modelData.name; onPicked: setup.partBoot = modelData.name }
+                            }
+                        }
+                    }
+                    Link { x: (parent.width - width) / 2; y: Look.px(680); bright: true
+                        text: backend.editing ? "The partition editor is open…" : "Make or resize partitions  ›"
+                        onClicked: if (!backend.editing) { backend.editing = true; backend.send({ op: "editor" }); } }
+                }
+
+                // ── the partitions, said once more
+                Item {
+                    visible: root.shownPage === "eraseparts"
+                    anchors.fill: parent
+                    readonly property var rootPart: backend.parts.find(p => p.name === setup.partRoot) ?? ({})
+                    readonly property var bootPart: backend.parts.find(p => p.name === setup.partBoot) ?? null
+                    Headline { text: "Erase this partition?" }
+                    Sentence { text: `Everything on ${root.partName(parent.rootPart)} will be erased. This can't be undone. The other partitions stay as they are.` }
+                    Column {
+                        x: (parent.width - width) / 2; y: Look.px(360); width: Look.px(640); spacing: Look.px(10)
+                        T { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Look.fs(19); color: Look.main
+                            text: `Tacit: ${root.partName(parent.parent.rootPart)}, ${root.partHolds(parent.parent.rootPart)}` }
+                        T { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Look.fs(17); color: Look.sec
+                            text: `Start-up: ${setup.partEfi.replace("/dev/", "")}, kept` + (parent.parent.bootPart ? ` · boot files: ${root.partName(parent.parent.bootPart)}, erased` : "") }
                     }
                 }
 
@@ -506,7 +590,7 @@ ApplicationWindow {
                 // on the stick's first screen: Tacit as it is, without installing it (Discord 2026-10-24: people did not
                 // know they could, and Setup covered the desktop)
                 readonly property bool tryFirst: root.shownPage === "welcome" && !backend.practice && !root.windowed
-                visible: tryFirst || ["wifi", "where", "erase"].includes(root.shownPage)
+                visible: tryFirst || ["wifi", "where", "erase", "parts", "eraseparts"].includes(root.shownPage)
                 x: primary.x - width - Look.px(18); y: Look.px(724)
                 text: tryFirst ? "Try Tacit first" : root.shownPage === "wifi" ? "Not now" : "Back"
                 onClicked: tryFirst ? root.tryTacitFirst() : root.shownPage === "wifi" ? setup.go("where") : setup.back()
@@ -576,6 +660,54 @@ ApplicationWindow {
         horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; lineHeight: 1.3
         color: Look.sec
     }
+    function partName(p) {
+        if (!p || !p.name) return "";
+        const sz = (p.size ?? 0) >= 1e9 ? `${Math.round(p.size / 1e9)} GB` : `${Math.round((p.size ?? 0) / 1e6)} MB`;
+        return `${p.name.replace("/dev/", "")} · ${sz}`;
+    }
+    readonly property bool efiSmall: (backend.parts.find(p => p.name === setup.partEfi)?.size ?? 1e12) < 3e8
+    function partHolds(p) {
+        if (!p || !p.name) return "";
+        const f = ({ ntfs: "NTFS", vfat: "FAT", ext4: "ext4", btrfs: "Btrfs", xfs: "XFS", BitLocker: "BitLocker", swap: "swap" })[p.fstype] ?? (p.fstype || "empty");
+        return p.label ? `${f}, ${p.label}` : f;
+    }
+    function pickRoot(p) {
+        setup.partRoot = p.name;
+        // the EFI partition on the same disk, when there is one and none was chosen on that disk
+        const same = backend.parts.find(e => e.esp && e.disk === p.disk);
+        if (same && (setup.partEfi === "" || backend.parts.find(e => e.name === setup.partEfi)?.disk !== p.disk)) setup.partEfi = same.name;
+    }
+    // what was chosen goes when the editor took it away
+    function keepParts() {
+        const has = n => backend.parts.some(p => p.name === n);
+        if (setup.partRoot && !has(setup.partRoot)) setup.partRoot = "";
+        if (setup.partEfi && !has(setup.partEfi)) setup.partEfi = "";
+        if (setup.partBoot && !has(setup.partBoot)) setup.partBoot = "";
+        if (setup.partEfi === "") setup.partEfi = backend.parts.find(p => p.esp)?.name ?? "";
+    }
+    onEfiSmallChanged: if (!efiSmall) setup.partBoot = ""
+    // the start-up loader finds a boot partition only on the disk it started from, the EFI partition's
+    readonly property string efiDisk: backend.parts.find(p => p.name === setup.partEfi)?.disk ?? ""
+    readonly property var bootChoices: backend.parts.filter(p => !p.esp && p.disk === efiDisk && p.size >= 5e8 && p.size < 32e9 && p.name !== setup.partRoot)
+    onEfiDiskChanged: if (setup.partBoot && backend.parts.find(p => p.name === setup.partBoot)?.disk !== efiDisk) setup.partBoot = ""
+    component PartHead: T { width: Look.px(720); topPadding: Look.px(10); bottomPadding: Look.px(2); font.pixelSize: Look.fs(15); color: Look.meta }
+    component PartNone: T { width: Look.px(720); leftPadding: Look.px(44); wrapMode: Text.Wrap; font.pixelSize: Look.fs(16); color: Look.sec }
+    component PartRow: Item {
+        id: pr
+        property var part
+        property bool on: false
+        signal picked()
+        width: Look.px(720); height: Look.px(40)
+        activeFocusOnTab: true
+        Keys.onReturnPressed: pr.picked()
+        Rectangle { visible: pr.on; anchors.verticalCenter: parent.verticalCenter; x: Look.px(6); width: Look.px(10); height: width; radius: width / 2; color: Look.light }
+        T { x: Look.px(44); anchors.verticalCenter: parent.verticalCenter; font.pixelSize: Look.fs(19)
+            text: pr.part.name ? `${pr.part.model ?? ""}  ${root.partName(pr.part)}` : (pr.part.label ?? "")
+            font.weight: pr.on || pr.activeFocus ? Font.Medium : Font.Normal; color: pr.on || pr.activeFocus || pma.containsMouse ? Look.main : Look.meta }
+        T { anchors.right: parent.right; anchors.rightMargin: Look.px(20); anchors.verticalCenter: parent.verticalCenter
+            text: pr.part.name ? root.partHolds(pr.part) : "The EFI partition holds the start-up files"; font.pixelSize: Look.fs(16); color: Look.sec }
+        MouseArea { id: pma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: pr.picked() }
+    }
     component Link: Item {
         id: lk
         property string text
@@ -601,7 +733,7 @@ ApplicationWindow {
     // the system Tacit goes next to
     readonly property string other: backend.disk.case === "windows" ? "Windows" : backend.disk.case === "linux" ? "Linux" : "it"
     readonly property string primaryText: ({
-        welcome: "Continue", wifi: "Continue", erase: "Erase and install", you: "Continue", ready: "Restart", failed: "Try again"
+        welcome: "Continue", wifi: "Continue", erase: "Erase and install", parts: "Continue", eraseparts: "Erase and install", you: "Continue", ready: "Restart", failed: "Try again"
     })[shownPage] ?? (shownPage === "where" ? (!backend.disksRead ? "Continue"
                                                 : backend.disk.case === "choose" ? "Choose a disk"
                                                 : ["bitlocker", "asleep"].includes(backend.disk.case) ? "Restart into Windows"
@@ -609,7 +741,8 @@ ApplicationWindow {
                                                 : (backend.plan?.room ?? false) && setup.place === "next" ? (root.other === "it" ? "Install" : `Install next to ${root.other}`)
                                                 : backend.disk.case === "empty" ? "Install" : "Continue") : "Continue")
     readonly property bool primaryLater: shownPage === "you" ? (nameField.text.trim() === "" || passField.text === "" || againField.text !== passField.text)
-                                       : shownPage === "wifi" ? setup.joining : shownPage === "where" ? !backend.disksRead : false
+                                       : shownPage === "wifi" ? setup.joining : shownPage === "where" ? !backend.disksRead
+                                       : shownPage === "parts" ? (setup.partRoot === "" || setup.partEfi === "" || backend.editing || (root.efiSmall && setup.partBoot === "")) : false
     function pickLanguage(l) { setup.language = l.code; setup.layout = l.layout; }
     function pickFrom(item) {
         if (shownPage === "languages") { setup.language = item.code; setup.layout = item.layout; }
@@ -654,6 +787,8 @@ ApplicationWindow {
             break;
         }
         case "erase": setup.startInstall(); break;
+        case "parts": if (!root.primaryLater) setup.go("eraseparts"); break;
+        case "eraseparts": setup.startManual(); break;
         case "you": if (!root.primaryLater) setup.go("privacy"); break;
         case "ready": if (backend.practice) root.endPractice(); else backend.send({ op: "restart" }); break;
         case "failed": setup.installState = ""; setup.trail = []; setup.page = "where"; break;

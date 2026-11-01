@@ -12,7 +12,7 @@
 #                     check|unread                          Windows with a disk check waiting, or a partition not read
 # TACIT_SETUP_FAIL=1                                       the practice install stops at 60 %
 # TACIT_SETUP_SECONDS=90                                    how long the practice install takes
-import json, os, re, select, subprocess, sys, threading, time
+import json, os, re, select, shutil, subprocess, sys, threading, time
 
 SCENARIO = os.environ.get("TACIT_SETUP_SCENARIO", "")
 # the real install only on Tacit's live system, never with a made-up disk
@@ -185,7 +185,7 @@ def all_disks():
     if SCENARIO:
         return fake_disks(SCENARIO)
     try:
-        d = json.loads(run("lsblk", "-J", "-b", "-o", "NAME,SIZE,TYPE,FSTYPE,LABEL,MODEL,TRAN,RM,MOUNTPOINTS"))
+        d = json.loads(run("lsblk", "-J", "-b", "-o", "NAME,SIZE,TYPE,FSTYPE,LABEL,MODEL,TRAN,RM,MOUNTPOINTS,PARTTYPE,PARTLABEL"))
     except ValueError:
         return []
     # the stick itself, however it is attached (a card reader, a VM's disk): the disk under the live system's boot files
@@ -201,12 +201,18 @@ def all_disks():
     with ThreadPoolExecutor(max_workers=len(inside)) as pool:
         return list(pool.map(described, inside))
 
+def parts_of(b):
+    """A disk's partitions for "Choose partitions myself": name, size, what is on it, its label, whether it is an EFI one."""
+    return [{"name": "/dev/" + p["name"], "size": p.get("size") or 0, "fstype": p.get("fstype") or "",
+             "label": p.get("label") or p.get("partlabel") or "", "esp": (p.get("parttype") or "").lower() == ESP}
+            for p in b.get("children") or [] if p.get("type") == "part"]
+
 def described(b):
     """describe(), and a disk it cannot read is still offered, as one whose contents Setup does not know (erasing it is
     still possible): one unreadable disk took the whole list down, and Setup said there was no disk at all. What failed
     goes to /tmp/tacit-setup-disks.log."""
     try:
-        return describe(b)
+        return dict(describe(b), parts=parts_of(b))
     except Exception:
         import traceback
         try:
@@ -215,7 +221,7 @@ def described(b):
         except OSError:
             pass
         return {"name": "/dev/" + b["name"], "model": (b.get("model") or "").strip() or "this disk", "size": b.get("size") or 0,
-                "case": "other"}
+                "case": "other", "parts": parts_of(b)}
 
 def disks(ds=None):
     """The disk Tacit would go on: the one picked, else an empty one (nothing to lose), else the only one; with several
@@ -258,10 +264,20 @@ def fake_disks(case):
     if case == "two":
         return [dict(fake_disk("windows"), name="/dev/sda", model="Seagate Barracuda", size=1000 * GB, winSize=998 * GB),
                 fake_disk("empty")]
+    if case == "games":     # a PC like the one in Discord 2026-11-01: Windows, and two drives of games
+        return [fake_disk("windows"),
+                dict(fake_disk("other"), name="/dev/sda", model="WD Games", size=2000 * GB, esp=False,
+                     parts=[{"name": "/dev/sda1", "size": 2000 * GB, "fstype": "ntfs", "label": "Games", "esp": False}]),
+                dict(fake_disk("other"), name="/dev/sdb", model="Seagate", size=1000 * GB, esp=False,
+                     parts=[{"name": "/dev/sdb1", "size": 600 * GB, "fstype": "ntfs", "label": "Other games", "esp": False},
+                            {"name": "/dev/sdb2", "size": 400 * GB, "fstype": "", "label": "", "esp": False}])]
     return [fake_disk(case)]
 
 def fake_disk(case):
-    disk = {"name": "/dev/nvme0n1", "model": "Samsung SSD", "size": 512 * GB, "fake": True, "gpt": True, "esp": True, "free": 0}
+    disk = {"name": "/dev/nvme0n1", "model": "Samsung SSD", "size": 512 * GB, "fake": True, "gpt": True, "esp": True, "free": 0,
+            "parts": [{"name": "/dev/nvme0n1p1", "size": 100 * 1000 ** 2, "fstype": "vfat", "label": "", "esp": True},
+                      {"name": "/dev/nvme0n1p2", "size": 16 * 1000 ** 2, "fstype": "", "label": "", "esp": False},
+                      {"name": "/dev/nvme0n1p3", "size": 510 * GB, "fstype": "ntfs", "label": "Windows", "esp": False}]}
     if case == "windows":
         return dict(disk, case="windows", used=140 * GB, winSize=510 * GB)
     if case == "full":
@@ -355,13 +371,13 @@ def practice_install():
     install["running"] = False
 
 # ------------------------------------------------------------------ the real install (tacit-install as root)
-def real_install(disk, place, keep):
+def real_install(disk, place, keep, manual=None):
     install["running"] = True
     t0 = time.time()
     p = subprocess.Popen(["sudo", "-n", "python3", "-I", INSTALLER], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=open("/tmp/tacit-install.log", "w"), text=True)   # what it says on the way, for a failure
     install["proc"] = p
-    p.stdin.write(json.dumps({"disk": disk, "place": place, "keep": keep}) + "\n")
+    p.stdin.write(json.dumps(dict({"disk": disk, "place": place, "keep": keep}, **(manual or {}))) + "\n")
     p.stdin.flush()
     ended = False
     for line in p.stdout:
@@ -409,7 +425,9 @@ def survey():
         d = disks(many)
         # the disk list only where there is a choice to make
         listed = [dict(x, plan=show(x)) for x in many] if len(many) > 1 else []
-        emit({"ev": "disks", "disks": listed, "disk": d, "plan": show(d)})
+        # every partition on every disk inside, for "Choose partitions myself" (with one disk too)
+        parts = [dict(p, disk=x["name"], model=x["model"]) for x in many for p in x.get("parts", [])]
+        emit({"ev": "disks", "disks": listed, "disk": d, "plan": show(d), "parts": parts})
     finally:
         surveying.release()
 
@@ -454,7 +472,11 @@ def act(req):
             # a retry's new installer has had no answers: the person answers again after this request, and only those go
             install.pop("answers", None)
             install["sent"] = False
-            if REAL:
+            if REAL and req.get("place") == "manual":
+                # the partitions the person chose: tacit-install checks each one again before it changes anything
+                manual = {k: req.get(k) for k in ("root", "efi", "boot")}
+                threading.Thread(target=real_install, args=(None, "manual", None, manual), daemon=True).start()
+            elif REAL:
                 d = disks()
                 pl = plan(d)
                 # "next to" is never turned into an erase: without room it stops before anything changes. Room shown
@@ -473,6 +495,15 @@ def act(req):
                 threading.Thread(target=real_install, args=(d.get("name"), place, keep), daemon=True).start()
             else:
                 threading.Thread(target=practice_install, daemon=True).start()
+    elif op == "editor":
+        # the live system's partition editor, for "Choose partitions myself"; when it closes the disks are read again,
+        # so what was made there is offered at once
+        def edit():
+            if REAL and shutil.which("gparted"):
+                subprocess.run(["sudo", "-n", "-E", "gparted"], capture_output=True)
+            emit({"ev": "editorClosed"})
+            survey()
+        threading.Thread(target=edit, daemon=True).start()
     elif op == "answers":
         if REAL:
             install["answers"] = {k: v for k, v in req.items() if k != "op"}

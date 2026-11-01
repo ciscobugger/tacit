@@ -3,6 +3,11 @@
 #   in:  {"disk": "/dev/vda", "place": "instead"}  the disk to erase, once; or
 #        {"disk": ..., "place": "next", "keep": N}  next to what is on it: in its biggest free stretch, or in room made by
 #                                                 shrinking Windows to N bytes (keep: null uses free room only)
+#        {"place": "manual", "root": "/dev/sda3", "efi": "/dev/nvme0n1p1", "boot": null|"/dev/sda2"}  onto partitions the
+#                                                 person chose (Setup's "Choose partitions myself"): root is erased and
+#                                                 becomes Tacit's (ext4); efi, an EFI partition, is shared and never
+#                                                 formatted; boot, optional, is erased and becomes Tacit's start-up files
+#                                                 (FAT, XBOOTLDR) where the EFI partition has too little room for them
 #        {"answers": {name, password, language, layout}}   the person, whenever Setup has them (the install waits for
 #                                                 them only at its last step); the password never reaches a log
 #   out: {"state": "running", "done": 0.42, "step": "copying"}, then {"state": "done"} ("other": "Windows" when Windows on
@@ -110,6 +115,84 @@ def check(disk):
     boot = sh("findmnt", "-nro", "SOURCE", "/run/archiso/bootmnt").strip() if os.path.ismount("/run/archiso/bootmnt") else ""
     if boot and sh("lsblk", "-nrpso", "NAME", boot).split()[-1] == disk:
         raise Refused("that is the stick Tacit runs from")
+
+
+EFI_ROOM = 250 * 1000 ** 2          # a kernel and its initramfs, with room for the next update's
+BOOT_MIN = 500 * 1000 ** 2
+
+
+def lsblk_one(dev):
+    return json.loads(sh("lsblk", "-J", "-b", "-p", "-o", "NAME,TYPE,PKNAME,SIZE,MOUNTPOINTS,PARTTYPE,FSTYPE,PTTYPE", dev))["blockdevices"][0]
+
+
+def set_type(dev, gpt, dos, label):
+    """A chosen partition's type, in its own table's terms: sgdisk would turn an MBR disk into GPT."""
+    info = lsblk_one(dev)
+    number = re.search(r"(\d+)$", dev).group(1)
+    if info.get("pttype") == "gpt":
+        sh("sfdisk", "-q", "--part-type", info["pkname"], number, gpt)
+        sh("sfdisk", "-q", "--part-label", info["pkname"], number, label)
+    else:
+        sh("sfdisk", "-q", "--part-type", info["pkname"], number, dos)
+    sh("partprobe", info["pkname"])
+    sh("udevadm", "settle")
+
+
+def check_manual(root, efi, boot):
+    """Each partition the person chose, before anything changes: a partition (not a disk) on a disk inside this
+    computer, not the stick, nothing mounted; Tacit's at least 32 GB; efi an EFI partition (FAT); boot, when there is
+    one, at least 500 MB; no two the same. Returns the disk of root and the disk of efi."""
+    picked = [d for d in (root, efi, boot) if d]
+    if len(set(picked)) != len(picked):
+        raise Refused("the same partition was chosen twice")
+    disks = {}
+    for dev in picked:
+        if not re.fullmatch(r"/dev/(nvme\d+n\d+p\d+|[sv]d[a-z]+\d+|mmcblk\d+p\d+)", dev or ""):
+            raise Refused(f"not a partition: {dev}")
+        info = lsblk_one(dev)
+        if info["type"] != "part":
+            raise Refused(f"{dev} is not a partition")
+        if any(m for m in (info.get("mountpoints") or []) if m):
+            raise Refused(f"{dev} is in use")
+        disk = info["pkname"]
+        check(disk) if dev == root else check_disk_only(disk)
+        disks[dev] = (disk, info)
+    if disks[root][1]["size"] < MIN_TACIT:
+        raise Refused("the partition for Tacit is smaller than 32 GB")
+    if (disks[efi][1].get("parttype") or "").lower() != ESP:
+        raise Refused(f"{efi} is not an EFI partition")
+    if fstype(efi) != "vfat":
+        raise Refused(f"{efi} is not formatted FAT, as an EFI partition must be")
+    if (disks[root][1].get("parttype") or "").lower() == ESP:
+        raise Refused("the partition for Tacit is an EFI partition")
+    # systemd-boot looks for the boot partition only on the disk it was started from
+    if boot and disks[boot][0] != disks[efi][0]:
+        raise Refused("the boot partition must be on the same disk as the EFI partition")
+    if boot and disks[boot][1]["size"] < BOOT_MIN:
+        raise Refused("the boot partition is smaller than 500 MB")
+    if boot and (disks[boot][1].get("parttype") or "").lower() == ESP:
+        raise Refused("the boot partition is an EFI partition; choose it as the EFI partition instead")
+    return disks[root][0], disks[efi][0]
+
+
+def check_disk_only(disk):
+    """For a disk that only holds the shared EFI partition or the boot partition: not the stick."""
+    boot = sh("findmnt", "-nro", "SOURCE", "/run/archiso/bootmnt").strip() if os.path.ismount("/run/archiso/bootmnt") else ""
+    if boot and sh("lsblk", "-nrpso", "NAME", boot).split()[-1] == disk:
+        raise Refused("that is the stick Tacit runs from")
+
+
+def efi_room(efi):
+    """Free bytes on the EFI partition, and whether another Linux keeps its kernel there (as /boot), read with it
+    mounted read-only for a moment."""
+    mnt = "/mnt/tacit-efi-check"
+    os.makedirs(mnt, exist_ok=True)
+    sh("mount", "-o", "ro", efi, mnt)
+    try:
+        st = os.statvfs(mnt)
+        return st.f_bavail * st.f_frsize, bool(glob.glob(f"{mnt}/vmlinuz-linux") + glob.glob(f"{mnt}/initramfs-linux*.img"))
+    finally:
+        subprocess.run(["umount", mnt], capture_output=True)
 
 
 def part_dev(disk, n):
@@ -247,11 +330,45 @@ def windows_elsewhere(disk):
     return False
 
 
-def install(disk, place, keep):
-    check(disk)
+def install(disk, place, keep, manual=None):
+    efi_disk = disk
+    if place == "manual":
+        root, efi, boot = manual.get("root"), manual.get("efi"), manual.get("boot")
+        disk, efi_disk = check_manual(root, efi, boot)
+        # the start-up files go on the EFI partition when it has room for them, else on the boot partition the person
+        # chose; with neither, nothing is changed (Windows makes its EFI partition 100 MB)
+        if not boot:
+            free, taken = efi_room(efi)
+            if taken:
+                raise Refused("another Linux keeps its start-up files on this EFI partition and Tacit's would replace them; choose a boot partition of 500 MB or more for Tacit's")
+            if free < EFI_ROOM:
+                raise Refused(f"the EFI partition has {free // 1000 ** 2} MB free and Tacit needs 250 MB there; choose a boot partition of 500 MB or more for Tacit's start-up files")
+    else:
+        check(disk)
     sfs = image()
     progress(0.01, "disk")
-    if place == "next":
+    # two start-up partitions (the EFI one, kept, at /efi and Tacit's own at /boot), or one (the EFI partition at /boot)
+    split = place == "next" or (place == "manual" and bool(manual.get("boot")))
+    if place == "manual":
+        # from here the chosen partitions are changed; nothing else on any disk is
+        state["touched"] = True
+        # typed as what they now hold, so bootctl takes the boot partition and Windows leaves Tacit's alone
+        if boot:
+            sh("wipefs", "-af", boot)
+            set_type(boot, "bc13c2ff-59e6-4262-a352-b275fd6f7172", "ea", "Tacit boot")
+            sh("mkfs.fat", "-F32", "-n", "TACITBOOT", boot)
+        sh("wipefs", "-af", root)
+        set_type(root, "4f68bce3-e8cd-4db1-96e7-fbcaf984b709", "83", "Tacit")
+        sh("mkfs.ext4", "-F", "-q", "-L", "Tacit", root)
+        os.makedirs(TARGET, exist_ok=True)
+        sh("mount", root, TARGET)
+        for where, dev in ((("boot", boot), ("efi", efi)) if boot else (("boot", efi),)):
+            os.makedirs(f"{TARGET}/{where}", exist_ok=True)
+            sh("mount", "-o", "fmask=0077,dmask=0077", dev, f"{TARGET}/{where}")
+            mounted = sh("findmnt", "-nro", "SOURCE", "--target", f"{TARGET}/{where}").strip()
+            if os.path.realpath(mounted) != os.path.realpath(dev):
+                raise Refused(f"{TARGET}/{where} is not mounted from {dev}")
+    elif place == "next":
         # the disk's EFI partition keeps what is on it; Tacit's kernels go on its own boot partition (/boot)
         efi, boot, root = make_room(disk, keep)
         sh("partprobe", disk)
@@ -346,12 +463,15 @@ def install(disk, place, keep):
             f.write("# Tacit (Setup): NVIDIA video memory kept across sleep, for nvidia-suspend/-hibernate/-resume\n"
                     "options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_TemporaryFilePath=/var/tmp\n")
         chroot("systemctl", "enable", "nvidia-suspend.service", "nvidia-hibernate.service", "nvidia-resume.service")
+    # the live system's partition editor (for "Choose partitions myself") stays on the stick
+    if subprocess.run(["arch-chroot", TARGET, "pacman", "-Q", "gparted"], capture_output=True).returncode == 0:
+        chroot("pacman", "-Rns", "--noconfirm", "gparted")
     progress(0.80, "starting")
     chroot("mkinitcpio", "-P")
     progress(0.88, "starting")
     # outside arch-chroot: there bootctl turns the failure to write the firmware's variables into a warning and
     # reports success, which is how a computer ends up starting Windows only
-    esp = "/efi" if place == "next" else "/boot"
+    esp = "/efi" if split else "/boot"
     # --boot-path names /boot only when it is a second, XBOOTLDR partition ("next to Windows"). In the whole-disk
     # install the ESP *is* /boot, and given the ESP's own partition as --boot-path bootctl reads it as an XBOOTLDR
     # one and refuses: "/dev/sda1: Partition has wrong PART_ENTRY_TYPE=c12a7328-f81f-11d2-ba4b-00a0c93ec93b for
@@ -359,7 +479,7 @@ def install(disk, place, keep):
     # after the disk was erased. Without it, bootctl's boot partition is the ESP, where the loader goes in this
     # layout (reported and verified by hand on the laptop).
     args = ["bootctl", f"--root={TARGET}", f"--esp-path={esp}"]
-    if place == "next":
+    if split:
         args.append("--boot-path=/boot")
     args.append("install")
     sh(*args)
@@ -369,32 +489,32 @@ def install(disk, place, keep):
     for path in (f"{TARGET}{esp}/EFI/systemd/systemd-boot{suffix}.efi", f"{TARGET}{esp}/EFI/BOOT/BOOT{suffix.upper()}.EFI"):
         if not os.path.isfile(path) or os.path.getsize(path) == 0:
             raise Refused(f"bootctl did not install the UEFI loader at {path}")
-    boot_entry(disk, efi, suffix)
+    boot_entry(efi_disk, efi, suffix)
     partuuid = sh("blkid", "-s", "PARTUUID", "-o", "value", root).strip()
     resume = f" resume=PARTUUID={partuuid} resume_offset={offset}" if offset is not None else ""
     os.makedirs(f"{TARGET}/boot/loader/entries", exist_ok=True)
     with open(f"{TARGET}/boot/loader/entries/tacit.conf", "w") as f:
         f.write(f"title Tacit\nlinux /vmlinuz-linux\ninitrd /initramfs-linux.img\noptions root=PARTUUID={partuuid} rw quiet splash loglevel=1 rd.udev.log_level=0 udev.log_level=0 systemd.show_status=false rd.systemd.show_status=false vt.global_cursor_default=0{resume}\n")
     # loader.conf is read from the EFI partition only; another Linux's on a shared one is kept beside it
-    loader = f"{TARGET}/{'efi' if place == 'next' else 'boot'}/loader/loader.conf"
-    if place == "next" and os.path.isfile(loader) and not os.path.exists(loader + ".bak"):
+    loader = f"{TARGET}{esp}/loader/loader.conf"
+    if place != "instead" and os.path.isfile(loader) and not os.path.exists(loader + ".bak"):
         shutil.copy2(loader, loader + ".bak")
     with open(loader, "w") as f:
         f.write("default tacit.conf\ntimeout 0\neditor no\n")
     # next to another Linux: systemd-boot finds Windows by itself, not GRUB, so each other system's loader on the EFI
     # partition gets an entry (shown with Space, as Windows is)
-    if place == "next":
-        for path in sorted(glob.glob(f"{TARGET}/efi/EFI/*/grubx64.efi") + glob.glob(f"{TARGET}/efi/EFI/*/shimx64.efi")):
+    if place != "instead":
+        for path in sorted(glob.glob(f"{TARGET}{esp}/EFI/*/grubx64.efi") + glob.glob(f"{TARGET}{esp}/EFI/*/shimx64.efi")):
             vendor = os.path.basename(os.path.dirname(path))
-            if vendor.lower() in ("microsoft", "boot", "systemd", "linux") or os.path.exists(f"{TARGET}/efi/loader/entries/{vendor}.conf"):
+            if vendor.lower() in ("microsoft", "boot", "systemd", "linux") or os.path.exists(f"{TARGET}{esp}/loader/entries/{vendor}.conf"):
                 continue
-            os.makedirs(f"{TARGET}/efi/loader/entries", exist_ok=True)
-            with open(f"{TARGET}/efi/loader/entries/{vendor}.conf", "w") as f:
+            os.makedirs(f"{TARGET}{esp}/loader/entries", exist_ok=True)
+            with open(f"{TARGET}{esp}/loader/entries/{vendor}.conf", "w") as f:
                 f.write(f"title {vendor[:1].upper() + vendor[1:]}\nefi /EFI/{vendor}/{os.path.basename(path)}\n")
     elsewhere = place == "instead" and windows_elsewhere(disk)
     if elsewhere:
         state["other"] = "Windows"
-    if elsewhere or (place == "next" and os.path.isfile(f"{TARGET}/efi/EFI/Microsoft/Boot/bootmgfw.efi")):
+    if elsewhere or (place != "instead" and os.path.isfile(f"{TARGET}{esp}/EFI/Microsoft/Boot/bootmgfw.efi")):
         local_clock()
     progress(0.92, "keys")
     chroot("pacman-key", "--init")
@@ -541,7 +661,7 @@ def finish():
 def main():
     first = json.loads(sys.stdin.readline() or "{}")
     try:
-        install(first.get("disk"), first.get("place", "instead"), first.get("keep"))
+        install(first.get("disk"), first.get("place", "instead"), first.get("keep"), first)
         answers = None
         while answers is None:
             line = sys.stdin.readline()
