@@ -35,6 +35,9 @@ Singleton {
     }
 
     property int retries: 0
+    // Same floor as Threads: crew's events file is only there once something has been logged,
+    // and until then every reload fails with a warning. Back off, reset on a successful read.
+    property int floorInterval: 30000
 
     FileView {
         id: file
@@ -43,6 +46,7 @@ Singleton {
         onFileChanged: file.reload()
         onLoaded: {
             root.retries = 0;
+            root.floorInterval = 30000;
             root.parse(file.text());
         }
         // Mid-roll the file is gone for an instant: come back for it, and keep the day already
@@ -60,10 +64,14 @@ Singleton {
         onTriggered: file.reload()
     }
     Timer {   // the floor under the watch, which the roll's rename drops
-        interval: 30000
+        interval: root.floorInterval
         running: true
         repeat: true
-        onTriggered: file.reload()
+        onTriggered: {
+            file.reload();
+            // no events yet: 30 s -> 60 -> 120 -> 240 -> 300 s, then hold
+            root.floorInterval = Math.min(root.floorInterval * 2, 300000);
+        }
     }
     Component.onCompleted: file.reload()
 

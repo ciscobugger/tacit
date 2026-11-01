@@ -22,6 +22,10 @@ Singleton {
 
     property int retries: 0
     property string lastRead: ""
+    // The floor timer below reloads a file crew may never have written: without crew installed
+    // the read fails every time and each failure is a warning in the log (one per 30 s, for the
+    // life of the session). Back off instead, and come back to 30 s as soon as a load succeeds.
+    property int floorInterval: 30000
 
     FileView {
         id: index
@@ -30,6 +34,7 @@ Singleton {
         onFileChanged: index.reload()
         onLoaded: {
             root.retries = 0;
+            root.floorInterval = 30000;
             try {
                 root.sessions = JSON.parse(index.text()).sessions ?? ({});
             } catch (e) {
@@ -55,10 +60,14 @@ Singleton {
         onTriggered: index.reload()
     }
     Timer {   // the floor under the watch: the last good maps stand until a load succeeds
-        interval: 30000
+        interval: root.floorInterval
         running: true
         repeat: true
-        onTriggered: index.reload()
+        onTriggered: {
+            index.reload();
+            // no index (crew never ran): 30 s -> 60 -> 120 -> 240 -> 300 s, then hold
+            root.floorInterval = Math.min(root.floorInterval * 2, 300000);
+        }
     }
     Component.onCompleted: index.reload()
 
