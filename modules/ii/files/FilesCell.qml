@@ -3,6 +3,7 @@ import QtQuick.Effects
 import qs
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 import Tacit.Kit as K
 
@@ -52,6 +53,17 @@ Item {
         anchors.margins: cell.bare ? 0 : Tacit.space.s
     }
 
+    // The tile as 1.1.7 drew it, outside a folder of pictures (owner 2026-11-01: the old Pinax back): a wash behind it when
+    // chosen (12 % of the ink) or under the pointer (5 %), a rounded frame the picture fills, the name and the age under it.
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 4
+        radius: 12
+        visible: !cell.bare
+        color: cell.selected ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.88)
+            : (area.containsMouse ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.95) : "transparent")
+        Behavior on color { ColorAnimation { duration: 80 } }
+    }
     // a folder or a file without a picture, among pictures: its symbol and name on the field's wash
     Rectangle {
         anchors.fill: box
@@ -69,6 +81,12 @@ Item {
         height: cell.bare ? cell.height : Math.round(100 * cell.zoom)
         opacity: cell.cut ? 0.5 : 1
 
+        Rectangle {
+            anchors.fill: parent
+            radius: 10
+            visible: !cell.bare && cell.symbolOnly
+            color: Appearance.colors.colLayer1
+        }
         K.Symbol {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: cell.bare ? -Tacit.space.m : 0
@@ -86,8 +104,8 @@ Item {
             readonly property real ratio: thumb.ready ? thumb.item.implicitWidth / Math.max(1, thumb.item.implicitHeight) : 1
             readonly property bool wider: thumb.ratio >= art.width / Math.max(1, art.height)
             active: cell.shows
-            width: cell.bare ? art.width : Math.round(thumb.wider ? art.width : art.height * thumb.ratio)
-            height: cell.bare ? art.height : Math.round(thumb.wider ? art.width / thumb.ratio : art.height)
+            width: art.width
+            height: art.height
             x: Math.round((art.width - width) / 2)
             y: art.height - height
             sourceComponent: ThumbnailImage {
@@ -120,7 +138,7 @@ Item {
                 }
             }
         }
-        Rectangle { id: shapeMask; visible: false; width: thumb.width; height: thumb.height; radius: Tacit.radius.row; layer.enabled: true }
+        Rectangle { id: shapeMask; visible: false; width: thumb.width; height: thumb.height; radius: cell.bare ? Tacit.radius.row : 10; layer.enabled: true }
     }
     Column {
         visible: !cell.bare || cell.symbolOnly
@@ -131,20 +149,32 @@ Item {
         spacing: 2
         K.TacitText {
             width: parent.width
+            visible: cell.bare
             horizontalAlignment: Text.AlignHCenter
             text: cell.fileName
             elide: Text.ElideMiddle
             weight: cell.selected ? "medium" : "regular"
             ink: cell.cut ? "quiet" : "main"
         }
-        K.TacitText {
+        StyledText {
+            width: parent.width
+            visible: !cell.bare
+            horizontalAlignment: Text.AlignHCenter
+            text: cell.fileName
+            elide: Text.ElideMiddle
+            font.pixelSize: 14
+            font.weight: cell.selected ? Font.Medium : Font.Normal
+            color: Tacit.inkMain
+            opacity: cell.cut ? 0.5 : 1
+        }
+        StyledText {
             width: parent.width
             visible: !cell.bare
             horizontalAlignment: Text.AlignHCenter
             text: Voice.age(cell.fileModified.getTime())
-            size: "meta"
-            cut: "numbers"
-            ink: cell.cut ? "quiet" : "sec"
+            font.pixelSize: 13
+            font.family: Appearance.font.family.numbers
+            color: Tacit.inkMeta
         }
     }
 
@@ -153,7 +183,7 @@ Item {
         anchors.fill: box
         radius: Tacit.radius.row
         color: Tacit.inkMain
-        opacity: area.pressed && !area.rightHeld ? Tacit.wash.pressed : area.containsMouse ? Tacit.wash.hover : 0
+        opacity: !cell.bare ? 0 : area.pressed && !area.rightHeld ? Tacit.wash.pressed : area.containsMouse ? Tacit.wash.hover : 0
         Behavior on opacity { NumberAnimation { duration: Tacit.motion.hover.ms } }
     }
     // a file just revealed ("show in folder") lights once
@@ -172,7 +202,7 @@ Item {
         color: "transparent"
         border.width: 2
         border.color: Tacit.accent
-        visible: cell.selected
+        visible: cell.selected && cell.bare
     }
     // the keyboard's place: around the selection's ring when it has one, else around the cell
     Item {

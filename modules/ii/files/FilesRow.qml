@@ -1,7 +1,10 @@
 import QtQuick
+import Quickshell.Widgets
 import qs
 import qs.services
 import qs.modules.common
+import qs.modules.common.widgets
+import qs.modules.common.functions
 import Tacit.Kit as K
 
 /**
@@ -57,7 +60,7 @@ Item {
     signal slowClicked(int index)   // a second click on the name of the one selected row
 
     width: ListView.view ? ListView.view.width : 400
-    height: row.hidden ? 0 : row.headingHeight + Tacit.height.row
+    height: row.hidden ? 0 : row.headingHeight + line.height
     visible: !row.hidden
     onEditingChanged: {
         if (editing) {
@@ -79,28 +82,110 @@ Item {
         id: line
         y: row.headingHeight
         width: row.width
-        height: Tacit.height.row
+        height: row.from.length > 0 ? 48 : 34
 
-        K.ListRow {
+        // The row as 1.1.7 drew it (owner 2026-11-01: the old Pinax back, with the new features): 34 high (48 with
+        // where it came from), a wash when chosen (12 % of the ink, 5 % under the pointer), the kind's glyph or the
+        // picture itself, the name in 15 px with its source under it, then Modified and Size in the meta ink.
+        Item {
             id: look
             anchors.fill: parent
-            focusable: false
-            // cut and still downloading: the whole row faint (ListRow has no quiet state of its own)
             opacity: row.partial || row.cut ? 0.5 : 1
-            glyph: row.thing.glyph
-            picture: row.picture
-            name: row.editing ? "" : row.fileName
-            aside: row.editing ? "" : row.from
-            facts: {
-                const f = [row.fileIsDir ? "—" : Voice.size(row.fileSize), row.partial ? "downloading" : row.when];
-                return row.offerShown ? [""].concat(f) : f;
+            // what the window's rename field and the press's band read: the name's column and the name's own width
+            readonly property real textRoom: Math.max(60, meta.x - 46 - (row.offerShown ? offerPill.implicitWidth + 14 : 0) - 12)
+            readonly property real nameRoom: Math.min(nameText.implicitWidth, look.textRoom)
+            Rectangle {
+                anchors.fill: parent
+                radius: 8
+                color: row.selected ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.88)
+                    : (area.containsMouse ? ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.95) : "transparent")
+                Behavior on color { ColorAnimation { duration: 80 } }
             }
-            factWidths: row.offerShown ? [offerPill.implicitWidth + Tacit.space.s].concat(row.factWidths) : row.factWidths
-            selected: row.selected
-            joinAbove: row.joinAbove
-            joinBelow: row.joinBelow
-            ring: row.ring
-            previewState: area.pressed && !area.rightHeld && !area.banding ? "pressed" : area.containsMouse ? "hover" : ""
+            Rectangle {   // the keyboard's row without a selection: a hairline
+                anchors.fill: parent
+                radius: 8
+                color: "transparent"
+                border.width: 1
+                border.color: Appearance.colors.colOutlineVariant
+                visible: row.ring && !row.selected
+                opacity: 0.7
+            }
+            MaterialSymbol {
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !thumb.visible
+                text: row.thing.glyph
+                fill: row.fileIsDir ? 1 : 0
+                iconSize: 20
+                color: row.fileIsDir ? Tacit.inkSec : (row.selected ? Tacit.inkMain : Tacit.inkMeta)
+            }
+            // a picture shows itself where the glyph would be (the list's new feature, kept)
+            ClippingRectangle {
+                id: thumb
+                visible: row.picture.toString().length > 0 && thumbImage.status === Image.Ready
+                x: 10
+                anchors.verticalCenter: parent.verticalCenter
+                width: 24
+                height: 24
+                radius: 5
+                color: "transparent"
+                Image {
+                    id: thumbImage
+                    anchors.fill: parent
+                    source: row.picture
+                    sourceSize: Qt.size(48, 48)
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                }
+            }
+            Column {
+                x: 46
+                width: look.textRoom
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 1
+                StyledText {
+                    id: nameText
+                    width: parent.width
+                    visible: !row.editing
+                    text: row.fileName
+                    elide: Text.ElideMiddle
+                    font.pixelSize: 15
+                    font.weight: row.selected ? Font.Medium : Font.Normal
+                    color: Tacit.inkMain
+                }
+                StyledText {
+                    width: parent.width
+                    visible: row.from.length > 0 && !row.editing
+                    text: row.from
+                    elide: Text.ElideRight
+                    font.pixelSize: 13
+                    color: Tacit.inkSec
+                }
+            }
+            Row {
+                id: meta
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 18
+                StyledText {
+                    width: 84
+                    horizontalAlignment: Text.AlignRight
+                    text: row.partial ? "downloading" : Voice.age(row.fileModified.getTime())
+                    font.pixelSize: 14
+                    font.family: Appearance.font.family.numbers
+                    color: row.partial ? Tacit.accent : row.selected ? Tacit.inkSec : Tacit.inkMeta
+                }
+                StyledText {
+                    width: 72
+                    horizontalAlignment: Text.AlignRight
+                    text: row.fileIsDir ? "—" : Voice.size(row.fileSize)
+                    font.pixelSize: 14
+                    font.family: Appearance.font.family.numbers
+                    color: row.selected ? Tacit.inkSec : Tacit.inkMeta
+                }
+            }
         }
         // A folder row is a place to drop into: a ring of the accent while something is held over it.
         DropArea {
@@ -136,7 +221,7 @@ Item {
         // folder changed, the window closed) left Qt reading a dead item and took the shell down.
         readonly property Item dragProxy: row.ListView.view?.dragProxy ?? null
         // where the name ends: past it a press draws a band instead of taking the file
-        readonly property real nameEnd: 52 + look.nameRoom
+        readonly property real nameEnd: 46 + look.nameRoom
         MouseArea {
             id: area
             anchors.fill: parent
@@ -192,7 +277,7 @@ Item {
                     const now = Date.now();
                     const since = now - lastClick;
                     lastClick = now;
-                    const onName = mouse.x > 52 - 4 && mouse.x < line.nameEnd + 8;
+                    const onName = mouse.x > 46 - 4 && mouse.x < line.nameEnd + 8;
                     const alone = row.selected && row.ListView.view.selectedCount() === 1 && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier));
                     row.clicked(mouse, row.index);
                     if (alone && onName && since > 450 && since < 3000)
@@ -223,7 +308,7 @@ Item {
         // and refuses. Above the row's MouseArea, so a click in it places the caret.
         Item {
             visible: row.editing
-            x: 52 - Tacit.space.m
+            x: 46 - Tacit.space.m
             width: look.textRoom + 2 * Tacit.space.m
             height: Tacit.height.field
             anchors.verticalCenter: parent.verticalCenter
@@ -282,7 +367,7 @@ Item {
             id: offerPill
             visible: row.offerShown
             anchors.right: parent.right
-            anchors.rightMargin: Tacit.space.l + row.factWidths[0] + row.factWidths[1] + Tacit.space.s
+            anchors.rightMargin: 12 + 84 + 18 + 72 + 14
             anchors.verticalCenter: parent.verticalCenter
             text: row.offer?.label ?? ""
             onActivated: row.offerTaken(row.index)

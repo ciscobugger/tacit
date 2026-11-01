@@ -531,7 +531,19 @@ FloatingWindow {
     readonly property int railFoldWidth: 312 + win.barNeed
     // no panel over a search, the shelf, Recent or Large & old: those rows are their own view; renaming many is the
     // panel's face whatever the panel was
-    readonly property bool panelShown: (win.panelOpen && !win.searching && win.selectedPaths.length > 0) || renameSheet.active
+    readonly property bool panelShown: renameSheet.active
+    // The third column (1.1.7's, back 2026-11-01): on its own when the window is wide enough to afford it, Space toggles it
+    property bool previewToggled: false
+    readonly property bool wide: win.width >= 1240 || (win.width >= 900 && win.height >= 800)
+    readonly property bool previewOpen: !win.searching && !win.phoneShown && !renameSheet.active && (win.wide ? !win.previewToggled : win.previewToggled)
+    readonly property double folderBytes: {
+        let total = 0;
+        const n = Math.min(folderModel.count, 2000);
+        for (let i = 0; i < n; i++)
+            if (!folderModel.get(i, "fileIsDir"))
+                total += folderModel.get(i, "fileSize");
+        return total;
+    }
     property bool panelBefore: false      // open before renaming many took the panel over
     // The list narrows once when the panel opens, by the panel's width. Where that would leave too little list (a
     // window at half width), the panel covers the list from the right instead and the list is cut at its edge.
@@ -810,6 +822,30 @@ FloatingWindow {
         if (win.searching && !win.recentShown && !win.shelfShown && !win.largeOld && p)
             return Voice.facts([p.kindWord || p.sourceWord || p.timeWord || p.sizeWord ? `Read as ${win.readAs(p)}` : "", win.hits.length >= 500 ? "the first 500" : ""]);
         return "";
+    }
+    // The status line under the list, as 1.1.7 had it: what just happened, or what is here and what is selected; the room
+    // left on the drive sits at its right (freeLine).
+    readonly property string statusLine: {
+        if (win.footLine.length > 0)
+            return win.footLine;
+        if (win.phoneShown)
+            return "";
+        if (win.recentShown)
+            return Voice.facts([`${Voice.count(win.hits.length, "file")} touched this week`, win.searchRunning ? "looking" : ""]);
+        if (win.shelfShown)
+            return `${Voice.count(win.hits.length, "item")} parked on the notch`;
+        if (win.largeOld)
+            return Voice.facts([`${Voice.count(win.hits.length, "file")} over 100 MB not touched in 90 days`, win.diskLine, win.searchRunning ? "looking" : ""]);
+        if (win.searching)
+            return Voice.facts([`${Voice.count(win.hits.length, "hit")} for "${win.searchQuery}" under ${Files.placeName(win.folder)}`, win.searchRunning ? "searching" : ""]);
+        const parts = [Voice.count(win.shownCount, "item")];
+        if (win.selectedPaths.length > 0)
+            parts.push(`${win.selectedPaths.length} selected` + (win.selectedBytes > 0 ? ` · ${Voice.size(win.selectedBytes)}` : ""));
+        if (win.query.length > 0)
+            parts.push(`matching "${win.query}"`);
+        if (win.showHidden)
+            parts.push("hidden shown");
+        return Voice.facts(parts);
     }
     // A selection's count and size, "3 files, 2.9 GB" (kit-v0): the docked panel says it while it is open.
     readonly property string selectionLine: {
@@ -1603,10 +1639,9 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
         keys.forceActiveFocus();
     }
     // Space: the panel for any selection; again, it closes
-    function togglePanel() {
+    function togglePanel() {   // the third column (renaming many keeps the docked panel until it closes)
         if (renameSheet.active) renameSheet.close();
-        else if (win.panelShown) win.panelOpen = false;
-        else if (win.selectedPaths.length > 0) win.panelOpen = true;
+        else win.previewToggled = !win.previewToggled;
     }
     // for scripted checks (the test display): the sheet's fields and its Rename, as the keys would
     function presetRename(m, a, b) { renameSheet.preset(m, a, b); }
@@ -2223,7 +2258,7 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
                 case Qt.Key_PageUp:
                     win.moveCursor(-12, shift); event.accepted = true; return;
                 case Qt.Key_Space:
-                    win.togglePanel(); event.accepted = true; return;
+                    win.previewToggled = !win.previewToggled; event.accepted = true; return;
                 case Qt.Key_Escape:
                     // the panel first: it is what is in front, and a copy under way is not stopped by a key meant for it
                     if (renameSheet.active) renameSheet.close();
@@ -2306,95 +2341,206 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
                     Layout.fillHeight: true
                     spacing: 0
 
-                    // ---------------------------------------------------- header (Tacit.Kit)
-                    // The kit's page header: back and forward, the path as the title (at most two parents, so the
-                    // folder's own name keeps its room; Back and Backspace go further), the page's search.
-                    // The order, the views and the filter are the view bar's, under the header's line. A click on the empty header edits the path.
+                    // ---------------------------------------------------- header
+                    // Pinax's own header, as 1.1.7 had it (owner 2026-11-01: "bring old pinax and keep the new features"):
+                    // back and forward; the folder's name (16 DemiBold) with the way up under it (13, each part a step
+                    // back), or the path being edited; the views as one switch (Columns joins them), the order as a word,
+                    // the filter, hidden files, something new; the search field.
                     Item {
                         id: headerBox
                         objectName: "headerBox"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: header.implicitHeight
+                        Layout.preferredHeight: headerRow.implicitHeight + 4
                         readonly property bool aView: win.recentShown || win.largeOld || win.shelfShown || win.phoneShown
-                        readonly property string placeWord: aView ? (win.recentShown ? "Recent" : win.shelfShown ? "Shelf" : win.phoneShown ? (PhoneLink.paired ? PhoneLink.phoneName : "Your phone") : "Large & old")
-                            : win.crumbs.length ? win.crumbs[win.crumbs.length - 1].name : Files.placeName(win.folder)
-                        readonly property var parents: aView ? [] : win.crumbs.slice(Math.max(0, win.crumbs.length - 3), Math.max(0, win.crumbs.length - 1))
+                        RowLayout {
+                            id: headerRow
+                            anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 8; rightMargin: 8; topMargin: 4 }
+                            spacing: 4
 
-                        // What the title and the search leave each other. The title gives way first (the outer parent,
-                        // then the other), then the search shortens to its one word, then the folder's name is cut with
-                        // an ellipsis: never two things on the same stretch of the line.
-                        K.TacitText { id: probeHere; visible: false; size: "headline"; cut: "display"; weight: "strong" }
-                        K.TacitText { id: probeParent; visible: false; size: "headline"; cut: "display" }
-                        K.TacitText { id: probeSearch; visible: false }
-                        K.TacitText { id: probeCount; visible: false; ink: "meta"; cut: "numbers"; text: Voice.count(win.shownCount, "item") }
-                        FontMetrics { id: hereFm; font: probeHere.font }
-                        FontMetrics { id: parentFm; font: probeParent.font }
-                        FontMetrics { id: searchFm; font: probeSearch.font }
-                        // FontMetrics does not tell when its font changes (the kit's fonts arrive after the first layout):
-                        // every measure goes through here, which reads the fonts
-                        readonly property string fontKey: `${probeHere.font.family}|${probeHere.font.pixelSize}|${probeHere.font.weight}|${probeParent.font.pixelSize}|${probeSearch.font.pixelSize}`
-                        function adv(fm, text) { headerBox.fontKey; return fm.advanceWidth(text); }
-                        readonly property real titleX: 16 + 2 * 36 + 4 + 8 + 4   // after back and forward
-                        readonly property real searchQuiet: 36 + headerBox.adv(searchFm, "Search " + headerBox.placeWord) + 14
-                        readonly property real searchShort: 36 + headerBox.adv(searchFm, "Search") + 14
-                        function searchWidth(quiet) { return search.visible ? quiet + (search.fieldWidth - quiet) * search.openness : 0; }
-                        function roomFor(quiet) { return header.width - headerBox.titleX - K.Kit.tokens.space.xl - 24 - headerBox.searchWidth(quiet); }
-                        function titleWidth(k) {
-                            let w = headerBox.adv(hereFm, headerBox.placeWord);
-                            const sep = headerBox.adv(parentFm, "›"), gap = K.Kit.tokens.space.s;
-                            for (const c of headerBox.parents.slice(headerBox.parents.length - k))
-                                w += headerBox.adv(parentFm, c.name) + 2 * gap + sep + gap;
-                            return w + 2;
-                        }
-                        readonly property int parentsKept: {
-                            const room = headerBox.roomFor(headerBox.searchQuiet);
-                            for (let k = headerBox.parents.length; k > 0; k--)
-                                if (headerBox.titleWidth(k) <= room) return k;
-                            return 0;
-                        }
-                        readonly property bool searchShortened: headerBox.titleWidth(headerBox.parentsKept) > headerBox.roomFor(headerBox.searchQuiet)
-                        readonly property var shownParents: headerBox.parents.slice(headerBox.parents.length - headerBox.parentsKept)
-                        readonly property string hereShown: (headerBox.fontKey, hereFm.elidedText(headerBox.placeWord, Qt.ElideRight, Math.max(40, headerBox.roomFor(headerBox.searchShortened ? headerBox.searchShort : headerBox.searchQuiet) - 2)))
+                            HeaderButton { glyph: "arrow_back"; enabled: win.historyIndex > 0; onActivated: win.back() }
+                            HeaderButton { glyph: "arrow_forward"; enabled: win.historyIndex < win.history.length - 1; onActivated: win.forward() }
 
-                        MouseArea {   // the empty header ground: click to edit the path
-                            anchors.fill: parent
-                            onClicked: win.editingPath = true
-                        }
-                        K.PageHeader {
-                            id: header
-                            // its line runs to the window's edge: the docked panel hangs from it
-                            width: parent.width + page.anchors.rightMargin
-                            objectName: "pageHeader"
-                            crumbs: win.editingPath ? [] : headerBox.shownParents.map(c => c.name)
-                            here: win.editingPath ? "" : headerBox.hereShown
-                            canGoBack: win.historyIndex > 0
-                            canGoForward: win.historyIndex < win.history.length - 1
-                            // a folder still being read (a slow drive), a search or a view still looking
-                            loading: folderModel.status === FolderListModel.Loading || win.searchRunning
-                            onBack: win.back()
-                            onForward: win.forward()
-                            onCrumbPicked: i => win.go(headerBox.shownParents[i].path)
+                            Item {
+                                id: titleBlock
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 90
+                                Layout.preferredHeight: 44
+                                Layout.leftMargin: 8
+                                clip: true
+                                StyledText {
+                                    id: headTitle
+                                    anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 3 }
+                                    visible: !win.editingPath
+                                    text: headerBox.aView ? (win.recentShown ? "Recent" : win.shelfShown ? "Shelf" : win.phoneShown ? (PhoneLink.paired ? PhoneLink.phoneName : "Your phone") : "Large & old")
+                                        : win.crumbs.length ? win.crumbs[win.crumbs.length - 1].name : Files.placeName(win.folder)
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                    color: Tacit.inkMain
+                                }
+                                StyledText {
+                                    anchors { left: parent.left; right: parent.right; top: headTitle.bottom; topMargin: 2 }
+                                    visible: !win.editingPath && headerBox.aView
+                                    text: win.recentShown ? "What arrived and what you opened, newest first"
+                                        : win.shelfShown ? "Parked on the notch, ready to drop anywhere"
+                                        : win.phoneShown ? "Send files to it, and see what you sent"
+                                        : "Big files you have not opened in a long while"
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 13
+                                    color: Tacit.inkSec
+                                }
+                                Row {
+                                    id: crumbRow
+                                    anchors { top: headTitle.bottom; topMargin: 2 }
+                                    // wider than the header: the end nearest you stays in view
+                                    x: Math.min(0, parent.width - width - 8)
+                                    spacing: 4
+                                    visible: !win.editingPath && !headerBox.aView
+                                    Repeater {
+                                        model: win.crumbs.slice(0, Math.max(0, win.crumbs.length - 1))
+                                        delegate: Row {
+                                            required property var modelData
+                                            required property int index
+                                            spacing: 4
+                                            StyledText {
+                                                visible: index > 0
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: "›"
+                                                font.pixelSize: 13
+                                                color: Tacit.inkMeta
+                                            }
+                                            StyledText {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: modelData.name
+                                                font.pixelSize: 13
+                                                color: crumbArea.containsMouse ? Tacit.inkMain : Tacit.inkSec
+                                                MouseArea {
+                                                    id: crumbArea
+                                                    anchors.fill: parent
+                                                    anchors.margins: -4
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: win.go(modelData.path)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                MouseArea {   // the empty header ground: click to edit the path
+                                    anchors.fill: parent
+                                    z: -1
+                                    onClicked: win.editingPath = true
+                                }
+                                TextInput {
+                                    id: pathEdit
+                                    anchors.fill: parent
+                                    anchors.rightMargin: 12
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    visible: win.editingPath
+                                    font.family: Appearance.font.family.monospace
+                                    font.pixelSize: 14
+                                    color: Tacit.inkMain
+                                    selectionColor: ColorUtils.transparentize(Tacit.accent, 0.6)
+                                    selectedTextColor: Tacit.inkMain
+                                    onVisibleChanged: {
+                                        if (visible) {
+                                            text = win.folder;
+                                            selectAll();
+                                            forceActiveFocus();
+                                        } else {
+                                            keys.forceActiveFocus();
+                                        }
+                                    }
+                                    Keys.onPressed: event => {
+                                        if (event.key === Qt.Key_Escape) { win.editingPath = false; event.accepted = true; }
+                                        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                            const t = text.trim().replace(/^~/, win.home);
+                                            if (t.length > 0) win.go(t);
+                                            win.editingPath = false;
+                                            event.accepted = true;
+                                        }
+                                    }
+                                }
+                            }
 
-                            K.SearchField {
+                            // the views as one switch, the order as a word, the filter, hidden files, and something new
+                            Row {
+                                id: tools
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.rightMargin: 6
+                                spacing: 2
+                                visible: !win.phoneShown
+                                Repeater {
+                                    model: [{ v: "list", g: "view_list", t: "List (Ctrl+1)" },
+                                            { v: "grid", g: "grid_view", t: "Grid (Ctrl+2)" },
+                                            { v: "gallery", g: "view_carousel", t: "Gallery (Ctrl+3)" },
+                                            { v: "columns", g: "view_column", t: "Columns (Ctrl+4)" }]
+                                    delegate: ToolGlyph {
+                                        required property var modelData
+                                        glyph: modelData.g
+                                        on: win.view === modelData.v
+                                        tip: modelData.t
+                                        onActivated: win.setView(modelData.v)
+                                    }
+                                }
+                                Item { width: 10; height: 30 }
+                                ToolWord {
+                                    id: sortWordButton
+                                    readonly property string fieldWord: win.sortField === FolderListModel.Time ? "Modified"
+                                        : win.sortField === FolderListModel.Size ? "Size" : win.sortField === FolderListModel.Type ? "Kind" : "Name"
+                                    text: fieldWord + (win.sortReversed ? " ↓" : " ↑")
+                                    glyph: "sort"
+                                    // narrow, the word goes before the folder's name does (Columns and the filter took room)
+                                    compact: headerRow.width < 630
+                                    tip: "Sort and group"
+                                    // the order menu's choices as rows (this menu draws no headings): the field, the direction,
+                                    // and the grouping the view bar brought
+                                    onActivated: win.openMenuAt(sortWordButton, [
+                                        { "id": "name", "label": "Name", "glyph": win.sortField === FolderListModel.Name ? "check" : "", "run": () => win.sortTo(FolderListModel.Name) },
+                                        { "id": "time", "label": "Modified", "glyph": win.sortField === FolderListModel.Time ? "check" : "", "run": () => win.sortTo(FolderListModel.Time) },
+                                        { "id": "size", "label": "Size", "glyph": win.sortField === FolderListModel.Size ? "check" : "", "run": () => win.sortTo(FolderListModel.Size) },
+                                        { "id": "kind", "label": "Kind", "glyph": win.sortField === FolderListModel.Type ? "check" : "", "run": () => win.sortTo(FolderListModel.Type) },
+                                        { "id": "flip", "label": win.sortReversed ? win.orderWords[0] : win.orderWords[1], "glyph": "swap_vert", "run": () => { win.editingIndex = -1; win.sortReversed = !win.sortReversed; } },
+                                        { "id": "gdate", "label": "Group by date", "glyph": win.grouped === "date" ? "check" : "", "run": () => win.groupMode = win.grouped === "date" ? "none" : "date" },
+                                        { "id": "gkind", "label": "Group by kind", "glyph": win.grouped === "kind" ? "check" : "", "run": () => win.groupMode = win.grouped === "kind" ? "none" : "kind" }])
+                                }
+                                ToolGlyph {
+                                    glyph: "filter_list"
+                                    on: win.filterOpen || win.filterActive
+                                    tip: "Filter by kind, date or size"
+                                    onActivated: { if (win.filterActive) { win.clearFilter(); win.filterOpen = false; } else win.filterOpen = !win.filterOpen; }
+                                }
+                                ToolGlyph {
+                                    glyph: win.showHidden ? "visibility" : "visibility_off"
+                                    on: win.showHidden
+                                    tip: win.showHidden ? "Hide hidden files (Ctrl+H)" : "Show hidden files (Ctrl+H)"
+                                    onActivated: win.showHidden = !win.showHidden
+                                }
+                                ToolGlyph {
+                                    id: newButton
+                                    glyph: "add"
+                                    tip: "New folder or file"
+                                    onActivated: win.openMenuAt(newButton, [
+                                        { "id": "newfolder", "label": "New folder", "glyph": "create_new_folder", "run": () => win.newFolder() },
+                                        { "id": "newfile", "label": "New file", "glyph": "note_add", "run": () => win.newFile() }])
+                                }
+                            }
+
+                            ToolbarTextField {
                                 id: search
                                 visible: !win.phoneShown
-                                anchors.verticalCenter: parent.verticalCenter
-                                scope: headerBox.searchShortened ? "" : headerBox.placeWord
-                                // tiled narrow, the path needs the room more than the field
-                                fieldWidth: Math.max(180, Math.min(300, win.width * 0.28))
+                                Layout.fillHeight: false
+                                // the folder's name keeps 100 of the line first; the field takes what is left, 110 to 230
+                                Layout.preferredWidth: Math.max(110, Math.min(230, headerRow.width - 2 * 36 - 8 - tools.width - 6 - 100 - 4 * headerRow.spacing))
+                                Layout.preferredHeight: 36
+                                radius: Appearance.rounding.full
+                                colBackground: Appearance.m3colors.m3surfaceContainerHighest
+                                font.pixelSize: 15
+                                leftPadding: 34
+                                text: win.query
                                 onTextChanged: {
                                     if (text === "" && win.searching) win.endSearch();
                                     queryDebounce.restart();
-                                }
-                                onAccepted: {
-                                    if (text.trim().length > 0) { win.deepSearch(text); keys.forceActiveFocus(); }
-                                    else if (folderModel.count > 0) { win.selectOnly(0); keys.forceActiveFocus(); }
-                                }
-                                onDismissed: { if (win.searching) win.endSearch(); keys.forceActiveFocus(); }
-                                onDown: {
-                                    keys.forceActiveFocus();
-                                    if (win.searching) win.searchCursor = Math.min(win.hits.length - 1, win.searchCursor + 1);
-                                    else win.moveCursor(1, false);
                                 }
                                 Timer {   // a held key must not walk the folder once per character
                                     id: queryDebounce
@@ -2405,96 +2551,146 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
                                     target: win
                                     function onQueryChanged() { if (search.text !== win.query) search.text = win.query; }
                                 }
-                            }
-                        }
-                        TextInput {
-                            id: pathEdit
-                            // where the title stands: after back and forward
-                            x: 16 + 2 * 36 + 4 + 8 + 4
-                            width: parent.width - x - 24
-                            height: header.implicitHeight - 1
-                            verticalAlignment: TextInput.AlignVCenter
-                            visible: win.editingPath
-                            font.family: Appearance.font.family.monospace
-                            font.pixelSize: 15
-                            color: Tacit.inkMain
-                            selectionColor: ColorUtils.transparentize(Tacit.accent, 0.6)
-                            selectedTextColor: Tacit.inkMain
-                            onVisibleChanged: {
-                                if (visible) {
-                                    text = win.folder;
-                                    selectAll();
-                                    forceActiveFocus();
-                                } else {
-                                    keys.forceActiveFocus();
+                                MaterialSymbol {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 11
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "search"
+                                    iconSize: 18
+                                    color: Tacit.inkSec
                                 }
-                            }
-                            Keys.onPressed: event => {
-                                if (event.key === Qt.Key_Escape) { win.editingPath = false; event.accepted = true; }
-                                else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    const t = text.trim().replace(/^~/, win.home);
-                                    if (t.length > 0) win.go(t);
-                                    win.editingPath = false;
-                                    event.accepted = true;
+                                Rectangle {   // focused: a hairline in the accent
+                                    anchors.fill: parent
+                                    radius: Appearance.rounding.full
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: Tacit.accent
+                                    opacity: search.activeFocus ? 0.8 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 120 } }
+                                }
+                                placeholderText: win.searching && !win.recentShown && !win.largeOld && !win.shelfShown ? `Searching under ${Files.placeName(win.folder)}` : "Search"
+                                Keys.onPressed: event => {
+                                    if (event.key === Qt.Key_Escape) {
+                                        if (win.searching) win.endSearch();
+                                        else if (text.length > 0) text = "";
+                                        else keys.forceActiveFocus();
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                        if (text.trim().length > 0) { win.deepSearch(text); keys.forceActiveFocus(); }
+                                        else if (folderModel.count > 0) { win.selectOnly(0); keys.forceActiveFocus(); }
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Down) {
+                                        keys.forceActiveFocus();
+                                        if (win.searching) win.searchCursor = Math.min(win.hits.length - 1, win.searchCursor + 1);
+                                        else win.moveCursor(1, false);
+                                        event.accepted = true;
+                                    }
                                 }
                             }
                         }
                     }
+                    Rectangle {   // the one hairline
+                        Layout.fillWidth: true
+                        Layout.topMargin: 6
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8
+                        height: 1
+                        color: Appearance.colors.colOutlineVariant
+                        opacity: 0.5
+                    }
 
-                    // ---------------------------------------------------- view bar (Tacit.Kit)
-                    // What is here, and how to see it: the filter's fields, the order's menu, the views as words.
-                    K.ViewBar {
+                    // ---------------------------------------------------- the filter (opened from its glyph)
+                    // The view bar's filter fields (kind, date, size), in a row of their own while the filter is open or
+                    // in use; how many of the folder's files it lets through, and the way out.
+                    Item {
                         id: viewBar
                         objectName: "viewBar"
                         Layout.fillWidth: true
-                        Layout.rightMargin: win.panelRoom   // a covering panel starts under the bar, so the bar keeps its width
-                        Layout.preferredHeight: win.searching ? 0 : implicitHeight
-                        visible: !win.searching
-                        // "3 items" is the first to go: it stays while it and the controls (the bar's last child) both fit
-                        readonly property bool countFits: width - K.Kit.tokens.space.l - children[children.length - 1].implicitWidth >= 28 + probeCount.implicitWidth + K.Kit.tokens.space.xl
-                        count: countFits ? Voice.count(win.shownCount, "item") : ""
-                        filtering: win.filterOpen || win.filterActive
-                        active: win.filterActive
-                        shown: `${win.shownCount} of ${folderModel.total}`
-                        order: win.orderWord
-                        orderItems: win.orderItems
-                        views: win.viewWords
-                        view: Math.max(0, win.viewKeys.indexOf(win.view))
-                        onFilterToggled: { if (!win.filterActive) win.filterOpen = !win.filterOpen; }
-                        onOrderPicked: i => win.orderItems[i].run?.()
-                        onViewPicked: i => win.setView(win.viewKeys[i])
-                        onCleared: { win.clearFilter(); win.filterOpen = false; }
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8 + win.panelRoom
+                        Layout.preferredHeight: (win.filterOpen || win.filterActive) && !win.searching ? 44 : 0
+                        visible: Layout.preferredHeight > 0
+                        clip: true
+                        Row {
+                            x: 6
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 8
+                            K.FilterField {
+                                id: kindField
+                                objectName: "kindField"
+                                label: "Kind"
+                                on: win.fKinds.length > 0
+                                value: win.fKinds.length > 0 ? win.fKinds.join(", ") : "Any"
+                                items: [{ "heading": true, "label": "Kind" }].concat(win.kindItems)
+                                onPicked: i => items[i].run?.()
+                                onCleared: win.fKinds = []
+                            }
+                            K.FilterField {
+                                id: whenField
+                                objectName: "whenField"
+                                label: "Modified"
+                                on: win.fWhen !== ""
+                                value: win.whenChoices.find(c => c[0] === win.fWhen)[1]
+                                items: win.whenChoices.map(c => ({ "label": c[1], "checked": win.fWhen === c[0] }))
+                                onPicked: i => win.fWhen = win.whenChoices[i][0]
+                                onCleared: win.fWhen = ""
+                            }
+                            K.FilterField {
+                                id: sizeField
+                                objectName: "sizeField"
+                                label: "Size"
+                                on: win.fSize !== ""
+                                value: win.sizeChoices.find(c => c[0] === win.fSize)[1]
+                                items: win.sizeChoices.map(c => ({ "label": c[1], "checked": win.fSize === c[0] }))
+                                onPicked: i => win.fSize = win.sizeChoices[i][0]
+                                onCleared: win.fSize = ""
+                            }
+                            StyledText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: win.filterActive
+                                text: `${win.shownCount} of ${folderModel.total}`
+                                font.pixelSize: 13
+                                color: Tacit.inkMeta
+                            }
+                            ToolWord {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: win.filterActive
+                                text: "Clear"
+                                onActivated: { win.clearFilter(); win.filterOpen = false; }
+                            }
+                        }
+                    }
 
-                        K.FilterField {
-                            id: kindField
-                            objectName: "kindField"
-                            label: "Kind"
-                            on: win.fKinds.length > 0
-                            value: win.fKinds.length > 0 ? win.fKinds.join(", ") : "Any"
-                            items: [{ "heading": true, "label": "Kind" }].concat(win.kindItems)
-                            onPicked: i => items[i].run?.()
-                            onCleared: win.fKinds = []
+                    // ---------------------------------------------------- columns (list only)
+                    // Name, Modified and Size over the list, each a way to sort by it (a second press turns the order).
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8 + win.panelRoom
+                        Layout.preferredHeight: win.view === "list" && !win.searching && !win.phoneShown ? 28 : 0
+                        visible: Layout.preferredHeight > 0
+                        clip: true
+                        component SortLabel: StyledText {
+                            required property int field
+                            property bool alignRight: false
+                            readonly property bool active: win.sortField === field
+                            font.pixelSize: 13
+                            color: active ? Tacit.inkMain : Tacit.inkMeta
+                            horizontalAlignment: alignRight ? Text.AlignRight : Text.AlignLeft
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    win.editingIndex = -1;   // the rows are about to move under the field
+                                    if (win.sortField === parent.field) win.sortReversed = !win.sortReversed;
+                                    else { win.sortTo(parent.field); }
+                                }
+                            }
                         }
-                        K.FilterField {
-                            id: whenField
-                            objectName: "whenField"
-                            label: "Modified"
-                            on: win.fWhen !== ""
-                            value: win.whenChoices.find(c => c[0] === win.fWhen)[1]
-                            items: win.whenChoices.map(c => ({ "label": c[1], "checked": win.fWhen === c[0] }))
-                            onPicked: i => win.fWhen = win.whenChoices[i][0]
-                            onCleared: win.fWhen = ""
-                        }
-                        K.FilterField {
-                            id: sizeField
-                            objectName: "sizeField"
-                            label: "Size"
-                            on: win.fSize !== ""
-                            value: win.sizeChoices.find(c => c[0] === win.fSize)[1]
-                            items: win.sizeChoices.map(c => ({ "label": c[1], "checked": win.fSize === c[0] }))
-                            onPicked: i => win.fSize = win.sizeChoices[i][0]
-                            onCleared: win.fSize = ""
-                        }
+                        SortLabel { field: FolderListModel.Name; text: "Name" + (active ? (win.sortReversed ? " ↓" : " ↑") : ""); anchors.left: parent.left; anchors.leftMargin: 46; anchors.verticalCenter: parent.verticalCenter }
+                        SortLabel { field: FolderListModel.Time; text: (active ? (win.sortReversed ? "↓ " : "↑ ") : "") + "Modified"; alignRight: true; width: 84; anchors.right: parent.right; anchors.rightMargin: 12 + 72 + 18; anchors.verticalCenter: parent.verticalCenter }
+                        SortLabel { field: FolderListModel.Size; text: (active ? (win.sortReversed ? "↓ " : "↑ ") : "") + "Size"; alignRight: true; width: 72; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter }
                     }
 
                     // In a narrow window the docked panel covers the list instead of narrowing it, and the page cuts the
@@ -2923,52 +3119,56 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
                         }
                     }
 
-                    // ---------------------------------------------------- the foot
-                    // The approved design has no status line. What it said lives where the design puts it: a selection's
-                    // count and size in the docked panel (selectionLine), the room left on the rail's drive (freeLine). The
-                    // answer to what just happened stays, here: one quiet line under the list, only while it has something
-                    // to say (a job running with Stop, "Moved 3 files" with Undo for a minute, a reason, how a search read
-                    // its words); a failure with the warning symbol in the risk ink.
-                    Item {
+                    // ---------------------------------------------------- status
+                    // The status line, as 1.1.7 had it: what is here and what is selected, or what just happened with Stop
+                    // or Undo after it; the room left on the drive at the right. A failure in the risk ink.
+                    RowLayout {
                         id: foot
-                        property string said: ""   // kept while the line closes, so the words do not vanish first
-                        readonly property bool open: win.footLine.length > 0
-                        Connections {
-                            target: win
-                            function onFootLineChanged() { if (win.footLine.length > 0) foot.said = win.footLine; }
-                        }
                         Layout.fillWidth: true
-                        Layout.leftMargin: 8
-                        Layout.rightMargin: 8 + win.panelRoom   // clear of the docked panel, as the list
-                        Layout.preferredHeight: foot.open ? Tacit.height.row : 0
-                        Behavior on Layout.preferredHeight {
-                            NumberAnimation { duration: Tacit.motion.arriveSmall.ms; easing.type: Easing.BezierSpline; easing.bezierCurve: Tacit.motion.arriveSmall.curve }
+                        Layout.leftMargin: 16
+                        Layout.rightMargin: 12 + win.panelRoom
+                        Layout.topMargin: 4
+                        Layout.bottomMargin: 2
+                        spacing: 10
+                        visible: !win.phoneShown
+                        StyledText {
+                            Layout.maximumWidth: parent.width - 140
+                            text: win.statusLine
+                            elide: Text.ElideRight
+                            font.pixelSize: 15
+                            color: win.activeJob?.state === "failed" || win.statusLine.startsWith("Can't") ? Tacit.kit.risk : Tacit.inkSec
                         }
-                        clip: true
-                        Row {
-                            x: Tacit.space.xl + Tacit.space.l
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: Tacit.space.m
-                            opacity: foot.open ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: Tacit.motion.fadeFast.ms } }
-                            K.Symbol {
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: foot.said.startsWith("Can't")
-                                text: "warning"
-                                size: 15
-                                color: Tacit.kit.risk
-                            }
-                            K.TacitText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Math.min(implicitWidth, foot.width - 240)
-                                text: foot.said
-                                elide: Text.ElideRight
-                                ink: "sec"
-                            }
-                            K.Slab { anchors.verticalCenter: parent.verticalCenter; visible: win.activeJob !== null; text: "Stop"; onActivated: win.stopJob() }
-                            K.Slab { anchors.verticalCenter: parent.verticalCenter; visible: win.activeJob === null && win.undoJob.length > 0; text: "Undo"; onActivated: win.undo() }
+                        K.Slab { visible: win.activeJob !== null; text: "Stop"; onActivated: win.stopJob() }
+                        K.Slab { visible: win.activeJob === null && win.undoJob.length > 0; text: "Undo"; onActivated: win.undo() }
+                        Item { Layout.fillWidth: true }
+                        StyledText {
+                            text: win.freeLine
+                            font.pixelSize: 13
+                            font.family: Appearance.font.family.numbers
+                            color: Tacit.inkMeta
                         }
                     }
+                }
+                // ---------------------------------------------------- the third column
+                FilesPreview {
+                    id: previewColumn
+                    showLook: win.view !== "gallery"
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: win.previewOpen ? 300 : 0
+                    Layout.leftMargin: win.previewOpen ? 8 : 0
+                    visible: Layout.preferredWidth > 0
+                    clip: true
+                    Behavior on Layout.preferredWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    path: win.previewPath
+                    folder: win.folder
+                    isDir: win.previewPath.length > 0 ? (folderModel.get(win.cursor, "fileIsDir") ?? false) : false
+                    size: win.previewPath.length > 0 ? (folderModel.get(win.cursor, "fileSize") ?? 0) : 0
+                    modified: win.previewPath.length > 0 ? (folderModel.get(win.cursor, "fileModified") ?? new Date(0)) : new Date(0)
+                    count: folderModel.count
+                    folderBytes: win.folderBytes
+                    many: win.selectedPaths.length > 1 ? win.selectedPaths.length : 0
+                    manyBytes: win.previewOpen && win.selectedPaths.length > 1 ? win.selectedBytesNow() : 0
+                    actions: win.selectedPaths.length > 1 ? win.selectionActions : (win.previewPath.length > 0 ? win.actionsFor(win.cursor) : win.folderActions)
                 }
             }
         }
@@ -2989,23 +3189,6 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
                 acceptedButtons: Qt.AllButtons
                 hoverEnabled: true
                 onWheel: wheel => wheel.accepted = true
-            }
-            FilesPreview {
-                id: selectionFace
-                anchors.fill: parent
-                visible: !renameSheet.active
-                path: win.previewPath
-                isDir: win.previewPath.length > 0 ? (folderModel.get(win.cursor, "fileIsDir") ?? false) : false
-                size: win.previewPath.length > 0 ? (folderModel.get(win.cursor, "fileSize") ?? 0) : 0
-                showHidden: win.showHidden
-                showLook: win.view !== "gallery"
-                sizeSaid: win.view === "list"
-                many: win.selectedPaths.length > 1 ? win.selectedPaths.length : 0
-                manyDirs: win.selectedPaths.length > 1 ? win.selectedPaths.filter(p => win.dirPaths[p] === true).length : 0
-                manyBytes: win.selectedBytes
-                actions: !win.panelShown ? [] : win.selectedPaths.length > 1 ? win.selectionActions : win.actionsFor(win.cursor)
-                onOpen: win.openSelection()
-                onMore: at => win.openMenuAt(at, selectionFace.actions)
             }
             RenameSheet {
                 id: renameSheet
