@@ -487,8 +487,8 @@ ApplicationWindow {
                     anchors.fill: parent
                     readonly property var rootPart: backend.parts.find(p => p.name === setup.partRoot) ?? ({})
                     readonly property var bootPart: backend.parts.find(p => p.name === setup.partBoot) ?? null
-                    Headline { text: "Erase this partition?" }
-                    Sentence { text: `Everything on ${root.partName(parent.rootPart)} will be erased. This can't be undone. The other partitions stay as they are.` }
+                    Headline { text: parent.bootPart ? "Erase these partitions?" : "Erase this partition?" }
+                    Sentence { text: `Everything on ${root.partName(parent.rootPart)}${parent.bootPart ? " and " + root.partName(parent.bootPart) : ""} will be erased. This can't be undone. The other partitions stay as they are.` }
                     Column {
                         x: (parent.width - width) / 2; y: Look.px(360); width: Look.px(640); spacing: Look.px(10)
                         T { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Look.fs(19); color: Look.main
@@ -686,6 +686,12 @@ ApplicationWindow {
         if (setup.partEfi === "") setup.partEfi = backend.parts.find(p => p.esp)?.name ?? "";
     }
     onEfiSmallChanged: if (!efiSmall) setup.partBoot = ""
+    // the partition editor has the screen while it is open (over it, Setup left full screen and sat on top of it as a
+    // card); Setup comes back when it closes
+    Connections {
+        target: backend
+        function onEditingChanged() { if (root.windowed) return; if (backend.editing) root.hide(); else root.showFullScreen(); }
+    }
     // the start-up loader finds a boot partition only on the disk it started from, the EFI partition's
     readonly property string efiDisk: backend.parts.find(p => p.name === setup.partEfi)?.disk ?? ""
     readonly property var bootChoices: backend.parts.filter(p => !p.esp && p.disk === efiDisk && p.size >= 5e8 && p.size < 32e9 && p.name !== setup.partRoot)
