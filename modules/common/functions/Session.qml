@@ -90,7 +90,11 @@ Singleton {
     }
 
     function reboot() {
-        root.runAction(Translation.tr("Restart"), "reboot || loginctl reboot");
+        // updates that are downloaded install on the way, as Settings says ("they install while the computer restarts"): a
+        // Restart from the session screen, the palette or the lock ran a plain reboot and they never installed (Discord
+        // 2026-11-02, "updates are broken in the graphical interface"). The restart happens even when they can't be readied.
+        const update = Updates.ready ? "systemctl start tacit-update@now.service; " : "";
+        root.runAction(Translation.tr("Restart"), update + "reboot || loginctl reboot");
     }
 
     function rebootToFirmware() {
