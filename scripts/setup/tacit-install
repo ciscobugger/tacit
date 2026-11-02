@@ -27,7 +27,7 @@
 import glob, json, os, re, shutil, subprocess, sys, time, traceback
 
 TARGET = "/mnt/tacit"
-state = {"touched": False, "t0": time.time()}
+state = {"touched": False, "t0": time.time(), "step": "disk"}
 ESP = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 WINDOWS_DATA = "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7"
 MIN_TACIT = 32 * 1000 ** 3              # setupd.py offers "next to" from this much room (Tacit is about 7 GB)
@@ -40,6 +40,7 @@ def say(obj):
 
 
 def progress(done, step):
+    state["step"] = step
     say({"state": "running", "done": round(done, 3), "step": step})
 
 
@@ -672,12 +673,15 @@ def main():
         finish()
         say(dict({"state": "done", "done": 1.0}, **({"other": state["other"]} if state.get("other") else {})))
     except Exception as e:
-        # an unexpected error is plumbing: Setup shows only "didn't finish", and the traceback is in the log (stderr)
+        # an unexpected error is plumbing: Setup shows only "didn't finish", and the traceback is in the log (stderr).
+        # Every failure goes to the log with the step it stopped at: Setup shows a tool's failure ("bootctl failed: ...")
+        # as no more than "didn't finish", and the log was its only record, empty (issue #36)
         reason = str(e) if isinstance(e, Refused) else ""
+        print(f"failed at {state['step']}: {reason}" if reason else f"failed at {state['step']}:", file=sys.stderr, flush=True)
         if not isinstance(e, Refused):
             traceback.print_exc()
         subprocess.run(["umount", "-R", TARGET], capture_output=True)
-        say({"state": "failed", "reason": reason, "untouched": not state["touched"]})
+        say({"state": "failed", "reason": reason, "step": state["step"], "untouched": not state["touched"]})
 
 
 if __name__ == "__main__":
