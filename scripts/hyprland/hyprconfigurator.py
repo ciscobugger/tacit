@@ -101,7 +101,12 @@ def devices_file_for(file_path):
 
 
 def lua_string(text):
-    return f'"{text.replace("\\\\", "\\\\\\\\").replace(chr(34), chr(92) + chr(34))}"'
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def lua_unquote(text):
+    """The inside of a string lua_string wrote, back to the text."""
+    return re.sub(r"\\(.)", r"\1", text)
 
 
 def read_devices(path):
@@ -117,13 +122,13 @@ def read_devices(path):
         fields = dict(re.findall(r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|[-0-9.]+)', m.group(2)))
         if "accel" not in fields:
             continue
-        entry = {"accel": fields["accel"][1:-1].replace('\\"', '"').replace("\\\\", "\\")}
+        entry = {"accel": lua_unquote(fields["accel"][1:-1])}
         if "speed" in fields:
             try:
                 entry["speed"] = float(fields["speed"])
             except ValueError:
                 pass
-        entries[m.group(1)] = entry
+        entries[lua_unquote(m.group(1))] = entry
     return entries
 
 
@@ -195,7 +200,6 @@ if __name__ == "__main__":
 
     if set_pairs or reset_keys:
         file_path = os.path.expanduser(args.file)
-        edit_lua(file_path, set_pairs, reset_keys)
 
         # the same run brings the per-device resolutions to the hotplug layer: the device's accel_profile
         # as it was written, with libinput's speed beside it when it is not a curve
@@ -232,7 +236,9 @@ if __name__ == "__main__":
                 if name in devices and "speed" in devices[name]:
                     del devices[name]["speed"]
                     changed = True
+        # before main.lua: its edit makes Hyprland reload, and the reload's hotplug layer reads this file
         if changed:
             write_devices(devices_path, devices)
+        edit_lua(file_path, set_pairs, reset_keys)
     else:
         print("Error: specify --set or --reset")
