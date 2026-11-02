@@ -3100,7 +3100,8 @@ for l in sys.stdin.buffer.read().split(b"\\n"):
                                     return `Nothing here matches “${win.query}”.`;
                                 if (win.filterActive && folderModel.total > 0)
                                     return win.filterSaid;
-                                return win.probed ? "Nothing in this folder. Drop files here to move them in." : "";
+                                // in Columns the empty column says it, and the sentence, placed for the list, stood over the columns
+                                return win.probed && win.view !== "columns" ? "Nothing in this folder. Drop files here to move them in." : "";
                             }
                             action: win.searching ? ""
                                 : win.gone.length > 0 ? (pageState.drive.length > 0 ? "Go to Home" : `Go to ${Files.placeName(win.gone)}`)

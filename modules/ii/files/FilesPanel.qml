@@ -42,13 +42,17 @@ Scope {
             return;
         // the window's own address once it has caught it: every Files window carries the same
         // class and title, so the first match in the list was as likely to be an older one
-        if (w.hyprAddress.length > 0) {
-            Hyprland.dispatch(`hl.dsp.focus({ window = "address:${w.hyprAddress}" })`);
+        const addr = w.hyprAddress.length > 0 ? w.hyprAddress
+            : (HyprlandData.windowList.find(c => (c.class ?? "").includes("quickshell") && c.title === w.title)?.address ?? "");
+        if (addr.length === 0)
             return;
-        }
-        const client = HyprlandData.windowList.find(c => (c.class ?? "").includes("quickshell") && c.title === w.title);
-        if (client)
-            Hyprland.dispatch(`hl.dsp.focus({ window = "address:${client.address}" })`);
+        // asked from another workspace (a folder on the desktop, a download, a file chooser), the window comes to this one:
+        // focus alone left it where it was, and the double-click on a desktop folder seemed to do nothing (Discord 2026-11-02)
+        const here = HyprlandData.activeWorkspace?.id ?? 0;
+        const there = HyprlandData.windowByAddress[addr]?.workspace?.id ?? here;
+        if (here > 0 && there !== here)
+            Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${here}, follow = false, window = "address:${addr}" })`);
+        Hyprland.dispatch(`hl.dsp.focus({ window = "address:${addr}" })`);
     }
 
     Connections {
