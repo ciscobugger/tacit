@@ -119,7 +119,31 @@ if theirs("workspaces") then safe_require("workspaces") end
 if theirs("monitors") then safe_require("monitors") end
 
 -- Shell overrides (the person's, written by the shell) --
-if theirs("hyprland/shellOverrides/main") then safe_require("hyprland.shellOverrides.main") end
+-- Hyprland 0.57 refuses a curve in input.accel_profile, where Settings before 1.2.8 wrote the person's pointer speed:
+-- that line showed a config error at every start until the speed was moved again (Discord 2026-11-03). Its curve is
+-- kept as TACIT_POINTER_CURVE instead, which tacit/general.lua gives each mouse and touchpad without a profile of its
+-- own, and every other setting in the file goes through as written.
+if theirs("hyprland/shellOverrides/main") then
+    if hl.get_devices then
+        hl.__tacit_config = hl.__tacit_config or hl.config
+        local config = hl.__tacit_config
+        TACIT_POINTER_CURVE = nil
+        hl.config = function(t, ...)
+            local input = type(t) == "table" and t.input
+            if type(input) == "table" and type(input.accel_profile) == "string" and input.accel_profile:match("^custom ") then
+                TACIT_POINTER_CURVE = input.accel_profile
+                input.accel_profile = nil
+                if next(input) == nil then t.input = nil end
+                if next(t) == nil then return end
+            end
+            return config(t, ...)
+        end
+        safe_require("hyprland.shellOverrides.main")
+        hl.config = config
+    else
+        safe_require("hyprland.shellOverrides.main")
+    end
+end
 
 -- windows not in use as the person set them (Settings, shellOverrides), with this wallpaper's scale on their see-through
 local inactive = hl.get_config("decoration:inactive_opacity")

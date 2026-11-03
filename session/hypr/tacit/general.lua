@@ -143,7 +143,8 @@ if hl.get_devices then
                     if type(o.speed) == "number" then a.sensitivity = o.speed end
                     hl.device(a)
                 else
-                    hl.device({ name = d.name, accel_profile = POINTER_CURVE })
+                    -- the speed Settings wrote before 1.2.8 as one curve for every pointer (hyprland.lua), else Tacit's
+                    hl.device({ name = d.name, accel_profile = TACIT_POINTER_CURVE or POINTER_CURVE })
                 end
             end
         end
