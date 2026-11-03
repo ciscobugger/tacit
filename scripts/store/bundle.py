@@ -383,12 +383,20 @@ def run(app, cmd):
     perm = man["permissions"]
     uid = os.getuid(); rt = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{uid}"
     data = os.path.join(DATA, app); os.makedirs(data, exist_ok=True)
+    # one /tmp for every start of the app (until logout): a second start, as a sign-in's link opening the app, finds the
+    # first one's socket there and hands it the link. With a /tmp of its own each time, Chromium and Electron apps started
+    # a second copy on the same profile, which could not open its own databases, and the sign-in never arrived
+    # (Discord 2026-11-03: a sign-in looped back to the start).
+    tmp = os.path.join(rt, "tacit-bundle", f"{app}-tmp"); os.makedirs(tmp, mode=0o700, exist_ok=True)
     a = ["bwrap", "--die-with-parent", "--new-session", "--unshare-all", "--clearenv", *layers(root),
-         "--ro-bind", "/sys", "/sys", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--tmpfs", "/var/tmp",
+         "--ro-bind", "/sys", "/sys", "--proc", "/proc", "--dev", "/dev", "--bind", tmp, "/tmp", "--tmpfs", "/var/tmp",
          "--ro-bind-try", "/var/cache/fontconfig", "/var/cache/fontconfig", "--tmpfs", "/run", "--dir", rt, "--chmod", "0700", rt,
          "--bind", data, HOME]
     if "gpu" in perm["devices"]:
         a += ["--dev-bind-try", "/dev/dri", "/dev/dri"]
+        # NVIDIA's own driver draws through these, not /dev/dri: without them Blender and other OpenGL apps did not start
+        for v in sorted(glob.glob("/dev/nvidia*")):
+            a += ["--dev-bind-try", v, v]
     if "camera" in perm["devices"]:
         for v in glob.glob("/dev/video*") + glob.glob("/dev/media*"):
             a += ["--dev-bind", v, v]
