@@ -1040,6 +1040,12 @@ Item {
                     root.verbIndex = index;
                     root.activate(false);
                 }
+                // The verb under the pointer is the one highlighted: the wash marks what a click
+                // and Enter run, and it used to sit on Copy while the pointer was on Delete
+                onVerbHovered: index => {
+                    if (rowItem.index === root.chosen)
+                        root.verbIndex = index;
+                }
             }
         }
 

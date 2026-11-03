@@ -28,6 +28,9 @@ MouseArea {
     property int verbIndex: 0
     signal picked
     signal verbPicked(int index)
+    // the pointer is over a verb: it becomes the one the sand wash marks, so the button under the
+    // pointer is the one Enter and a click run
+    signal verbHovered(int index)
     // the pointer moved over the row (not the row moving under a resting pointer)
     signal pointerMoved(point at)
 
@@ -269,6 +272,11 @@ MouseArea {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onContainsMouseChanged: if (containsMouse) root.verbHovered(verbChip.index)
+                    // a press picks the verb too: the pointer may have arrived by a warp, which
+                    // sends no hover
+                    onPressed: root.verbHovered(verbChip.index)
                     onClicked: root.verbPicked(verbChip.index)
                 }
                 StyledText {
