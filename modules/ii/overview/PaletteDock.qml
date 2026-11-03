@@ -15,7 +15,8 @@ import Quickshell.Widgets
  * symbol + name pills, the open ones raised in the wash an "on" toggle wears; the search disc
  * waits at the end (SearchWidget draws it). Rest on an open program and its windows rise above
  * it as live pictures. Click opens or focuses (again: the next window); middle-click opens a new
- * one; right-click pins or unpins; drag a pinned program to move it. The peek itself is drawn by
+ * one; right-click pins or unpins; drag a pinned program to move it: the row opens its place as it
+ * goes and settles it in before the order is written. The peek itself is drawn by
  * SearchWidget.qml, outside the dock's shape (it grows out of the dock's top edge).
  *
  * Never wider than the search: when the names would make it so, closed programs lose theirs
@@ -215,24 +216,94 @@ Item {
     }
 
     // ------------------------------------------------------------- reordering
+    // A pinned pill is carried by the pointer. The row makes its room as it goes: the pills between it and
+    // the place it would take slide over by its own width, so it is not laid on top of them. Let go, and it
+    // settles into that place before the order is written: writing it rebuilds every pill at once, and a
+    // pill still in the hand would leave it.
     property string draggingId: ""
     property real dragOffset: 0
-    function moveTo(appId, x) {
-        const pins = (Config.options.dock.pinnedApps ?? []).slice();
-        const from = pins.findIndex(id => id.toLowerCase() === appId.toLowerCase());
-        if (from < 0)
-            return;
-        // the slot whose centre the dragged pill passed
+    property int dragFrom: -1      // its place among the pinned programs
+    property int dragTo: -1        // the place it would take
+    property real dragHome: 0      // its centre where it rests, in the row
+    property real dragWidth: 0     // its width: the room the others make for it
+    property bool landing: false   // let go: it is going into dragTo now
+
+    // Arrive, small (the guide's motion): it decelerates and ends still, so the pill reads as put down
+    NumberAnimation {
+        id: land
+        target: root
+        property: "dragOffset"
+        duration: Appearance.animationCurves.smallDuration
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+        onFinished: {
+            if (root.landing)
+                root.finishDrag();
+        }
+    }
+
+    function beginDrag(appId, homeX, width) {
+        root.reset();
+        root.draggingId = appId;
+        const pins = Config.options.dock.pinnedApps ?? [];
+        root.dragFrom = pins.findIndex(id => id.toLowerCase() === appId.toLowerCase());
+        root.dragTo = root.dragFrom;
+        root.dragHome = homeX;
+        root.dragWidth = width;
+    }
+
+    // the place the carried pill has reached: the other pinned pills whose centre it has passed
+    function slotFor(x) {
         let to = 0;
         for (let i = 0; i < programRow.children.length; i++) {
             const child = programRow.children[i];
-            if (!child.appId || !child.pinned || child.appId === appId)
+            if (!child.appId || !child.pinned || child.appId === root.draggingId)
                 continue;
             if (x > child.x + child.width / 2)
                 to++;
         }
-        pins.splice(from, 1);
-        pins.splice(Math.min(to, pins.length), 0, Config.options.dock.pinnedApps[from]);
+        return to;
+    }
+
+    // the carried pill's centre where it comes to rest: the slots of the pills that keep their place up to
+    // dragTo, then half its own width
+    function landingOffset() {
+        let x = 0, kept = 0;
+        for (let i = 0; i < programRow.children.length; i++) {
+            const child = programRow.children[i];
+            if (!child.appId || !child.pinned || child.appId === root.draggingId)
+                continue;
+            if (kept === root.dragTo)
+                break;
+            x += child.width + programRow.spacing;
+            kept++;
+        }
+        return x + root.dragWidth / 2 - root.dragHome;
+    }
+
+    function cancelDrag() {
+        land.stop();
+        root.landing = false;
+        root.draggingId = "";
+        root.dragFrom = -1;
+        root.dragTo = -1;
+        root.dragHome = 0;
+        root.dragWidth = 0;
+        root.dragOffset = 0;
+    }
+
+    function finishDrag() {
+        const appId = root.draggingId;
+        const from = root.dragFrom;
+        const to = root.dragTo;
+        root.cancelDrag();
+        if (appId.length === 0 || from < 0 || to < 0 || from === to)
+            return;
+        const pins = (Config.options.dock.pinnedApps ?? []).slice();
+        const at = pins.findIndex(id => id.toLowerCase() === appId.toLowerCase());
+        if (at < 0)
+            return;
+        pins.splice(to, 0, pins.splice(at, 1)[0]);
         Config.options.dock.pinnedApps = pins;
     }
 
@@ -266,6 +337,9 @@ Item {
     }
     function rest(app) {
         unpeekTimer.stop();
+        // a pill being carried (or settling) is arranging the row, not asking for a program's windows
+        if (root.draggingId !== "" || root.landing)
+            return;
         if (!app || app.toplevels.length === 0) {
             peekTimer.stop();
             followTimer.stop();
@@ -296,8 +370,8 @@ Item {
         unpeekTimer.stop();
         root.peekEntry = null;
         root.peekCandidate = null;
-        root.draggingId = "";
         root.focusIndex = -1;
+        root.cancelDrag();
     }
 
     readonly property color colWash: ColorUtils.transparentize(Appearance.m3colors.m3onSurface, 0.88)
@@ -465,12 +539,40 @@ Item {
                 // at, a closed one in sand
                 color: pill.hot ? root.colSandWash : pill.lit ? root.colWashLit : pill.open ? root.colWash : "transparent"
                 opacity: pill.swept
-                // sunk a little while pressed
-                scale: (0.92 + 0.08 * pill.swept) * (pillArea.pressed ? 0.95 : 1) * (pill.taking ? 1.08 : 1)
+                // sunk a little while pressed, a hair raised while carried
+                scale: (0.92 + 0.08 * pill.swept) * (pill.dragging ? 1.06 : (pillArea.pressed ? 0.95 : 1)) * (pill.taking ? 1.08 : 1)
                 Behavior on scale { Anim { type: Anim.FastSpatial } }
                 z: pill.dragging ? 2 : 0
+                // the row makes room: the pills the carried one has passed slide over by its width
+                readonly property real reorderShift: {
+                    if (root.draggingId === "" || pill.dragging || !pill.pinned || root.dragTo < 0)
+                        return 0;
+                    const step = root.dragWidth + programRow.spacing;
+                    if (root.dragTo > root.dragFrom && pill.index > root.dragFrom && pill.index <= root.dragTo)
+                        return -step;
+                    if (root.dragTo < root.dragFrom && pill.index >= root.dragTo && pill.index < root.dragFrom)
+                        return step;
+                    return 0;
+                }
                 transform: Translate {
-                    x: pill.dragging ? root.dragOffset : 0
+                    x: pill.dragging ? root.dragOffset : pill.reorderShift
+                    // carried, it follows the pointer with nothing in between; otherwise the room it made arrives
+                    Behavior on x {
+                        enabled: !pill.dragging
+                        NumberAnimation {
+                            duration: Appearance.animationCurves.smallDuration
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+                        }
+                    }
+                    y: pill.dragging ? -Tacit.space.xs : 0
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: Appearance.animationCurves.smallDuration
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+                        }
+                    }
                 }
                 Behavior on width {
                     Anim {
@@ -600,13 +702,19 @@ Item {
                     id: pillArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
+                    cursorShape: pill.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                     property real pressX: 0
                     property bool moved: false
                     onEntered: root.rest(pill.modelData)
                     onExited: root.leave()
                     onPressed: mouse => {
+                        // the last one put down is still settling: let it land, and this press does nothing
+                        if (root.landing) {
+                            pillArea.moved = true;
+                            root.finishDrag();
+                            return;
+                        }
                         // the pointer's place in the dock, not in the pill: once the pill is being dragged
                         // it is moved under the pointer, and its own coordinates subtract that move
                         pillArea.pressX = pillArea.mapToItem(root, mouse.x, mouse.y).x;
@@ -621,24 +729,23 @@ Item {
                         const dx = pillArea.mapToItem(root, mouse.x, mouse.y).x - pillArea.pressX;
                         if (!pillArea.moved && Math.abs(dx) > 6) {
                             pillArea.moved = true;
-                            root.draggingId = pill.appId;
-                            root.reset();
-                            root.draggingId = pill.appId;
+                            root.beginDrag(pill.appId, pill.x + pill.width / 2, pill.width);
                         }
-                        if (pillArea.moved)
-                            root.dragOffset = dx;
-                    }
-                    onReleased: mouse => {
                         if (!pillArea.moved)
                             return;
-                        root.moveTo(pill.appId, pill.x + pill.width / 2 + root.dragOffset);
-                        root.draggingId = "";
-                        root.dragOffset = 0;
+                        root.dragOffset = dx;
+                        // the row opens the place the pill's centre has reached, while it is still carried
+                        root.dragTo = root.slotFor(pill.x + pill.width / 2 + dx);
                     }
-                    onCanceled: {
-                        root.draggingId = "";
-                        root.dragOffset = 0;
+                    onReleased: mouse => {
+                        if (!pill.dragging)
+                            return;
+                        // let go: it goes into that place first, then the order is written
+                        root.landing = true;
+                        land.to = root.landingOffset();
+                        land.start();
                     }
+                    onCanceled: root.cancelDrag()
                     onClicked: mouse => {
                         if (pillArea.moved)
                             return;
