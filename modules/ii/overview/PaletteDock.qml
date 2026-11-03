@@ -607,13 +607,18 @@ Item {
                     onEntered: root.rest(pill.modelData)
                     onExited: root.leave()
                     onPressed: mouse => {
-                        pillArea.pressX = mouse.x;
+                        // the pointer's place in the dock, not in the pill: once the pill is being dragged
+                        // it is moved under the pointer, and its own coordinates subtract that move
+                        pillArea.pressX = pillArea.mapToItem(root, mouse.x, mouse.y).x;
                         pillArea.moved = false;
                     }
                     onPositionChanged: mouse => {
                         if (!(pillArea.pressedButtons & Qt.LeftButton) || !pill.pinned)
                             return;
-                        const dx = mouse.x - pillArea.pressX;
+                        // measured in the pill's coordinates, the far end of the drag took the drag itself
+                        // off and the sign flipped on every event: the pill ran left and right and left the
+                        // dock. Mapped into the dock, the pointer's move is the move.
+                        const dx = pillArea.mapToItem(root, mouse.x, mouse.y).x - pillArea.pressX;
                         if (!pillArea.moved && Math.abs(dx) > 6) {
                             pillArea.moved = true;
                             root.draggingId = pill.appId;
