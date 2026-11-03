@@ -4590,7 +4590,7 @@ ApplicationWindow {
                 // touchpad's own touchpad-scoped keys keep winning for it
                 ChoiceRow {
                     label: "Scrolling"
-                    description: Config.options.hyprland.input.naturalScroll ? "Natural: the page follows the wheel" : "Traditional: the page moves against the wheel"
+                    description: Config.options.hyprland.input.naturalScroll ? "Natural: the page follows your fingers" : "Traditional: the page moves against your fingers"
                     options: [{ value: true, label: "Natural" }, { value: false, label: "Traditional" }]
                     current: Config.options.hyprland.input.naturalScroll
                     onPicked: value => {

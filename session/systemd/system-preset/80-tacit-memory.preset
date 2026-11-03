@@ -1,0 +1,2 @@
+# earlyoom closes one program when memory runs out, before the screen freezes (memory/earlyoom.service.d).
+enable earlyoom.service
