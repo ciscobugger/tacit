@@ -632,9 +632,13 @@ Item {
                     onClicked: mouse => {
                         if (pillArea.moved)
                             return;
-                        if (mouse.button === Qt.RightButton)
-                            TaskbarApps.togglePin(pill.appId);
-                        else if (mouse.button === Qt.MiddleButton)
+                        // a right click (a two-finger tap on a touchpad) pins a running app and never unpins: it took a
+                        // pinned app off the dock at once, with no way back there (Discord 2026-11-03). Unpinning stays in
+                        // Settings and on Ctrl+P.
+                        if (mouse.button === Qt.RightButton) {
+                            if (!pill.pinned)
+                                TaskbarApps.togglePin(pill.appId);
+                        } else if (mouse.button === Qt.MiddleButton)
                             root.launch(pill.appId);
                         else
                             root.activate(pill.modelData);
