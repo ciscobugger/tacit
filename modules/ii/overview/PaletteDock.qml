@@ -252,14 +252,20 @@ Item {
         root.dragWidth = width;
     }
 
-    // the place the carried pill has reached: the other pinned pills whose centre it has passed
+    // The place the carried pill has reached: the other pinned pills it has come past. Half the way to a
+    // neighbour's centre already counts, so a pill a little short of the neighbour is in its place; laid
+    // exactly on the neighbour's centre was the whole way, and the hand had to overshoot to change the row.
     function slotFor(x) {
         let to = 0;
         for (let i = 0; i < programRow.children.length; i++) {
             const child = programRow.children[i];
             if (!child.appId || !child.pinned || child.appId === root.draggingId)
                 continue;
-            if (x > child.x + child.width / 2)
+            const centre = child.x + child.width / 2;
+            const reach = (root.dragWidth + child.width) / 2 + programRow.spacing;
+            // the side the pill rests on: the room it gives is on the side it is coming from
+            const bias = root.dragHome <= centre ? -reach / 2 : reach / 2;
+            if (x > centre + bias)
                 to++;
         }
         return to;
