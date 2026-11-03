@@ -466,15 +466,18 @@ Item {
     }
 
     function activate(keepOpen) {
-        // Cached before closing: closing empties the sections
+        // Cached before closing: closing empties the sections and clears the choice, which resets
+        // the verb with it - read after, every verb but the row's own ran the row's own (Delete
+        // copied, 2026-11-03)
         const entry = root.selectedEntry;
         if (!entry)
             return;
+        const verbIndex = root.verbIndex;
         if (!keepOpen)
             root.dockDone();
         const own = (entry.verb ?? "").length > 0 ? entry.verb : Translation.tr("Open");
         const actions = (entry.actions ?? []).filter(action => action.name !== own);
-        const action = root.verbIndex > 0 ? actions[root.verbIndex - 1] : null;
+        const action = verbIndex > 0 ? actions[verbIndex - 1] : null;
         if (!keepOpen)
             GlobalStates.overviewOpen = false;
         if (action)
