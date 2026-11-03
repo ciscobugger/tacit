@@ -256,20 +256,24 @@ MouseArea {
                 required property int index
                 readonly property bool active: index === root.verbIndex
                 implicitWidth: verbLabel.implicitWidth + 22
-                implicitHeight: 28
-                radius: 14
-                color: verbChip.active && root.verbs.length > 1 ? root.colSandWash : "transparent"
-                Behavior on color {
-                    ColorAnimation {
-                        duration: Appearance.animationCurves.expressiveEffectsDuration
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                // The button is the row's whole height. A 28 px pill left 12 px of row above and
+                // below it, and a click there ran the row's own verb: Delete copied.
+                implicitHeight: root.height
+                color: "transparent"
+                Rectangle {
+                    id: verbPill
+                    anchors.centerIn: parent
+                    implicitWidth: verbChip.implicitWidth
+                    implicitHeight: 28
+                    radius: 14
+                    color: verbChip.active && root.verbs.length > 1 ? root.colSandWash : "transparent"
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: Appearance.animationCurves.expressiveEffectsDuration
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                        }
                     }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.verbPicked(verbChip.index)
                 }
                 StyledText {
                     id: verbLabel
@@ -279,10 +283,15 @@ MouseArea {
                     font.weight: verbChip.active ? Font.Medium : Font.Normal
                     color: verbChip.active ? Tacit.inkMain : root.colQuiet
                 }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.verbPicked(verbChip.index)
+                }
             }
         }
         Rectangle {
-            y: 4
+            anchors.verticalCenter: parent.verticalCenter
             implicitHeight: 20
             implicitWidth: chipLabel.implicitWidth + 12
             radius: 6
