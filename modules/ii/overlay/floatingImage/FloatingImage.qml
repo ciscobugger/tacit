@@ -64,6 +64,21 @@ StyledOverlayWidget {
         OverlayContext.pickImage();
     }
 
+    // A picture is far larger than the empty card it replaces, which starts near the right edge: pulled back
+    // in where it would run off the screen, once the card has its new size (and as the wheel scales it).
+    onWidthChanged: Qt.callLater(root.keepOnScreen)
+    onHeightChanged: Qt.callLater(root.keepOnScreen)
+    function keepOnScreen() {
+        const area = root.parent;
+        // not before the overlay has its size: against a 0 px area every card went to the corner
+        if (!area || area.width <= 0 || area.height <= 0)
+            return;
+        const x = Math.max(0, Math.min(root.x, area.width - root.width));
+        const y = Math.max(0, Math.min(root.y, area.height - root.height));
+        if (x !== root.x || y !== root.y)
+            root.savePosition(x, y);
+    }
+
     contentItem: OverlayBackground {
         id: bg
         radius: root.contentRadius
