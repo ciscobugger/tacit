@@ -61,6 +61,7 @@ ShellRoot {
         Cliphist.refresh()
         Wallpapers.load()
         Updates.load()
+        AppScope.load()
     }
     
     // GlobalStates' shortcuts and IPC, here so only the shell holds them. GlobalStates is also

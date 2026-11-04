@@ -92,7 +92,18 @@ Item {
     readonly property int tile: 44
     // the program just asked to start, until its window is there (or 8 s have gone)
     property string launching: ""
-    Timer { id: launchTimer; interval: 8000; onTriggered: root.launching = "" }
+    // until the window shows or the start is known to have failed (AppScope); a minute at most. At 8 s it went out while
+    // a slow app was still starting, and an app that never started looked the same as one on its way
+    Timer { id: launchTimer; interval: 60000; onTriggered: root.launching = "" }
+    Connections {
+        target: AppScope
+        function onStartFailed(entryId) {
+            if (root.launching !== "" && root.entryFor(root.launching)?.id === entryId) {
+                root.launching = "";
+                launchTimer.stop();
+            }
+        }
+    }
     // 0 every name, 1 open programs only, 2 symbols only
     readonly property int tier: {
         const room = root.maxWidth - 36 - root.discSpace;

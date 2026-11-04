@@ -852,7 +852,10 @@ Item {
                 action: () => {
                     const p = IslandController.payload;
                     IslandController.dismiss();
-                    WindowBand.act(p?.verb ?? "", p?.address ?? "");
+                    if (p?.run)
+                        p.run();        // an app that didn't open: Try again (AppScope)
+                    else
+                        WindowBand.act(p?.verb ?? "", p?.address ?? "");
                 }
             }
         }

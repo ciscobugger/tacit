@@ -362,6 +362,16 @@ def locked(app):
         yield
 
 
+def shell_file():
+    return os.environ.get("TACIT_SHELL") or os.path.join(HOME, ".config/quickshell/tacit")
+
+
+def tell(*args):
+    """the shell (AppScope.qml): an app being made ready before it starts, or one that stopped"""
+    subprocess.Popen(["qs", "-p", shell_file(), "ipc", "call", "apps", *map(str, args)],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
 def run(app, cmd):
     base = os.path.join(ROOT, app)
     man = json.load(open(os.path.join(base, "manifest.json")))
@@ -372,7 +382,14 @@ def run(app, cmd):
                 man = json.load(open(os.path.join(base, "manifest.json")))     # a launch ahead of us may have done it
                 if man.get("host_stamp") != host_stamp():
                     if stale(man):
-                        install(man["package"], quiet=True)
+                        # this can be a download before anything shows: the notch says so ("Getting Discord ready"),
+                        # where the start used to look like nothing at all (Discord 2026-11-04)
+                        tell("preparing", app, 0)
+                        try:
+                            install(man["package"], quiet=True, step=lambda **kw: kw.get("step") == "get" and kw["bytes"] > 0
+                                    and tell("preparing", app, kw["bytes"]))
+                        finally:
+                            tell("ready", app)
                     else:
                         man["host_stamp"] = host_stamp()
                         json.dump(man, open(os.path.join(base, "manifest.json"), "w"), indent=1)
@@ -455,7 +472,18 @@ def run(app, cmd):
         env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={rt}/bus"
     for k, v in env.items():
         a += ["--setenv", k, v]
-    os.execvp("bwrap", a + (cmd or man["exec"]))
+    a += cmd or man["exec"]
+    # at a terminal the app's errors are the person's to read there
+    if sys.stderr.isatty():
+        os.execvp("bwrap", a)
+    # otherwise its last start's errors are kept (the last 64 KB, in ~/.cache/tacit-bundle/<app>.log) and the shell hears
+    # when it stops: one that stopped with an error before it showed a window is said in the notch, with Try again. A
+    # start that failed was silent and left nothing to send (Discord 2026-11-04: "Discord isn't opening")
+    os.makedirs(CACHE, exist_ok=True)
+    os.environ.update(TACIT_APP=app, TACIT_APP_LOG=os.path.join(CACHE, f"{app}.log"), TACIT_APP_SHELL=shell_file())
+    os.execvp("bash", ["bash", "-c", 't=$SECONDS; "$@" 2> >(tail -c 65536 > "$TACIT_APP_LOG"); c=$?; '
+                       'qs -p "$TACIT_APP_SHELL" ipc call apps exited "$TACIT_APP" "$c" "$((SECONDS - t))" >/dev/null 2>&1; exit "$c"',
+                       "tacit-app", *a])
 
 
 # ---- install, remove ----
@@ -510,8 +538,8 @@ def integrate(app, root, target_files, made):
     return ids, [e for *_, e in sorted(execs, key=lambda e: e[:2])]
 
 
-def install(target, quiet=False):
-    step = (lambda **kw: None) if quiet else say
+def install(target, quiet=False, step=None):
+    step = step or ((lambda **kw: None) if quiet else say)
     step(step="lists")
     refresh_sync(max_age=600 if not quiet else 3600)
     bundle, used = resolve(target)
@@ -530,6 +558,7 @@ def install(target, quiet=False):
     if shutil.disk_usage(ROOT).free < size * 1.3 + (1 << 28):
         raise Refused("space", f"needs {size >> 20} MB")
     # fetch and check everything before touching anything
+    step(step="get", bytes=sum(p["csize"] for p in bundle.values() if not os.path.exists(os.path.join(CACHE, "pkg", p["filename"]))))
     files, done = {}, 0
     with concurrent.futures.ThreadPoolExecutor(4) as ex:
         futs = {ex.submit(fetch, p): n for n, p in bundle.items()}
