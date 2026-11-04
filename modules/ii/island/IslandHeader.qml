@@ -22,6 +22,8 @@ Item {
     // (the sign-in breathing in), "signinWait" (it waits as a wing), "recordSheet" (the recording's choice or card),
     // or a peek name.
     property string notchState: "idle"
+    // the window's middle in the header's own place (IslandContent sets it); the notch's own middle when alone
+    property real windowMid: width / 2
     property string loadedState: "idle"
     readonly property real wing: IslandController.wingFor(root.loadedState)
     readonly property string glyph: IslandController.ambientGlyph
@@ -89,7 +91,11 @@ Item {
     Item {
         id: centre
         readonly property bool live: IslandController.recording
-        x: Math.round((root.width - width) / 2)
+        // Kept on the window's middle, not the notch's: centred on the notch's own middle, the time moved with each width
+        // the notch passed through, which at 125 % showed as a small shift when it opened (Discord 2026-11-03: "the time
+        // just keeps small shifting when expand"). Measured on a test computer at 125 %: 0.8 px between closed and open
+        // before, 0.4 px after, which is what the time's change of ink alone reads as at 100 %, where it does not move.
+        x: Math.round(root.windowMid - width / 2)
         width: centre.live ? liveRow.width : clockFace.width
         height: parent.height
         // under the workspace sheet, which draws this same centre in the same place

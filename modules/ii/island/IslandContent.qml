@@ -966,6 +966,9 @@ Item {
             anchors.right: parent.right
             height: 34
             notchState: root.headerState
+            // the window's middle (the screen's), here: the notch moves a whole pixel at a time while its width
+            // changes, and the time keeps to this, not to the notch's own middle
+            windowMid: root.parent ? root.parent.width / 2 - root.x : width / 2
         }
 
         // An app stopped answering (Hyprland's detection, brought here by scripts/activity/hyprland-dialog):
