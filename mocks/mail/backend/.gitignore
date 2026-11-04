@@ -1,0 +1,6 @@
+/bin/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sock
+*.sqlite.blobs/
