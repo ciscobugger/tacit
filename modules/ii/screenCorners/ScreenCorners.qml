@@ -35,12 +35,13 @@ Scope {
         readonly property bool decorationVisible: (Config.options.appearance.fakeScreenRounding === 1 || (Config.options.appearance.fakeScreenRounding === 2 && !fullscreen))
         // An unmapped layer surface receives no pointer input, so the window stays mapped for the
         // corner gesture even with the rounding decoration off - only the decoration follows it.
-        visible: strip.decorationVisible || leftArea.active || rightArea.active
+        visible: strip.decorationVisible || leftArea.active || rightArea.active || door.active
 
         exclusionMode: ExclusionMode.Ignore
         mask: Region {
             Region { item: leftArea.active ? leftArea : null }
             Region { item: rightArea.active ? rightArea : null }
+            Region { item: door.active ? door : null }
         }
         WlrLayershell.namespace: "quickshell:screenCorners"
         WlrLayershell.layer: WlrLayer.Overlay
@@ -75,6 +76,49 @@ Scope {
             rightVisualMargin: strip.deadPixel * 1
             bottomVisualMargin: (strip.deadPixel && !strip.top) * 1
             implicitSize: Appearance.rounding.screenRounding
+        }
+
+        // The notification centre's door, here since the notification window exists only while something shows in it:
+        // the screen's very edge where notifications arrive, 3 px, on the focused screen, while nothing shows there.
+        // Hovered 300 ms or clicked, it opens the centre. Under the corner areas, as its window was under theirs.
+        readonly property string notificationPosition: {
+            const raw = Config.options.notifications.position ?? "top_right"
+            if (raw === "top") return "top_right"
+            if (raw === "bottom") return "bottom_right"
+            return raw
+        }
+        Item {
+            id: door
+            // NotificationPopup's `showing`, for the window that is not there
+            readonly property bool panelShowing: GlobalStates.notificationCenterOpen
+                || (!((Config.options.island.enable ?? false) && (Config.options.island.states.notification ?? false))
+                    && Notifications.popupList.length > 0)
+            readonly property bool active: strip.top === strip.notificationPosition.startsWith("top")
+                && strip.screen?.name === Hyprland.focusedMonitor?.name && !door.panelShowing
+            visible: door.active
+            width: Appearance.sizes.notificationPopupWidth
+            height: 3
+            anchors.top: strip.top ? parent.top : undefined
+            anchors.bottom: strip.top ? undefined : parent.bottom
+            anchors.bottomMargin: (strip.deadPixel && !strip.top) * 1
+            anchors.right: strip.notificationPosition.endsWith("right") ? parent.right : undefined
+            anchors.rightMargin: strip.deadPixel * 1
+            anchors.left: strip.notificationPosition.endsWith("left") ? parent.left : undefined
+            anchors.horizontalCenter: strip.notificationPosition.endsWith("center") ? parent.horizontalCenter : undefined
+
+            Timer {
+                id: doorTimer
+                interval: 300
+                onTriggered: GlobalStates.notificationCenterOpen = true
+            }
+            HoverHandler {
+                onHoveredChanged: hovered ? doorTimer.restart() : doorTimer.stop()
+            }
+            // A click opens at once; the hover above is for the hand that only lingers.
+            MouseArea {
+                anchors.fill: parent
+                onClicked: GlobalStates.notificationCenterOpen = true
+            }
         }
 
         // Siblings of the corners, not children: an invisible parent takes no pointer input.

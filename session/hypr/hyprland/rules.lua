@@ -117,7 +117,9 @@ hl.layer_rule({ match = { namespace = "quickshell:bar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:dock" }, animation = "slide bottom"})
 -- the corners are two screen-wide strips (ScreenCorners.qml): a pop-in from 120 % slid them in from far off-screen
 hl.layer_rule({ match = { namespace = "quickshell:screenCorners" }, animation = "fade"})
-hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, animation = "fade"})
+-- made when something shows and gone after (NotificationPopup.qml): the panel unfolds and folds itself, as it did when
+-- the window was always there
+hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "quickshell:overview" }, no_anim = true})
