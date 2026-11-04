@@ -1,0 +1,4 @@
+# Local Finder and IDE settings
+.DS_Store
+.qtcreator/
+.idea/
