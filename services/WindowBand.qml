@@ -67,6 +67,7 @@ Singleton {
         const a = root.norm(address);
         if ((root.held[a] ?? "").length > 0)
             root.setHeld(a, "");
+        delete root.comingBack[a];
         if (root.norm(root.dragAddress) === a) {
             root.dragAddress = "";
             root.holdDock = false;
@@ -74,6 +75,15 @@ Singleton {
             root.zone = "none";
             foldWatchdog.stop();
         }
+    }
+    // windows asked back while still on their way into the dock ("folding"): the plugin brings back only a window it
+    // already holds, so each goes back out the moment it lands. A dock click in the half second of the flight was lost
+    // and the window stayed hidden (Discord 2026-11-02: minimised windows sometimes stuck).
+    property var comingBack: ({})
+    function reopenWhenHidden(address) {
+        const a = root.norm(address);
+        if (a.length > 0)
+            root.comingBack[a] = true;
     }
     function norm(a) {
         return (a ?? "").replace(/^0x/, "");
@@ -188,6 +198,8 @@ Singleton {
         onTriggered: {
             if (!root.holdDock)
                 return;
+            if (root.held[root.norm(root.dragAddress)] === "folding")
+                root.setHeld(root.dragAddress, "");
             root.holdDock = false;
             root.dropInto = "";
             root.dragAddress = "";
@@ -290,6 +302,7 @@ Singleton {
                 if (f[2] === "hide") {
                     dockRetreat.stop();
                     foldWatchdog.restart();
+                    root.setHeld(f[1], "folding");
                     root.dragAddress = f[1];
                     root.dragApp = root.appIdOf(f[1]);
                     root.dropInto = root.dragApp;
@@ -325,6 +338,11 @@ Singleton {
                 root.dragAddress = "";
                 dockRetreat.restart();
                 root.mark("hide");
+                if (root.comingBack[root.norm(f[1])]) {
+                    delete root.comingBack[root.norm(f[1])];
+                    root.command("reopen", f[1]);
+                    break;
+                }
                 root.say(`${root.nameFor(f[2] ?? "")} hidden`, "minimize", "Show", "reopen", f[1], 3500);
                 break;
             case "side":
