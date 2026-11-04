@@ -123,7 +123,7 @@ Item {
     readonly property int dockCornerSize: 12
 
     implicitWidth: root.dockMaxWidth + root.dockCornerSize * 2
-    implicitHeight: frame.height + peekTab.height
+    implicitHeight: frame.height + Math.max(peekTab.height, menuTab.height)
 
     // Out of the bottom edge as one piece, like the control panel (SidebarRight.qml): one scalar,
     // the default spatial Anim both ways, no fade - Hyprland blurs only pixels above ignore_alpha,
@@ -594,6 +594,79 @@ Item {
             font.pixelSize: 13
             font.weight: Font.Medium
             color: Tacit.inkSec
+        }
+    }
+
+    // ------------------------------------------------------------ the menu: a right click
+    // A right click (a two-finger tap) on a program raises a short slab out of its pill, the peek's form, with what can
+    // be done with it as words: open, a new window or quit (and keep it, when it is not pinned); closed, take it off the
+    // dock. A pick, a click on the dock or the pointer leaving it puts it away.
+    Item {
+        id: menuTab
+        readonly property var entry: root.dockMode ? dock.menuEntry : null
+        readonly property bool appOpen: (menuTab.entry?.toplevels.length ?? 0) > 0
+        readonly property var actions: {
+            const e = menuTab.entry;
+            if (!e)
+                return [];
+            if (menuTab.appOpen)
+                return [{ "word": Translation.tr("New window"), "act": "new" }, { "word": Translation.tr("Quit"), "act": "quit" }]
+                    .concat(e.pinned ? [] : [{ "word": Translation.tr("Keep in dock"), "act": "pin" }]);
+            return [{ "word": Translation.tr("Remove from dock"), "act": "unpin" }];
+        }
+        readonly property int pad: 22
+        readonly property int full: 52
+        readonly property int corner: 20
+        readonly property real margin: menuTab.corner + 12
+        readonly property real pillCentre: frame.x + dock.x + dock.menuPill.x + dock.menuPill.width / 2
+        width: words.implicitWidth + menuTab.pad * 2
+        height: menuTab.entry ? menuTab.full : 0
+        Behavior on height {
+            Anim {
+                type: Anim.EmphasizedSmall
+            }
+        }
+        x: Math.max(frame.x + menuTab.margin, Math.min(frame.x + frame.width - menuTab.margin - menuTab.width, menuTab.pillCentre - menuTab.width / 2))
+        anchors.bottom: frame.top
+        visible: menuTab.height > 0.5
+
+        DockedRect {
+            anchors.fill: parent
+            edge: "bottom"
+            cornerRadius: menuTab.corner
+            fillet: 12
+            color: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainerHigh, 0.08)
+        }
+        // uncovered from the dock up as the slab rises
+        Item {
+            anchors.fill: parent
+            clip: true
+            Row {
+                id: words
+                x: menuTab.pad
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: (menuTab.full - words.height) / 2
+                spacing: 28
+                Repeater {
+                    model: menuTab.actions
+                    StyledText {
+                        id: word
+                        required property var modelData
+                        text: word.modelData.word
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.weight: Font.Medium
+                        color: wordArea.containsMouse ? Appearance.m3colors.m3onSurface : Appearance.colors.colSubtext
+                        MouseArea {
+                            id: wordArea
+                            anchors.fill: parent
+                            anchors.margins: -10
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: dock.menuAct(word.modelData.act)
+                        }
+                    }
+                }
+            }
         }
     }
 

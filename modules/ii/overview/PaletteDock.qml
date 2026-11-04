@@ -15,7 +15,7 @@ import Quickshell.Widgets
  * symbol + name pills, the open ones raised in the wash an "on" toggle wears; the search disc
  * waits at the end (SearchWidget draws it). Rest on an open program and its windows rise above
  * it as live pictures. Click opens or focuses (again: the next window); middle-click opens a new
- * one; right-click pins or unpins; drag a pinned program to move it: the row opens its place as it
+ * one; right-click (a two-finger tap) opens its menu; drag a pinned program to move it: the row opens its place as it
  * goes and settles it in before the order is written. The peek itself is drawn by
  * SearchWidget.qml, outside the dock's shape (it grows out of the dock's top edge).
  *
@@ -324,6 +324,36 @@ Item {
         Config.options.dock.pinnedApps = pins;
     }
 
+    // ------------------------------------------------------------- the menu
+    // A right click (a two-finger tap) on a program: what can be done with it, as words, in a slab over its pill
+    // (SearchWidget draws it). It took the place of a right click that took a pinned app off the dock at once
+    // (Discord 2026-11-03), and then of one that only pinned.
+    property var menuEntry: null
+    readonly property var menuPill: {
+        for (let i = 0; i < programRow.children.length; i++) {
+            const child = programRow.children[i];
+            if (child.appId && root.menuEntry && child.appId === root.menuEntry.appId)
+                return { "x": programRow.x + child.x, "width": child.width };
+        }
+        return { "x": root.width / 2 - 22, "width": 44 };
+    }
+    function openMenu(app) {
+        root.reset();
+        root.menuEntry = app;
+    }
+    function menuAct(act) {
+        const app = root.menuEntry;
+        root.menuEntry = null;
+        if (!app)
+            return;
+        if (act === "new")
+            root.launch(app.appId);
+        else if (act === "quit")
+            app.toplevels.slice().forEach(t => t.close());
+        else if (act === "pin" || act === "unpin")
+            TaskbarApps.togglePin(app.appId);
+    }
+
     // ------------------------------------------------------------- the peek
     property var peekEntry: null
     property var peekCandidate: null
@@ -354,8 +384,9 @@ Item {
     }
     function rest(app) {
         unpeekTimer.stop();
-        // a pill being carried (or settling) is arranging the row, not asking for a program's windows
-        if (root.draggingId !== "" || root.landing)
+        // a pill being carried (or settling) is arranging the row, not asking for a program's windows; an open menu stays
+        // the one thing over the dock until it is put away
+        if (root.draggingId !== "" || root.landing || root.menuEntry !== null)
             return;
         if (!app || app.toplevels.length === 0) {
             peekTimer.stop();
@@ -388,6 +419,7 @@ Item {
         root.peekEntry = null;
         root.peekCandidate = null;
         root.focusIndex = -1;
+        root.menuEntry = null;
         root.cancelDrag();
     }
 
@@ -766,13 +798,14 @@ Item {
                     onClicked: mouse => {
                         if (pillArea.moved)
                             return;
-                        // a right click (a two-finger tap on a touchpad) pins a running app and never unpins: it took a
-                        // pinned app off the dock at once, with no way back there (Discord 2026-11-03). Unpinning stays in
-                        // Settings and on Ctrl+P.
+                        // a right click (a two-finger tap on a touchpad) opens the program's menu; it no longer pins or
+                        // unpins on its own (it took a pinned app off the dock at once, Discord 2026-11-03)
                         if (mouse.button === Qt.RightButton) {
-                            if (!pill.pinned)
-                                TaskbarApps.togglePin(pill.appId);
-                        } else if (mouse.button === Qt.MiddleButton)
+                            root.openMenu(pill.modelData);
+                            return;
+                        }
+                        root.menuEntry = null;
+                        if (mouse.button === Qt.MiddleButton)
                             root.launch(pill.appId);
                         else
                             root.activate(pill.modelData);
