@@ -30,7 +30,7 @@ Singleton {
     // declares, so without a stamp on the file there is no way to tell a value that was never
     // set from one this build no longer knows the name of - and the next settings change writes
     // the loss to disk. migrate() carries a file with a lower stamp forward.
-    readonly property int currentConfigVersion: 3
+    readonly property int currentConfigVersion: 4
 
     function setNestedValue(nestedKey, value) {
         let keys = nestedKey.split(".");
@@ -99,6 +99,24 @@ Singleton {
         if (from < 3 && !root.options.appearance.transparency.enable) {
             root.options.appearance.transparency.enable = true;
             root.options.appearance.transparency.automatic = true;
+        }
+        // v4: Tacit's own apps back in the dock, once. Before 1.2.9 a right click or a two-finger tap unpinned an app,
+        // and people lost them without meaning to (Discord, 2026-11-04: "the apps in the dock aren't coming"). Each
+        // missing one goes back after the default it follows (dock.pinnedApps' default below); an app unpinned after
+        // this stays off.
+        if (from < 4) {
+            const pins = Array.from(root.options.dock.pinnedApps ?? []);
+            const has = id => pins.some(p => p.toLowerCase() === id);
+            let at = 0;
+            for (const id of ["praxis", "org.quickshell", "foot", "thyris", "graphis", "settings"]) {
+                if (has(id)) {
+                    at = pins.findIndex(p => p.toLowerCase() === id) + 1;
+                    continue;
+                }
+                pins.splice(at, 0, id);
+                at++;
+            }
+            root.options.dock.pinnedApps = pins;
         }
         if (from === root.currentConfigVersion) return;
         root.options.configVersion = root.currentConfigVersion;
