@@ -4,5 +4,5 @@ contact_links:
     url: https://discord.gg/Geg72FUhY
     about: Tacit's Discord, for questions and anything that is not a bug or an idea.
   - name: Security problem
-    url: https://github.com/ciscobugger/tacit/security/advisories/new
+    url: https://github.com/tacit-os/tacit/security/advisories/new
     about: Report it privately, not in a public issue.

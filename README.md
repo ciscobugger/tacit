@@ -28,8 +28,8 @@ goes through it step by step.
 
 ## This repository
 
-The desktop and its apps. The browser is in [thyris](https://github.com/ciscobugger/thyris), and how Tacit's packages
-and installer are made is in [tacit-build](https://github.com/ciscobugger/tacit-build). To build and run the desktop
+The desktop and its apps. The browser is in [thyris](https://github.com/tacit-os/thyris), and how Tacit's packages
+and installer are made is in [tacit-build](https://github.com/tacit-os/tacit-build). To build and run the desktop
 yourself, see [DEVELOPING.md](DEVELOPING.md).
 
 ## Contributing

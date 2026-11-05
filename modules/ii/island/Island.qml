@@ -112,6 +112,25 @@ Scope {
                     GlobalFocusGrab.removePersistent(islandRoot);
                 }
 
+                // The recording's choice opens from a key and holds the keyboard, so a click elsewhere never reached it:
+                // only Esc or the key again closed it (Discord, SrwR16, 2026-11-05). It closes on a click away now,
+                // through the grab the desktop's other key-opened surfaces use.
+                readonly property bool clickAway: IslandController.keyboard && islandContent.open && islandContent.keyScreen
+                    && islandContent.view === "record" && islandContent.recordMode === "choose"
+                onClickAwayChanged: {
+                    if (clickAway)
+                        GlobalFocusGrab.addDismissable(islandRoot);
+                    else
+                        GlobalFocusGrab.removeDismissable(islandRoot);
+                }
+                Connections {
+                    target: GlobalFocusGrab
+                    function onDismissed() {
+                        if (islandRoot.clickAway)
+                            islandContent.open = false;
+                    }
+                }
+
                 IslandContent {
                     id: islandContent
                     screenData: islandRoot.screen
