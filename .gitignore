@@ -2,3 +2,6 @@
 .DS_Store
 .qtcreator/
 .idea/
+
+# Local macOS mail preview
+/mocks/mail/mac-preview/
