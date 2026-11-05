@@ -681,19 +681,24 @@ PanelWindow {
         }
 
         // The mode, the hint and the shape live in the notch's strip; nothing follows the cursor.
-        // the recording's area, drawn: its size under it, Cancel and Record at its corner (above it near the bottom)
+        // the recording's area, drawn: its size under it, Cancel and Record at its corner (above it near the bottom,
+        // inside its lower edge when it fills the screen's height). Kept 16 px off every screen edge: flush with the
+        // edge, a rounded display corner cut Record off (Discord, SrwR16, 2026-11-05)
         Item {
             id: readyBar
             z: 10
             visible: root.recordReady
-            readonly property bool above: root.regionY + root.regionHeight + 52 > root.height
+            readonly property int edge: 16
+            readonly property bool below: root.regionY + root.regionHeight + 48 + readyBar.edge <= root.height
+            readonly property bool above: !readyBar.below && root.regionY - 48 >= readyBar.edge
             x: root.regionX
-            y: readyBar.above ? root.regionY - 48 : root.regionY + root.regionHeight + 8
+            y: readyBar.below ? root.regionY + root.regionHeight + 8 : readyBar.above ? root.regionY - 48
+                : Math.min(root.regionY + root.regionHeight - 48, root.height - readyBar.edge - 40)
             width: root.regionWidth
             height: 40
             StyledText {
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: readyBar.above ? 22 : 2
+                y: readyBar.below ? 2 : 22
                 text: `${Math.round(root.regionWidth)} × ${Math.round(root.regionHeight)}`
                 font.family: Appearance.font.family.condensed
                 font.pixelSize: 13
@@ -701,7 +706,11 @@ PanelWindow {
                 color: Tacit.inkMeta
             }
             Row {
-                anchors.right: parent.right
+                id: readyPills
+                // the area's right edge (8 in from it when inside), never past the screen's edges
+                x: Math.max(readyBar.edge - root.regionX,
+                    Math.min(readyBar.width - readyPills.width - (readyBar.below || readyBar.above ? 0 : 8),
+                        root.width - readyBar.edge - root.regionX - readyPills.width))
                 spacing: 6
                 RecordPill {
                     label: Translation.tr("Cancel")
