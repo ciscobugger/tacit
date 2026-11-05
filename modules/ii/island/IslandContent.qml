@@ -73,6 +73,7 @@ Item {
             signinBack.restart();
         if (!root.open) {
             root.selected = -1;
+            root.byHover = false;
             if (root.keyScreen)
                 IslandController.keyboard = false;
             // the card went unused: it folds away into a line
@@ -147,6 +148,11 @@ Item {
     }
     readonly property bool draggingOut: (sheetLoader.item?.draggingOut ?? false) || root.rowDragging
     property bool pinnedUntilVisit: false
+    // the sheet opened under a passing pointer: it closes when the pointer leaves and stays out of the click-away
+    // grab (the grab would take the keys from the window being typed in). Opened any other way, or clicked once it
+    // is open, a click elsewhere closes it too (Island.qml): a lost leave, or a tap on a touch screen, left it open
+    // with no way out (Discord, SrwR16).
+    property bool byHover: false
     onDraggingOutChanged: {
         if (!root.draggingOut && !islandHover.hovered)
             leaveTimer.restart();
@@ -576,7 +582,14 @@ Item {
         interval: 300
         repeat: false
         // a window held by its band on the way to the notch must not meet the sheet opening over it
-        onTriggered: if (!IslandController.recording && !IslandController.recordArming && WindowBand.dragAddress === "") root.openSheet()
+        onTriggered: {
+            if (IslandController.recording || IslandController.recordArming || WindowBand.dragAddress !== "")
+                return;
+            const wasOpen = root.open;
+            root.openSheet();
+            if (!wasOpen && root.open)
+                root.byHover = true;
+        }
     }
 
     function openSheet() {
@@ -822,8 +835,9 @@ Item {
         }
         // boring.notch: a tap only ever opens (ContentView.swift onTapGesture -> doOpen); an
         // open notch closes by leaving or Esc, never by a click that might have been aimed at
-        // a control.
+        // a control. A click elsewhere closes it (byHover).
         hoverTimer.stop();
+        root.byHover = false;
         root.openSheet();
     }
 

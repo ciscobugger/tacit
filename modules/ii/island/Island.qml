@@ -112,11 +112,14 @@ Scope {
                     GlobalFocusGrab.removePersistent(islandRoot);
                 }
 
-                // The recording's choice opens from a key and holds the keyboard, so a click elsewhere never reached it:
-                // only Esc or the key again closed it (Discord, SrwR16, 2026-11-05). It closes on a click away now,
-                // through the grab the desktop's other key-opened surfaces use.
-                readonly property bool clickAway: IslandController.keyboard && islandContent.open && islandContent.keyScreen
-                    && islandContent.view === "record" && islandContent.recordMode === "choose"
+                // A sheet opened by a click, a key or a drop closed only when the pointer left it or on Esc, so a leave
+                // that never came (a tap on a touch screen) or the recording's choice (it holds the keyboard) left it
+                // open with no way out (Discord, SrwR16, 2026-11-05). It closes on a click away now, through the grab
+                // the desktop's other click- and key-opened surfaces use. Not a sheet the hover opened (byHover), nor
+                // during a drag, nor Ask, the address and the sign-in, which close when you say so.
+                readonly property bool clickAway: islandContent.open && !islandContent.byHover && !islandContent.draggingOut
+                    && !islandContent.dragOver && !islandContent.textDragOver
+                    && !["ask", "address", "signin"].includes(islandContent.view)
                 onClickAwayChanged: {
                     if (clickAway)
                         GlobalFocusGrab.addDismissable(islandRoot);
@@ -126,8 +129,10 @@ Scope {
                 Connections {
                     target: GlobalFocusGrab
                     function onDismissed() {
-                        if (islandRoot.clickAway)
+                        if (islandRoot.clickAway) {
+                            islandContent.pinnedUntilVisit = false;
                             islandContent.open = false;
+                        }
                     }
                 }
 
