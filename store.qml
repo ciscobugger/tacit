@@ -374,7 +374,7 @@ ApplicationWindow {
             Rectangle {    // light at its leading edge
                 anchors.right: parent.right; width: Math.min(parent.width, 28); height: parent.height
                 gradient: Gradient { orientation: Gradient.Horizontal
-                    GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0) } GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0.18) } }
+                    GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0) } GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0) } }
             }
             Body {    // the same words, dark where the sand is under them
                 x: cap.width / 2 - width / 2; anchors.verticalCenter: parent.verticalCenter
@@ -1206,8 +1206,11 @@ ApplicationWindow {
                     Column {
                         id: getCol
                         anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 10
-                        Capsule { a: appPage.a; solid: true; large: true; anchors.right: parent.right }
-                        Word { visible: (appPage.st === "installed" || appPage.st === "removing") && !!appPage.a?.removable; text: root.work?.pkg === appPage.a?.pkg && root.work?.kind === "remove" ? "Removing…" : "Remove"; glyph: "delete"; ink: Tacit.risk; onPicked: root.removeApp(appPage.a.pkg) }
+                        Row {
+                            spacing: 10; anchors.right: parent.right
+                            Capsule { a: appPage.a; solid: true; large: true; anchors.right: parent.right }
+                            Word { visible: (appPage.st === "installed" || appPage.st === "removing") && !!appPage.a?.removable; text: root.work?.pkg === appPage.a?.pkg && root.work?.kind === "remove" ? "Removing…" : "Remove"; glyph: "delete"; ink: Tacit.risk; onPicked: root.removeApp(appPage.a.pkg) }
+                        }
                         Small { anchors.right: parent.right; horizontalAlignment: Text.AlignRight
                             text: appPage.st === "getting" ? (root.work?.phase ?? "") : root.justGot === appPage.a?.pkg ? "It's in your apps now."
                                   : appPage.st === "installed" ? "On this computer"
