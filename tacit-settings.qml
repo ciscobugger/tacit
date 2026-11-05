@@ -3879,8 +3879,9 @@ ApplicationWindow {
             id: dp
             spacing: 0
 
-            // Brightness and night light are the shell's: asked over IPC, so this slider and the
-            // keys never hold two values and there is one night-light schedule, not two.
+            // Brightness and night light are the shell's: the level is left where this page watches
+            // it as the keys and the control panel change it, and the night light is asked over
+            // IPC, so the slider holds one value with the keys and there is one night-light schedule.
             property real brightness: -1
             property real wantBrightness: -1
             property bool nightOn: false
@@ -3954,6 +3955,22 @@ ApplicationWindow {
                 id: nightCheck
                 interval: 1500
                 onTriggered: readNight.running = true
+            }
+            // The shell's level as it changes - a brightness key, the control panel, this slider once
+            // the write landed - so the knob follows while the page is open and does not fall back to
+            // the level read before a drag.
+            FileView {
+                id: brightnessLevelFile
+                path: Directories.brightnessLevelPath
+                blockLoading: true
+                watchChanges: true
+                printErrors: false
+                onFileChanged: reload()
+                onLoaded: {
+                    const v = parseFloat(text());
+                    if (!isNaN(v))
+                        dp.brightness = v;
+                }
             }
             Process {
                 id: readBrightness
@@ -4061,6 +4078,10 @@ ApplicationWindow {
                         to: 1
                         onMoved: {
                             dp.wantBrightness = brightnessSlider.value;
+                            // The shell's level comes back in a moment through the file above; until
+                            // then the knob stays where it was dragged instead of jumping back to the
+                            // value read before it.
+                            dp.brightness = brightnessSlider.value;
                             if (!brightnessWrite.running)
                                 brightnessWrite.start();
                         }
