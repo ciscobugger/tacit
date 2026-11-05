@@ -55,8 +55,12 @@ Singleton {
     }
 
     function initializeMonitor(i: int): void {
-        if (i >= monitors.length)
+        if (i >= monitors.length) {
+            // Every level is read: leave the panel's where Settings watches it, so a page that
+            // was already open starts from the value the shell found.
+            root.writePanelLevel();
             return;
+        }
         monitors[i].initialize();
     }
 
@@ -250,6 +254,34 @@ Singleton {
 
     // External trigger points
 
+    // The level Settings shows, left where its Display page watches it (Directories.brightnessLevelPath):
+    // Settings is its own process, so the brightness keys and the control panel can reach its slider no
+    // other way. Written at most every 100 ms - a drag changes the level once per pointer move - and the
+    // last change always lands.
+    FileView {
+        id: levelFile
+        path: Directories.brightnessLevelPath
+        blockWrites: true
+        printErrors: false
+    }
+    Timer {
+        id: levelWriteTimer
+        interval: 100
+        onTriggered: root.writePanelLevel()
+    }
+    // The one screen not driven over DDC (the built-in panel): the level Settings' slider shows.
+    readonly property var panel: root.monitors.find(m => !m.isDdc) ?? root.monitors[0] ?? null
+    function writePanelLevel(): void {
+        if (root.panel?.ready)
+            levelFile.setText(`${root.panel.brightness}\n`);
+    }
+    onBrightnessChanged: {
+        if (levelWriteTimer.running)
+            levelWriteTimer.restart();
+        else
+            levelWriteTimer.start();
+    }
+
     IpcHandler {
         target: "brightness"
 
@@ -264,12 +296,11 @@ Singleton {
         // The Settings app runs in its own process; a brightnessctl write from there would be
         // undone by the next key press, which steps from the value held here. 0..1, for the
         // built-in panel: the one screen not driven over DDC.
-        readonly property var panel: root.monitors.find(m => !m.isDdc) ?? root.monitors[0] ?? null
         function get(): real {
-            return panel?.brightness ?? 0;
+            return root.panel?.brightness ?? 0;
         }
         function set(value: real): void {
-            panel?.setBrightness(value);
+            root.panel?.setBrightness(value);
         }
     }
 
