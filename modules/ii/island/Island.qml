@@ -112,24 +112,50 @@ Scope {
                     GlobalFocusGrab.removePersistent(islandRoot);
                 }
 
-                // A sheet opened by a click, a key or a drop closed only when the pointer left it or on Esc, so a leave
-                // that never came (a tap on a touch screen) or the recording's choice (it holds the keyboard) left it
-                // open with no way out (Discord, SrwR16, 2026-11-05). It closes on a click away now, through the grab
-                // the desktop's other click- and key-opened surfaces use. Not a sheet the hover opened (byHover), nor
-                // during a drag, nor Ask, the address and the sign-in, which close when you say so.
-                readonly property bool clickAway: islandContent.open && !islandContent.byHover && !islandContent.draggingOut
+                // An open sheet closed only when the pointer left it or on Esc, so a leave that never came (a drag over
+                // the notch, a tap on a touch screen) or the recording's choice (it holds the keyboard) left it open with
+                // no way out (Discord, SrwR16, 2026-11-05). While one is open, a clear window covers the rest of the
+                // screen and a press on it folds the sheet. Not the desktop's click-away grab: Hyprland drops a grab as
+                // soon as the pointer rests outside it, which closed a sheet opened from a key at once, and the grab takes
+                // the keys. Not during a drag, nor Ask, the address and the sign-in, which close when you say so.
+                readonly property bool clickAway: islandContent.open && !islandContent.draggingOut
                     && !islandContent.dragOver && !islandContent.textDragOver
                     && !["ask", "address", "signin"].includes(islandContent.view)
-                onClickAwayChanged: {
-                    if (clickAway)
-                        GlobalFocusGrab.addDismissable(islandRoot);
-                    else
-                        GlobalFocusGrab.removeDismissable(islandRoot);
-                }
-                Connections {
-                    target: GlobalFocusGrab
-                    function onDismissed() {
-                        if (islandRoot.clickAway) {
+                PanelWindow {
+                    id: awayCatcher
+                    screen: islandRoot.screen
+                    visible: islandRoot.clickAway
+                    WlrLayershell.namespace: "quickshell:islandAway"
+                    WlrLayershell.layer: islandRoot.WlrLayershell.layer
+                    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+                    exclusionMode: ExclusionMode.Ignore
+                    anchors {
+                        top: true
+                        bottom: true
+                        left: true
+                        right: true
+                    }
+                    color: "transparent"
+                    // the notch keeps its own pointer: a hole where it is (the catcher maps above it)
+                    mask: Region {
+                        width: awayCatcher.width
+                        height: awayCatcher.height
+                        Region {
+                            x: (awayCatcher.width - islandRoot.width) / 2 + islandContent.x
+                            y: islandContent.y
+                            width: islandContent.width
+                            height: islandContent.height
+                            intersection: Intersection.Subtract
+                        }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.AllButtons
+                        onPressed: {
+                            islandContent.pinnedUntilVisit = false;
+                            islandContent.open = false;
+                        }
+                        onWheel: {
                             islandContent.pinnedUntilVisit = false;
                             islandContent.open = false;
                         }
