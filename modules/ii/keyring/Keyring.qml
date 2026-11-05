@@ -82,10 +82,16 @@ Scope {
     // Only gnome-keyring's own unlock ask, which names its keyring ('... the keyring "Login" ...'): gpg's pinentry and
     // an ssh key's passphrase come through the same prompter for passwords the keyring never holds, and were refused
     // as moot within a second (2026-10-22: signing a package always failed with "Operation cancelled").
+    // An ask worded for a login keyring that PAM did not open at login ('The login keyring did not get unlocked when
+    // you logged into your computer.') is that same ask, without the quoted name: autologin has no password to give
+    // PAM until the boot lock's own check does, so an app asking in between got it, and it stayed in the notch after
+    // the keyring was already open (2026-11-05, at every boot).
     readonly property var unlockAsk: {
         const c = DialogBridge.current;
+        const description = c?.params?.description ?? "";
         return c && c.kind === "keyring.password" && !c.params?.passwordNew
-            && /keyring\s+["“'‘]/i.test(c.params?.description ?? "") ? c : null;
+            && (/keyring\s+["“'‘]/i.test(description) || /login keyring did not get unlocked/i.test(description))
+            ? c : null;
     }
     Timer {
         interval: 1000
