@@ -1,0 +1,124 @@
+--- a/Slab.qml
++++ b/Slab.qml
+@@ -70,10 +70,10 @@
+     readonly property bool down: area.pressed || previewState === "pressed"
+     readonly property int forwardHeight: large ? 50 : Kit.tokens.height.action
+     readonly property int quietHeight: large ? 44 : Kit.tokens.height.field
+-    readonly property string inkName: waiting ? "sec" : forward ? "main" : risky ? "risk" : hovered ? "main" : "sec"
++    readonly property string inkName: waiting ? "sec" : forward ? "onAccent" : risky ? "risk" : hovered ? "main" : "sec"
+ 
+-    readonly property real padding: forward ? (large ? 72 : 52) : (large ? 52 : 36)
+-    readonly property real natural: forward ? Math.max(large ? 190 : 104, row.implicitWidth + padding) : row.implicitWidth + padding
++    readonly property real padding: forward ? (large ? Kit.tokens.space.page : Kit.tokens.space.xl*2-Kit.tokens.space.s) : (large ? 52 : 36)
++    readonly property real natural: forward ? row.implicitWidth + padding : row.implicitWidth + padding
+     implicitWidth: maxWidth > 0 ? Math.min(natural, maxWidth) : natural
+     implicitHeight: forwardHeight
+     enabled: !waiting          // presses, keys and the Tab stop go; a screen reader hears it as disabled
+@@ -91,8 +91,10 @@
+         anchors.verticalCenter: parent.verticalCenter
+         radius: height / 2
+         // asking: a faint fill of the risk ink, so the press that acts reads at a glance as armed
+-        color: slab.shownAsking ? Qt.alpha(Kit.tokens.risk, 0.14) : Qt.alpha(Kit.tokens.inkMain, slab.hovered ? 0.05 : 0)
+-        border.width: slab.forward ? 1.5 : 1
++        color: slab.shownAsking ? Qt.alpha(Kit.tokens.risk, 0.14)
++             : slab.forward ? Qt.alpha(Kit.tokens.accent, slab.waiting ? Kit.tokens.wash.currentHover : 1)
++             : Qt.alpha(Kit.tokens.inkMain, slab.hovered ? Kit.tokens.wash.hover : 0)
++        border.width: slab.forward ? 0 : 1
+         border.color: slab.shownAsking ? Qt.alpha(Kit.tokens.risk, 0.85)
+                     : slab.waiting ? Kit.tokens.quiet
+                     : slab.forward ? Qt.alpha(Kit.tokens.accent, 0.75)
+@@ -119,7 +121,7 @@
+             elide: Text.ElideMiddle
+             width: slab.maxWidth > 0 ? Math.min(implicitWidth, Math.max(0, slab.maxWidth - slab.padding - (slab.risky ? row.spacing + warnSign.width : 0))) : implicitWidth
+             size: slab.forward && slab.large ? "body" : "row"
+-            weight: slab.forward ? "medium" : "regular"
++            weight: slab.forward ? "strong" : "regular"
+             ink: slab.inkName
+         }
+     }
+--- a/Field.qml
++++ b/Field.qml
+@@ -33,18 +33,19 @@
+ 
+     Rectangle {
+         anchors.fill: parent
+-        radius: Kit.tokens.radius.slab
++        radius: 0
+         color: Kit.tokens.inkMain
+-        opacity: field.hovered && !input.activeFocus ? Kit.tokens.wash.action + Kit.tokens.wash.hover : Kit.tokens.wash.action
++        opacity: field.hovered ? Kit.tokens.wash.hover : 0
+         Behavior on opacity { NumberAnimation { duration: Kit.ms(Kit.tokens.motion.hover.ms) } }
+     }
+     FocusRing {
+-        shown: field.enabled && (input.activeFocus || field.previewState === "focus" || field.error); corner: Kit.tokens.radius.slab
++        shown: field.enabled && ((input.activeFocus && Kit.focusVisible) || field.previewState === "focus" || field.error); corner: Kit.tokens.radius.slab
+         border.color: field.error ? Kit.tokens.risk : Kit.tokens.accent
+     }
++    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Qt.alpha(Kit.tokens.inkMain, Kit.tokens.wash.hover + 0.02) }
+     TextInput {
+         id: input
+-        x: Kit.tokens.space.m; width: parent.width - 2 * Kit.tokens.space.m - (endHint.visible ? endHint.width + Kit.tokens.space.m : 0)
++        x: 0; width: parent.width - (endHint.visible ? endHint.width + Kit.tokens.space.m : 0)
+         anchors.verticalCenter: parent.verticalCenter
+         clip: true
+         activeFocusOnTab: field.enabled      // a TextInput is not a stop for Tab by itself
+@@ -53,8 +54,8 @@
+         selectionColor: Qt.alpha(Kit.tokens.accent, 0.4)
+         selectedTextColor: Kit.tokens.inkMain
+         font.family: Kit.tokens.font.main
+-        font.pixelSize: Kit.tokens.size.row
+-        font.variableAxes: ({ "wght": Kit.tokens.weight.regular, "wdth": 100 })
++        font.pixelSize: Kit.tokens.size.meta
++        font.variableAxes: ({ "wght": Kit.tokens.weight.medium, "wdth": 100 })
+         font.hintingPreference: Font.PreferNoHinting
+         renderType: Text.NativeRendering
+         cursorDelegate: Rectangle { width: 1.5; color: field.error ? Kit.tokens.risk : Kit.tokens.accent; visible: input.cursorVisible }
+--- a/TextArea.qml
++++ b/TextArea.qml
+@@ -27,7 +27,7 @@
+     signal edited()
+ 
+     readonly property bool hovered: enabled && (hover.hovered || previewState === "hover")
+-    readonly property real pad: Kit.tokens.space.s
++    readonly property real pad: 0
+     readonly property real line: lineMetrics.lineSpacing
+     implicitWidth: 320
+     // never shorter than a Field (36), so a one-line text area lines up with the fields beside it
+@@ -43,23 +43,23 @@
+     FontMetrics {
+         id: lineMetrics
+         font.family: Kit.tokens.font.main
+-        font.pixelSize: Kit.tokens.size.row
++        font.pixelSize: Kit.tokens.size.body
+     }
+     Rectangle {
+         anchors.fill: parent
+         radius: Kit.tokens.radius.slab
+         color: Kit.tokens.inkMain
+-        opacity: area.hovered && !input.activeFocus ? Kit.tokens.wash.action + Kit.tokens.wash.hover : Kit.tokens.wash.action
++        opacity: 0
+         Behavior on opacity { NumberAnimation { duration: Kit.tokens.motion.hover.ms } }
+     }
+     FocusRing {
+-        shown: area.enabled && (input.activeFocus || area.previewState === "focus" || area.error); corner: Kit.tokens.radius.slab
++        shown: area.enabled && ((input.activeFocus && Kit.focusVisible) || area.previewState === "focus" || area.error); corner: Kit.tokens.radius.slab
+         border.color: area.error ? Kit.tokens.risk : Kit.tokens.accent
+     }
+     Flickable {
+         id: flick
+-        x: Kit.tokens.space.m; y: area.pad
+-        width: parent.width - 2 * Kit.tokens.space.m; height: parent.height - 2 * area.pad
++        x: 0; y: area.pad
++        width: parent.width; height: parent.height - 2 * area.pad
+         contentWidth: width; contentHeight: input.contentHeight
+         clip: true
+         boundsBehavior: Flickable.StopAtBounds
+@@ -74,7 +74,7 @@
+             selectionColor: Qt.alpha(Kit.tokens.accent, 0.4)
+             selectedTextColor: Kit.tokens.inkMain
+             font.family: Kit.tokens.font.main
+-            font.pixelSize: Kit.tokens.size.row
++            font.pixelSize: Kit.tokens.size.body
+             font.variableAxes: ({ "wght": Kit.tokens.weight.regular, "wdth": 100 })
+             font.hintingPreference: Font.PreferNoHinting
+             renderType: Text.NativeRendering
