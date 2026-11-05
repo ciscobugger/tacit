@@ -441,7 +441,7 @@ def icon_ready(src):
     return dst if os.path.exists(dst) else ""
 
 
-def info(pkg, cat, ed, avail, inst, f=None, icon=True):
+def info(pkg, cat, ed, avail, inst, owned, f=None, icon=True):
     c = cat.get(pkg, {})
     e = ed["apps"].get(pkg, {})
     names = [pkg] + e.get("also", [])
@@ -453,16 +453,18 @@ def info(pkg, cat, ed, avail, inst, f=None, icon=True):
         "available": pkg in avail or bool(have), "installed": bool(have), "installedAs": have,
         "version": f.get("version", ""), "download": f.get("download", 0), "size": f.get("size", 0),
         "free": free_license(c.get("license") or f.get("licenses", "")),
+        "removable": bool(have) and pkg in owned,
     }
 
 
 def home():
     ed, cat, avail, inst = editorial(), load_index(), available(), installed()
+    owned = bundles() | got()
     pkgs = sorted({p for j in ed["jobs"] for p in j["pkgs"]} | set(ed["picks"]) | {ed["feature"]["pkg"]}
                   | {sp["pkg"] for sp in ed.get("issue", []) if sp.get("pkg")} | {pk for sp in ed.get("issue", []) for _, pk in sp.get("say", []) if pk}
                   | bundles() | (got() & inst))
     f = facts([p for p in pkgs if p in avail])
-    apps = {p: info(p, cat, ed, avail, inst, f.get(p)) for p in pkgs}
+    apps = {p: info(p, cat, ed, avail, inst, owned, f.get(p)) for p in pkgs}
     # first run: every picture is fetched, so fetch them together rather than one after another
     wanted = [(x["url"], 1600) for p in [ed["feature"]["pkg"]] + list(ed["picks"]) for x in cat.get(p, {}).get("shots", [])[:1]]
     wanted += [(issue_url(sp, cat), 2560) for sp in ed.get("issue", []) if sp.get("pkg")]
@@ -556,7 +558,8 @@ def search(words):
     if not q:
         return out({"query": q, "apps": [], "done": True})
     ed, cat, avail, inst = editorial(), load_index(), available(), installed()
-    out({"query": q, "apps": [info(p, cat, ed, avail, inst) for p in scores(q, cat, ed, avail, inst)], "done": True})
+    owned = bundles() | got()
+    out({"query": q, "apps": [info(p, cat, ed, avail, inst, owned) for p in scores(q, cat, ed, avail, inst)], "done": True})
 
 
 def serve():
@@ -565,7 +568,7 @@ def serve():
     import threading, queue
     state = {"ed": None, "ed_m": 0, "cat": None, "stamp": None, "avail": set(), "inst": set()}
     def stamp():
-        paths = ["/var/lib/pacman/local", BUNDLES] + [os.path.join("/var/lib/pacman/sync", f) for f in os.listdir("/var/lib/pacman/sync") if f.endswith(".db")]
+        paths = ["/var/lib/pacman/local", BUNDLES, GOT] + [os.path.join("/var/lib/pacman/sync", f) for f in os.listdir("/var/lib/pacman/sync") if f.endswith(".db")]
         return [os.path.getmtime(p) for p in paths if os.path.exists(p)]
     def fresh():
         m = os.path.getmtime(EDITORIAL)
@@ -576,12 +579,13 @@ def serve():
         st = stamp()
         if st != state["stamp"]:
             state["stamp"], state["avail"], state["inst"] = st, available(), installed()
+            state["owned"] = bundles() | got()
     lock, latest, icons = threading.Lock(), {"q": None, "pkgs": []}, queue.Queue()
     def answer(q, pkgs):
         cat, ed = state["cat"], state["ed"]
         apps = []
         for p in pkgs:
-            a = info(p, cat, ed, state["avail"], state["inst"], icon=False)
+            a = info(p, cat, ed, state["avail"], state["inst"], state["owned"], icon=False)
             if not a["icon"] and cat.get(p, {}).get("icon"):
                 icons.put(p)
             apps.append(a)
@@ -681,8 +685,9 @@ def system_plan(pkg, inst, ask=True):
 
 def app(pkg, with_plan=True):
     ed, cat, avail, inst = editorial(), load_index(), available(), installed()
+    owned = bundles() | got()
     f = facts([pkg]) if pkg in avail else {}
-    a = info(pkg, cat, ed, avail, inst, f.get(pkg))
+    a = info(pkg, cat, ed, avail, inst, owned, f.get(pkg))
     c = cat.get(pkg, {})
     with ThreadPoolExecutor(4) as pool:   # the developers' sites, all at once
         paths = list(pool.map(shot, [x["url"] for x in c.get("shots", [])[:4]]))
@@ -775,6 +780,9 @@ def install(pkg, everything=False):
 
 
 def remove(pkg):
+    owned = bundles() | got()
+    if pkg not in owned:
+        return out({"result": "not-removable"})
     if pkg in bundles():
         # the app's folder and its launcher go; what it saved stays, as on a Mac, should it come back
         r = subprocess.run(BUNDLE + ["remove", pkg], capture_output=True)
