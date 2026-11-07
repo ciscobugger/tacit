@@ -183,7 +183,8 @@ ApplicationWindow {
         "r-cancelled": ["Not removed", "The password was not given, so nothing changed."],
         "r-busy": ["Another update is running", "Try again when it has finished."],
         "r-failed": ["Couldn't remove it", "Nothing was changed. Try again, or look again later."],
-        "unavailable": ["Not made for this computer", "There is no version of it for this computer's processor."]
+        "unavailable": ["Not made for this computer", "There is no version of it for this computer's processor."],
+        "not-removable": ["Can't remove this app", "It wasn't installed through Tacit's Apps store."]
     })
 
     // ---- the backend
@@ -218,11 +219,25 @@ ApplicationWindow {
                     root.askUpdate = Object.assign({ pkg: root.work.pkg, name: root.appOf(root.work.pkg)?.name ?? root.appInfo?.name ?? "" }, msg.plan);
                 } else {
                     const o = Object.assign({}, root.outcome);
-                    o[root.work.pkg] = root.work.kind === "remove" && !["ok", "needed"].includes(msg.result) ? (["cancelled", "busy"].includes(msg.result) ? "r-" + msg.result : "r-failed") : msg.result;
+                    o[root.work.pkg] = root.work.kind === "remove" &&
+                            !["ok", "needed", "not-removable"].includes(msg.result)
+                            ? (["cancelled", "busy"].includes(msg.result) ? "r-" + msg.result : "r-failed")
+                            : msg.result;
                     root.outcome = o;
                     if (msg.result !== "ok" && root.work.kind === "install" && !(root.page === "app" && root.appInfo?.pkg === root.work.pkg)) root.openApp(root.work.pkg);
                 }
-                if (msg.result === "ok" && root.work.kind === "install") { root.justGot = root.work.pkg; tickTimer.restart(); }
+                if (msg.result === "ok") {
+                    if (root.work.kind === "install") {
+                        root.justGot = root.work.pkg;
+                        tickTimer.restart();
+                    } else if (root.work.kind === "remove" &&
+                               root.appInfo?.pkg === root.work.pkg) {
+                        root.appInfo = Object.assign({}, root.appInfo, {
+                                                         installed: false,
+                                                         removable: false
+                                                     });
+                    }
+                }
             }
         } }
         onExited: {
@@ -309,14 +324,16 @@ ApplicationWindow {
         property string text; property string glyph: ""; property color ink: root.inkSec
         signal picked()
         implicitWidth: wr.implicitWidth; implicitHeight: 28
-        scale: wa.pressed ? 0.94 : 1
+        scale: wd.enabled && wa.pressed ? 0.94 : 1
         Behavior on scale { Spring {} }
         Row { id: wr; anchors.verticalCenter: parent.verticalCenter; spacing: 8
             MaterialSymbol { visible: wd.glyph !== ""; text: wd.glyph; iconSize: 18; anchors.verticalCenter: parent.verticalCenter
-                color: wa.containsMouse ? root.inkMain : wd.ink; Behavior on color { ColorAnimation { duration: 120 } } }
+                color: !wd.enabled ? root.inkSec
+                                   : wa.containsMouse ? root.inkMain : wd.ink; Behavior on color { ColorAnimation { duration: 120 } } }
             Body { text: wd.text; anchors.verticalCenter: parent.verticalCenter; font.weight: Font.Medium
-                color: wa.containsMouse && wd.ink === root.inkSec ? root.inkMain : wd.ink; Behavior on color { ColorAnimation { duration: 120 } } } }
-        MouseArea { id: wa; anchors.fill: parent; anchors.margins: -8; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: wd.picked() }
+                color: !wd.enabled ? root.inkSec
+                                   : wa.containsMouse && wd.ink === root.inkSec ? root.inkMain : wd.ink; Behavior on color { ColorAnimation { duration: 120 } } } }
+        MouseArea { enabled: wd.enabled; id: wa; anchors.fill: parent; anchors.margins: -8; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: wd.picked() }
     }
     // the one action of an app, as a capsule: Get in the accent, Open in the main ink; while getting it, it fills
     component Capsule: Item {
@@ -1188,12 +1205,19 @@ ApplicationWindow {
                     Column {
                         id: getCol
                         anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 10
-                        Capsule { a: appPage.a; solid: true; large: true; anchors.right: parent.right }
-                        Small { anchors.right: parent.right; horizontalAlignment: Text.AlignRight
-                            text: appPage.st === "getting" ? (root.work?.phase ?? "") : root.justGot === appPage.a?.pkg ? "It's in your apps now."
-                                  : appPage.st === "installed" ? "On this computer"
-                                  : [appPage.a?.plan?.download ? `${appPage.a.plan.download} MB` : appPage.a?.plan?.appMB ? `${appPage.a.plan.appMB} MB` : "",
-                                     appPage.a?.free === false ? "Free to use" : "Free"].filter(x => x).join(" · ") }
+                        Row { spacing: 10; anchors.right: parent.right
+                            Capsule { a: appPage.a; solid: true; large: true } }
+
+                        Row { visible: appPage.st === "installed" && root.justGot !== appPage.a?.pkg; anchors.right: parent.right; spacing: 6
+                            Small { text: "On this computer"; anchors.verticalCenter: parent.verticalCenter }
+                            Small { visible: !!appPage.a?.removable; text: "·"; anchors.verticalCenter: parent.verticalCenter }
+                            Word { visible: !!appPage.a?.removable; text: "Remove"; ink: root.inkSec; onPicked: root.removeApp(appPage.a.pkg) } }
+
+                        Small { visible: (appPage.st !== "installed" && appPage.st !== "removing") || root.justGot === appPage.a?.pkg; anchors.right: parent.right; horizontalAlignment: Text.AlignRight
+                            text: appPage.st === "getting" ? (root.work?.phase ?? "")
+                                            : root.justGot === appPage.a?.pkg ? "It's in your apps now."
+                                            : [appPage.a?.plan?.download ? `${appPage.a.plan.download} MB` : appPage.a?.plan?.appMB ? `${appPage.a.plan.appMB}MB` : "",
+                                                appPage.a?.free === false ? "Free to use" : "Free"].filter(x => x).join(" · ") }
                     }
                 }
                 Column {
@@ -1262,7 +1286,7 @@ ApplicationWindow {
                 Item { width: 1; height: 56 }
                 Repeater {
                     model: yoursPage.list
-                    ListRow { required property var modelData; a: modelData; removable: true; width: Math.min(root.cw, 1100) }
+                    ListRow { required property var modelData; a: modelData; removable: modelData.removable; width: Math.min(root.cw, 1100) }
                 }
             }
         }
