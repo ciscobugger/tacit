@@ -43,6 +43,12 @@ Singleton {
         return FileUtils.trimFileProtocol(root.length > 0 ? `${root}/shell.qml` : Quickshell.shellPath("shell.qml"));
     }
 
+    // The built-in panel's brightness as the shell holds it, left where Settings' Display page
+    // watches it: that app runs in its own process and cannot be called, so the level has to be
+    // written down for its slider to follow the keys. Runtime dir: it means something only while
+    // the session runs.
+    property string brightnessLevelPath: FileUtils.trimFileProtocol(`${Directories.runtime}/quickshell/brightness-level`)
+
     // Other dirs used by the shell, without "file://"
     property string assetsPath: Quickshell.shellPath("assets")
     property string scriptPath: Quickshell.shellPath("scripts")

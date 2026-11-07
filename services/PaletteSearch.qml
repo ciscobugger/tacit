@@ -306,10 +306,15 @@ Singleton {
     // An app installed twice, natively and as a Flatpak (LibreOffice, Chrome, GIMP here), is one row: the native one.
     // Two different apps that only share a name ("Text Editor") both stay.
     function isFlatpak(e) { return (e.command ?? []).join(" ").includes("flatpak run") || /\/flatpak\//.test(e.execString ?? ""); }
+    // Nor is one thing two rows: Tacit's Settings is an app (session/applications/settings.desktop, which the Apps
+    // page and the dock use) and a System row, and with no prefix both answered "settings" and opened the same
+    // window. The System row is the one kept, so an app the System section already offers is left out; under the
+    // apps prefix no System row is built, and the entry stays the way in.
     readonly property var appMatchesOnce: {
         const natives = {};
         for (const e of root.appMatches) if (!root.isFlatpak(e)) natives[root.fold(e.name)] = true;
-        return root.appMatches.filter(e => !(root.isFlatpak(e) && natives[root.fold(e.name)]));
+        return root.appMatches.filter(e => !(root.isFlatpak(e) && natives[root.fold(e.name)])
+            && !root.systemEntries.some(system => system.id.length > 0 && system.id === e.id));
     }
     readonly property list<var> appEntries: {
         return root.appMatchesOnce.map(entry => resultComp.createObject(null, {

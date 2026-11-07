@@ -79,6 +79,9 @@ Singleton {
             run: () => IslandController.recording ? IslandController.stopRecording() : IslandController.openRecordSoon()
         },
         {
+            // The id of the desktop entry that opens the same window (session/applications/settings.desktop),
+            // so the palette can show this row and that app once, not twice.
+            id: "settings",
             name: Translation.tr("Settings"),
             subtitle: Translation.tr("Tacit's settings"),
             verb: Translation.tr("Go"),
@@ -144,6 +147,7 @@ Singleton {
                 return true;
             return action.name.toLowerCase().includes(needle) || action.keywords.includes(needle);
         }).map(action => resultComp.createObject(null, {
+            id: action.id ?? "",
             name: action.name,
             comment: action.subtitle,
             type: root.sectionTitle,

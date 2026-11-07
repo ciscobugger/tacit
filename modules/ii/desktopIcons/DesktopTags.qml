@@ -111,9 +111,23 @@ Scope {
                 menu.items = one ? [{ "label": "Open" }, { "label": "Rename" }, { "label": "Move to the trash" }]
                                  : [{ "label": "Open" }, { "label": "Move to the trash" }];
                 menu.openAt(board, x, y);
+                // A right click while the menu is open only moves it: no size or visibility changes, so it is put
+                // back inside here as well.
+                menu.keepInside();
             }
             K.Menu {
                 id: menu
+                // The menu is a window of its own over the board, and what hangs past the board's edge is cut.
+                // Its size is only known once it opens (a closed popup is not laid out), so it moves back inside
+                // then, while it is still fading in.
+                function keepInside() {
+                    const gap = Tacit.space.s;
+                    menu.x = Math.max(gap, Math.min(menu.x, board.width - menu.width - gap));
+                    menu.y = Math.max(gap, Math.min(menu.y, board.height - menu.height - gap));
+                }
+                onVisibleChanged: if (menu.visible) keepInside()
+                onWidthChanged: keepInside()
+                onHeightChanged: keepInside()
                 onPicked: i => {
                     const w = menu.items[i].label;
                     if (w === "Open") DesktopIcons.selected.forEach(n => DesktopIcons.open(n));
